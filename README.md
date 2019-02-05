@@ -2,6 +2,8 @@
 
 Proof of concept of fully-featured Kafka-based storage for Zipkin.
 
+*This is not production ready at the moment. Things will change!*
+
 ## Design goals
 
 * Remove need for additional storage when Kafka is in place.
@@ -82,3 +84,6 @@ that are not supported by Kafka Streams yet: we need an index that support
 [Luwak](https://github.com/flaxsearch/luwak) will be used to create an
 in-memory index that can handle these queries.
 
+## Acknowledged
+
+This project is inspired in Adrian Cole's <https://github.com/adriancole/zipkin-voltdb>
