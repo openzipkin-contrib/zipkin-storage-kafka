@@ -28,6 +28,7 @@ import zipkin2.storage.StorageComponent;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.List;
 import java.util.Properties;
 
 import static org.junit.Assert.*;
@@ -63,6 +64,16 @@ public class KafkaStorageIT {
         kafkaConsumer.subscribe(Collections.singletonList(KafkaSpanConsumer.TOPIC));
         ConsumerRecords<String, byte[]> records = kafkaConsumer.poll(Duration.ofSeconds(5));
         assertEquals(1, records.count());
+    }
+
+    @Test
+    public void should_get_trace() throws Exception {
+        StorageComponent storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers()).build();
+        Span root = Span.newBuilder().traceId("a").id("a").timestamp(TODAY).duration(10).build();
+        storage.spanConsumer().accept(Collections.singletonList(root)).execute();
+
+        List<Span> result = storage.spanStore().getTrace("a").execute();
+        assertEquals(1, result.size());
     }
 
 }
