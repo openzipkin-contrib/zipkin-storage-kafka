@@ -13,14 +13,16 @@
  */
 package zipkin2.autoconfigure.storage.kafka;
 
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import zipkin2.storage.kafka.KafkaStorage;
 
 import java.io.Serializable;
 
+@ConfigurationProperties("zipkin.storage.kafka")
 public class ZipkinKafkaStorageProperties implements Serializable {
     private static final long serialVersionUID = 0L;
 
-    private String bootstrapServers = "localhost";
+    private String bootstrapServers = "localhost:29092";
 
     public KafkaStorage.Builder toBuilder() {
         return KafkaStorage.newBuilder().bootstrapServers(bootstrapServers);
