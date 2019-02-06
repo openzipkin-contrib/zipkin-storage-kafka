@@ -29,24 +29,19 @@ import java.util.function.Function;
 
 public class KafkaSpanStore implements SpanStore {
 
-    final String traceStoreName;
-    final String serviceStoreName;
-    final String dependencyStoreName;
-
     final KafkaStreams kafkaStreams;
 
     final ReadOnlyKeyValueStore<String, Set<String>> serviceStore;
     final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
-    final ReadOnlyKeyValueStore<String, List<DependencyLink>> dependencyStore;
+    final ReadOnlyKeyValueStore<String, DependencyLink> dependencyStore;
+//    final IndexSearcher indexSearcher;
 
     KafkaSpanStore(KafkaStorage storage) {
         kafkaStreams = storage.kafkaStreams;
-        traceStoreName = storage.traceStoreName;
-        serviceStoreName = storage.serviceStoreName;
-        dependencyStoreName = storage.dependencyStoreName;
-        serviceStore = kafkaStreams.store(serviceStoreName, QueryableStoreTypes.keyValueStore());
-        traceStore = kafkaStreams.store(traceStoreName, QueryableStoreTypes.keyValueStore());
-        dependencyStore = kafkaStreams.store(dependencyStoreName, QueryableStoreTypes.keyValueStore());
+        traceStore = kafkaStreams.store(storage.traceStoreName, QueryableStoreTypes.keyValueStore());
+        serviceStore = kafkaStreams.store(storage.serviceStoreName, QueryableStoreTypes.keyValueStore());
+        dependencyStore = kafkaStreams.store(storage.dependencyStoreName, QueryableStoreTypes.keyValueStore());
+//        indexSearcher = storage.indexSearcher;
     }
 
     @Override
@@ -137,17 +132,17 @@ public class KafkaSpanStore implements SpanStore {
         return new GetDependenciesJsonCall(dependencyStore);
     }
 
-    static class GetDependenciesJsonCall extends KafkaStreamsStoreCall<String, List<DependencyLink>, List<DependencyLink>> {
+    static class GetDependenciesJsonCall extends KafkaStreamsStoreCall<String, DependencyLink, List<DependencyLink>> {
 
-        GetDependenciesJsonCall(ReadOnlyKeyValueStore<String, List<DependencyLink>> store) {
+        GetDependenciesJsonCall(ReadOnlyKeyValueStore<String, DependencyLink> store) {
             super(store);
         }
 
         @Override
-        Function<ReadOnlyKeyValueStore<String, List<DependencyLink>>, List<DependencyLink>> query() {
+        Function<ReadOnlyKeyValueStore<String, DependencyLink>, List<DependencyLink>> query() {
             return store -> {
                 List<DependencyLink> dependencyLinks = new ArrayList<>();
-                store.all().forEachRemaining(dependencyLink -> dependencyLinks.addAll(dependencyLink.value));
+                store.all().forEachRemaining(dependencyLink -> dependencyLinks.add(dependencyLink.value));
                 return dependencyLinks;
             };
         }

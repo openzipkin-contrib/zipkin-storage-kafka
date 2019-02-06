@@ -1,8 +1,12 @@
 .PHONY: all
 all: build zipkin-local
 
+.PHONY: license-header
+license-header:
+	./mvnw com.mycila:license-maven-plugin:format
+
 .PHONY: build
-build:
+build: license-header
 	./mvnw clean install -DskipTests
 
 .PHONY: zipkin-local

@@ -47,7 +47,8 @@ public class StreamsSupplierTest {
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
 
         TopologySupplier topologySupplier = new TopologySupplier(
-                "traces", "services", "dependencies");
+                "traces", "services", "dependencies"//, null
+        );
         Topology topology = topologySupplier.get();
         System.out.println(KafkaStreamsTopologyGraphvizPrinter.print(topology));
         TopologyTestDriver driver = new TopologyTestDriver(topology, props);

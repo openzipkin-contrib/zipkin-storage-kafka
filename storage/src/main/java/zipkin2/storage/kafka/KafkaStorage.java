@@ -16,6 +16,7 @@ package zipkin2.storage.kafka;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -32,6 +33,7 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
@@ -54,6 +56,7 @@ public class KafkaStorage extends StorageComponent {
         String serviceStoreName = "zipkin-service-operations-store";
         String dependencyStoreName = "zipkin-dependencies-store";
         String stateStoreDir = "/tmp/kafka-streams";
+        String indexDir = "/tmp/lucene-index";
 
         @Override
         public StorageComponent.Builder strictTraceId(boolean strictTraceId) {
@@ -113,7 +116,11 @@ public class KafkaStorage extends StorageComponent {
 
         @Override
         public StorageComponent build() {
-            return new KafkaStorage(this);
+            try {
+                return new KafkaStorage(this);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         }
 
         Builder() {
@@ -125,13 +132,16 @@ public class KafkaStorage extends StorageComponent {
     final String traceStoreName;
     final String serviceStoreName;
     final String dependencyStoreName;
+//    final IndexWriter indexWriter;
+//    final IndexSearcher indexSearcher;
 
-    KafkaStorage(Builder builder) {
+    KafkaStorage(Builder builder) throws IOException {
         final Properties producerConfigs = new Properties();
         producerConfigs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
         producerConfigs.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         producerConfigs.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class); //TODO validate format
         producerConfigs.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        producerConfigs.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.ZSTD.name);
         //TODO add a way to introduce custom properties
         this.producer = new KafkaProducer<>(producerConfigs);
 
@@ -148,6 +158,14 @@ public class KafkaStorage extends StorageComponent {
                 Serdes.String(),
                 Serdes.ByteArray());
 
+//        StandardAnalyzer analyzer = new StandardAnalyzer();
+//        Directory directory = new SimpleFSDirectory(Paths.get(builder.indexDir));
+//        IndexWriterConfig indexWriterConfigs = new IndexWriterConfig(analyzer);
+//        indexWriter = new IndexWriter(directory, indexWriterConfigs);
+//
+//        IndexReader reader = DirectoryReader.open(directory);
+//        indexSearcher = new IndexSearcher(reader);
+
         final Properties streamsConfig = new Properties();
         streamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
         streamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
@@ -155,9 +173,11 @@ public class KafkaStorage extends StorageComponent {
         streamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, builder.applicationId);
         streamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
         streamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.stateStoreDir);
+        streamsConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.ZSTD.name);
 
         final Topology topology = new TopologySupplier(
-                traceStoreBuilder.name(), serviceStoreBuilder.name(), dependencyStoreBuilder.name()).get();
+                traceStoreBuilder.name(), serviceStoreBuilder.name(), dependencyStoreBuilder.name()//, indexWriter
+        ).get();
 
         this.kafkaStreams = new KafkaStreams(topology, streamsConfig);
 
@@ -166,9 +186,6 @@ public class KafkaStorage extends StorageComponent {
         this.dependencyStoreName =builder.dependencyStoreName;
 
         new KafkaStreamsWorker(kafkaStreams).get();
-//        this.traceStore = traceStoreBuilder.withCachingEnabled().build();
-//        this.serviceStore = serviceStoreBuilder.withCachingEnabled().build();
-//        this.dependencyStore = dependencyStoreBuilder.withCachingEnabled().build();
     }
 
     @Override

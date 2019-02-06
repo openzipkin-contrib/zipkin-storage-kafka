@@ -52,10 +52,14 @@ public class TopologySupplier implements Supplier<Topology> {
     final DependencyLinkBytesEncoder dependencyLinkBytesEncoder;
     final SpanNamesSerde spanNamesSerde;
 
-    TopologySupplier(String traceStoreName, String serviceStoreName, String dependencyStoreName) {
+//    final IndexWriter indexWriter;
+
+    TopologySupplier(String traceStoreName, String serviceStoreName, String dependencyStoreName//, IndexWriter indexWriter
+    ) {
         this.traceStoreName = traceStoreName;
         this.serviceStoreName = serviceStoreName;
         this.dependencyStoreName = dependencyStoreName;
+//        this.indexWriter = indexWriter;
 
         spanBytesDecoder = SpanBytesDecoder.PROTO3;
         spanBytesEncoder = SpanBytesEncoder.PROTO3;
@@ -73,15 +77,36 @@ public class TopologySupplier implements Supplier<Topology> {
                         .withValueSerde(Serdes.ByteArray()))
                 .mapValues(spanBytesDecoder::decodeOne);
 
-        KTable<String, List<Span>> aggregatedSpans = spanStream.groupByKey(
+//        spanStream.foreach((key, span) -> {
+//            String kind = span.kind() != null ? span.kind().name() : "";
+//            Document doc = new Document();
+//            doc.add(new StringField("trace_id", span.traceId(), Field.Store.YES));
+//            doc.add(new StringField("parent_id", span.parentId(), Field.Store.YES));
+//            doc.add(new StringField("id", span.id(), Field.Store.YES));
+//            doc.add(new StringField("kind", kind, Field.Store.YES));
+//            doc.add(new StringField("local_service_name", span.localServiceName(), Field.Store.YES));
+//            doc.add(new StringField("remote_service_name", span.remoteServiceName(), Field.Store.YES));
+//            doc.add(new StringField("name", span.name(), Field.Store.YES));
+//        });
+
+        KStream<String, List<Span>> aggregatedSpans = spanStream.groupByKey(
                 Grouped.with(Serdes.String(), new SpanSerde()))
                 .aggregate(ArrayList::new,
                         (key, value, aggregate) -> {
                             aggregate.add(value);
                             return aggregate;
                         },
-                        Materialized.<String, List<Span>, KeyValueStore<Bytes, byte[]>>as(traceStoreName)
-                                .withKeySerde(Serdes.String()).withValueSerde(spansSerde));
+                        Materialized
+                                .<String, List<Span>, KeyValueStore<Bytes, byte[]>>with(Serdes.String(), spansSerde)
+                                .withLoggingDisabled().withCachingDisabled())
+                .toStream();
+
+        aggregatedSpans.to(traceStoreName, Produced.valueSerde(spansSerde));
+
+        builder.globalTable(traceStoreName,
+                Materialized
+                        .<String, List<Span>, KeyValueStore<Bytes, byte[]>>as(traceStoreName)
+                        .withValueSerde(spansSerde));
 
         spanStream.map((traceId, span) -> KeyValue.pair(span.localServiceName(), span.name()))
                 .groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
@@ -90,10 +115,17 @@ public class TopologySupplier implements Supplier<Topology> {
                             spanNames.add(spanName);
                             return spanNames;
                         },
-                        Materialized.<String, Set<String>, KeyValueStore<Bytes, byte[]>>as(serviceStoreName)
-                                .withKeySerde(Serdes.String()).withValueSerde(spanNamesSerde));
+                        Materialized
+                                .<String, Set<String>, KeyValueStore<Bytes, byte[]>>with(Serdes.String(), spanNamesSerde)
+                                .withLoggingDisabled().withCachingDisabled())
+                .toStream().to(serviceStoreName, Produced.with(Serdes.String(), spanNamesSerde));
 
-        aggregatedSpans.toStream()
+        builder.globalTable(
+                serviceStoreName,
+                Materialized.<String, Set<String>, KeyValueStore<Bytes, byte[]>>as(serviceStoreName)
+                        .withValueSerde(spanNamesSerde));
+
+        aggregatedSpans
                 .filterNot((traceId, spans) -> spans.isEmpty())
                 .mapValues(spans -> new DependencyLinker().putTrace(spans).link())
                 .flatMapValues(dependencyLinks -> dependencyLinks)
@@ -102,8 +134,14 @@ public class TopologySupplier implements Supplier<Topology> {
                         dependencyLink.child()),
                         Grouped.with(Serdes.String(), dependencyLinkSerde))
                 .reduce((l, r) -> r,
-                        Materialized.<String, DependencyLink, KeyValueStore<Bytes, byte[]>>as(dependencyStoreName)
-                                .withKeySerde(Serdes.String()).withValueSerde(dependencyLinkSerde));
+                        Materialized.<String, DependencyLink, KeyValueStore<Bytes, byte[]>>with(Serdes.String(), dependencyLinkSerde)
+                                .withLoggingDisabled().withCachingDisabled())
+                .toStream().to(dependencyStoreName, Produced.valueSerde(dependencyLinkSerde));
+
+        builder.globalTable(dependencyStoreName,
+                Materialized
+                        .<String, DependencyLink, KeyValueStore<Bytes, byte[]>>as(dependencyStoreName)
+                        .withValueSerde(dependencyLinkSerde));
 
         return builder.build();
     }
