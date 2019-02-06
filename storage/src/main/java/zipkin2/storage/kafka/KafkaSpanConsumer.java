@@ -27,7 +27,7 @@ import java.util.List;
 
 public class KafkaSpanConsumer implements SpanConsumer {
 
-    static final String TOPIC = "zipkin-spans-proto3_v2";
+    static final String TOPIC = "zipkin-spans-proto3_v1";
     final Producer<String, byte[]> producer;
 
     KafkaSpanConsumer(KafkaStorage kafkaStorage) {
