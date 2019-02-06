@@ -25,6 +25,9 @@ import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import zipkin2.CheckResult;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
@@ -32,9 +35,17 @@ import zipkin2.storage.StorageComponent;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class KafkaStorage extends StorageComponent {
+    private static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
+
+    public static Builder newBuilder() {
+        return new Builder();
+    }
 
     public static class Builder extends StorageComponent.Builder {
         String bootstrapServers = "localhost:29092";
@@ -154,7 +165,7 @@ public class KafkaStorage extends StorageComponent {
         this.serviceStoreName = builder.serviceStoreName;
         this.dependencyStoreName =builder.dependencyStoreName;
 
-        kafkaStreams.start();
+        new KafkaStreamsWorker(kafkaStreams).get();
 //        this.traceStore = traceStoreBuilder.withCachingEnabled().build();
 //        this.serviceStore = serviceStoreBuilder.withCachingEnabled().build();
 //        this.dependencyStore = dependencyStoreBuilder.withCachingEnabled().build();
@@ -174,5 +185,53 @@ public class KafkaStorage extends StorageComponent {
     public void close() {
         producer.close(1, TimeUnit.SECONDS);
         kafkaStreams.close(Duration.ofSeconds(1));
+    }
+
+    public static final class KafkaStreamsWorker {
+        volatile ExecutorService pool;
+        final KafkaStreams kafkaStreams;
+        final AtomicReference<CheckResult> failure = new AtomicReference<>();
+
+        KafkaStreamsWorker(KafkaStreams kafkaStreams) {
+            this.kafkaStreams = kafkaStreams;
+        }
+
+        ExecutorService get() {
+            if (pool == null) {
+                synchronized (this) {
+                    if (pool == null) {
+                        pool = compute();
+                    }
+                }
+            }
+            return pool;
+        }
+
+        void close() {
+            ExecutorService maybePool = pool;
+            if (maybePool == null) return;
+            try {
+                maybePool.awaitTermination(1, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+
+            }
+        }
+
+        private ExecutorService compute() {
+            ExecutorService pool = Executors.newSingleThreadExecutor();
+            pool.execute(guardFailures(kafkaStreams));
+            return pool;
+        }
+
+        private Runnable guardFailures(KafkaStreams kafkaStreams) {
+            return () -> {
+                try {
+                    kafkaStreams.start();
+                } catch (Exception e) {
+                    LOG.error("Kafka Streams worker exited with error", e);
+                    failure.set(CheckResult.failed(e));
+                }
+            };
+        }
     }
 }

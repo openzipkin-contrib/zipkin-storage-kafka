@@ -1,0 +1,5 @@
+# When enabled, this allows shorter env properties (ex -Dspring.profiles.active=voltdb)
+zipkin:
+  storage:
+    kafka:
+      bootstrapServers: ${KAFKA_BOOTSTRAP_SERVER:localhost:29092}
