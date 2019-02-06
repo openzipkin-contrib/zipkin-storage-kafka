@@ -24,7 +24,7 @@
         <version>0.1.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>autoconfigure</artifactId>
+    <artifactId>zipkin-autoconfigure-storage-kafka</artifactId>
     <name>Auto Configuration: Kafka Storage</name>
 
     <properties>
