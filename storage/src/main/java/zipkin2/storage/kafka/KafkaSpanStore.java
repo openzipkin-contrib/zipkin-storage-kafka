@@ -70,10 +70,7 @@ public class KafkaSpanStore implements SpanStore {
 
         @Override
         Function<ReadOnlyKeyValueStore<String, List<Span>>, List<Span>> query() {
-            return store -> {
-                store.all().forEachRemaining(System.out::println);
-                return store.get(key);
-            };
+            return store -> store.get(key);
         }
 
         @Override
