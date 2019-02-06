@@ -36,6 +36,10 @@ import java.util.concurrent.TimeUnit;
 
 public class KafkaStorage extends StorageComponent {
 
+    public static Builder newBuilder() {
+        return new Builder();
+    }
+
     public static class Builder extends StorageComponent.Builder {
         String bootstrapServers = "localhost:29092";
         String applicationId = "zipkin-server_v2";

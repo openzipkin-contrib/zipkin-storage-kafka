@@ -1,3 +1,16 @@
+/*
+ * Copyright 2019 [name of copyright owner]
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License
+ * is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under
+ * the License.
+ */
 package zipkin2.storage.kafka;
 
 import no.sysco.middleware.kafka.util.KafkaStreamsTopologyGraphvizPrinter;
@@ -12,11 +25,9 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.test.ConsumerRecordFactory;
 import org.junit.Test;
 import zipkin2.Span;
-import zipkin2.codec.SpanBytesDecoder;
 import zipkin2.codec.SpanBytesEncoder;
 
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -43,17 +54,18 @@ public class StreamsSupplierTest {
         ConsumerRecordFactory<String, byte[]> factory = new ConsumerRecordFactory<>(
                 KafkaSpanConsumer.TOPIC, new StringSerializer(), new ByteArraySerializer());
         Span root = Span.newBuilder().traceId("a").id("a").timestamp(TODAY).duration(10).build();
+        byte[] encode = SpanBytesEncoder.PROTO3.encode(root);
+        driver.pipeInput(factory.create(KafkaSpanConsumer.TOPIC, "000000000000000a", encode));
         Span child = Span.newBuilder().traceId("a").id("b").timestamp(TODAY).duration(2).build();
-        byte[] encode = SpanBytesEncoder.PROTO3.encodeList(Arrays.asList(root, child));
-        driver.pipeInput(factory.create(KafkaSpanConsumer.TOPIC, "", encode));
+        byte[] encodedChild = SpanBytesEncoder.PROTO3.encode(child);
+        driver.pipeInput(factory.create(KafkaSpanConsumer.TOPIC, "000000000000000a", encodedChild));
         driver.advanceWallClockTime(1000);
         for (Map.Entry<String, StateStore> storeEntry : driver.getAllStateStores().entrySet()) {
             storeEntry.getValue().flush();
             System.out.println(storeEntry.getKey());
         }
-        KeyValueStore<String, byte[]> store = driver.getKeyValueStore("traces");
-        byte[] traceEncoded = store.get("000000000000000a");
-        List<Span> spans = SpanBytesDecoder.PROTO3.decodeList(traceEncoded);
+        KeyValueStore<String, List<Span>> store = driver.getKeyValueStore("traces");
+        List<Span> spans = store.get("000000000000000a");
         assertEquals(2, spans.size());
     }
 
