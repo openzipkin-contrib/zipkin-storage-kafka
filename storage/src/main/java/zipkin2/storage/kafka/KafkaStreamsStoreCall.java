@@ -7,15 +7,15 @@ import zipkin2.Callback;
 import java.io.IOException;
 import java.util.function.Function;
 
-public abstract class KafkaStreamsStoreCall<V> extends Call.Base<V> {
-    final ReadOnlyKeyValueStore<String, byte[]> store;
+public abstract class KafkaStreamsStoreCall<K, V, T> extends Call.Base<T> {
+    final ReadOnlyKeyValueStore<K, V> store;
 
-    KafkaStreamsStoreCall(ReadOnlyKeyValueStore<String, byte[]> store) {
+    KafkaStreamsStoreCall(ReadOnlyKeyValueStore<K, V> store) {
         this.store = store;
     }
 
     @Override
-    protected V doExecute() throws IOException {
+    protected T doExecute() throws IOException {
         try {
             return query().apply(store);
         } catch (Exception e) {
@@ -24,7 +24,7 @@ public abstract class KafkaStreamsStoreCall<V> extends Call.Base<V> {
     }
 
     @Override
-    protected void doEnqueue(Callback<V> callback) {
+    protected void doEnqueue(Callback<T> callback) {
         try {
             callback.onSuccess(query().apply(store));
         } catch (Exception e) {
@@ -32,5 +32,5 @@ public abstract class KafkaStreamsStoreCall<V> extends Call.Base<V> {
         }
     }
 
-    abstract Function<ReadOnlyKeyValueStore<String, byte[]>, V> query();
+    abstract Function<ReadOnlyKeyValueStore<K, V>, T> query();
 }

@@ -114,9 +114,6 @@ public class KafkaStorage extends StorageComponent {
     final String traceStoreName;
     final String serviceStoreName;
     final String dependencyStoreName;
-//    final ReadOnlyKeyValueStore<String, byte[]> traceStore;
-//    final ReadOnlyKeyValueStore<String, byte[]> serviceStore;
-//    final ReadOnlyKeyValueStore<String, byte[]> dependencyStore;
 
     KafkaStorage(Builder builder) {
         final Properties producerConfigs = new Properties();
