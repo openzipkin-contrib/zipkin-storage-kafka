@@ -1,7 +1,7 @@
 package zipkin2.storage.kafka;
 
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
+import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import zipkin2.Call;
 import zipkin2.DependencyLink;
@@ -18,16 +18,16 @@ import java.util.function.Function;
 
 public class KafkaSpanStore implements SpanStore {
 
+    final String traceStoreName;
+    final String serviceStoreName;
+    final String dependencyStoreName;
     final KafkaStreams kafkaStreams;
-    final KeyValueBytesStoreSupplier traceStoreName;
-    final KeyValueBytesStoreSupplier serviceSpanStoreName;
-    final KeyValueBytesStoreSupplier dependencyStoreName;
 
     KafkaSpanStore(KafkaStorage storage) {
-        this.kafkaStreams = storage.kafkaStreams;
-        this.traceStoreName = storage.traceStoreSupplier;
-        this.serviceSpanStoreName = storage.serviceSpanStoreSupplier;
-        this.dependencyStoreName = storage.dependencyStoreSupplier;
+        kafkaStreams = storage.kafkaStreams;
+        traceStoreName = storage.traceStoreName;
+        serviceStoreName = storage.serviceStoreName;
+        dependencyStoreName = storage.dependencyStoreName;
     }
 
     @Override
@@ -38,16 +38,15 @@ public class KafkaSpanStore implements SpanStore {
 
     @Override
     public Call<List<Span>> getTrace(String traceId) {
-        return new GetTraceProto3Call(kafkaStreams, traceStoreName.name(), traceId);
+        ReadOnlyKeyValueStore<String, byte[]> traceStore = kafkaStreams.store(traceStoreName, QueryableStoreTypes.keyValueStore());
+        return new GetTraceProto3Call(traceStore, traceId);
     }
 
     static class GetTraceProto3Call extends KafkaStreamsStoreCall<List<Span>> {
-        final String tracesStoreName;
         final String key;
 
-        GetTraceProto3Call(KafkaStreams kafkaStreams, String tracesStoreName, String key) {
-            super(kafkaStreams, tracesStoreName);
-            this.tracesStoreName = tracesStoreName;
+        GetTraceProto3Call(ReadOnlyKeyValueStore<String, byte[]> store, String key) {
+            super(store);
             this.key = key;
         }
 
@@ -61,19 +60,20 @@ public class KafkaSpanStore implements SpanStore {
 
         @Override
         public Call<List<Span>> clone() {
-            return new GetTraceProto3Call(kafkaStreams, storeName, key);
+            return new GetTraceProto3Call(store, key);
         }
 
     }
 
     @Override
     public Call<List<String>> getServiceNames() {
-        return new GetServiceNamesCall(kafkaStreams, serviceSpanStoreName.name());
+        ReadOnlyKeyValueStore<String, byte[]> serviceStore = kafkaStreams.store(serviceStoreName, QueryableStoreTypes.keyValueStore());
+        return new GetServiceNamesCall(serviceStore);
     }
 
     static class GetServiceNamesCall extends KafkaStreamsStoreCall<List<String>> {
-        GetServiceNamesCall(KafkaStreams kafkaStreams, String storeName) {
-            super(kafkaStreams, storeName);
+        GetServiceNamesCall(ReadOnlyKeyValueStore<String, byte[]> store) {
+            super(store);
         }
 
         @Override
@@ -87,20 +87,21 @@ public class KafkaSpanStore implements SpanStore {
 
         @Override
         public Call<List<String>> clone() {
-            return new GetServiceNamesCall(kafkaStreams, storeName);
+            return new GetServiceNamesCall(store);
         }
     }
 
     @Override
     public Call<List<String>> getSpanNames(String serviceName) {
-        return new GetSpanNamesCall(kafkaStreams, serviceSpanStoreName.name(), serviceName);
+        ReadOnlyKeyValueStore<String, byte[]> serviceStore = kafkaStreams.store(serviceStoreName, QueryableStoreTypes.keyValueStore());
+        return new GetSpanNamesCall(serviceStore, serviceName);
     }
 
     static class GetSpanNamesCall extends KafkaStreamsStoreCall<List<String>> {
         final String serviceName;
 
-        GetSpanNamesCall(KafkaStreams kafkaStreams, String storeName, String serviceName) {
-            super(kafkaStreams, storeName);
+        GetSpanNamesCall(ReadOnlyKeyValueStore<String, byte[]> store, String serviceName) {
+            super(store);
             this.serviceName = serviceName;
         }
 
@@ -115,19 +116,20 @@ public class KafkaSpanStore implements SpanStore {
 
         @Override
         public Call<List<String>> clone() {
-            return new GetSpanNamesCall(kafkaStreams, storeName, serviceName);
+            return new GetSpanNamesCall(store, serviceName);
         }
     }
 
     @Override
     public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
-        return new GetDependenciesJsonCall(kafkaStreams, dependencyStoreName.name());
+        ReadOnlyKeyValueStore<String, byte[]> dependencyStore = kafkaStreams.store(dependencyStoreName, QueryableStoreTypes.keyValueStore());
+        return new GetDependenciesJsonCall(dependencyStore);
     }
 
     static class GetDependenciesJsonCall extends KafkaStreamsStoreCall<List<DependencyLink>> {
 
-        GetDependenciesJsonCall(KafkaStreams kafkaStreams, String storeName) {
-            super(kafkaStreams, storeName);
+        GetDependenciesJsonCall(ReadOnlyKeyValueStore<String, byte[]> store) {
+            super(store);
         }
 
         @Override
@@ -142,7 +144,7 @@ public class KafkaSpanStore implements SpanStore {
 
         @Override
         public Call<List<DependencyLink>> clone() {
-            return new GetDependenciesJsonCall(kafkaStreams, storeName);
+            return new GetDependenciesJsonCall(store);
         }
     }
 }

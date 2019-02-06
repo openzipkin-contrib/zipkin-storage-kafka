@@ -1,7 +1,5 @@
 package zipkin2.storage.kafka;
 
-import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import zipkin2.Call;
 import zipkin2.Callback;
@@ -10,19 +8,15 @@ import java.io.IOException;
 import java.util.function.Function;
 
 public abstract class KafkaStreamsStoreCall<V> extends Call.Base<V> {
-    final KafkaStreams kafkaStreams;
-    final String storeName;
+    final ReadOnlyKeyValueStore<String, byte[]> store;
 
-    KafkaStreamsStoreCall(KafkaStreams kafkaStreams, String storeName) {
-        this.kafkaStreams = kafkaStreams;
-        this.storeName = storeName;
+    KafkaStreamsStoreCall(ReadOnlyKeyValueStore<String, byte[]> store) {
+        this.store = store;
     }
 
     @Override
     protected V doExecute() throws IOException {
         try {
-            ReadOnlyKeyValueStore<String, byte[]> store = kafkaStreams.store(storeName, QueryableStoreTypes.keyValueStore());
-
             return query().apply(store);
         } catch (Exception e) {
             throw new IOException(e);
@@ -32,7 +26,6 @@ public abstract class KafkaStreamsStoreCall<V> extends Call.Base<V> {
     @Override
     protected void doEnqueue(Callback<V> callback) {
         try {
-            ReadOnlyKeyValueStore<String, byte[]> store = kafkaStreams.store(storeName, QueryableStoreTypes.keyValueStore());
             callback.onSuccess(query().apply(store));
         } catch (Exception e) {
             callback.onError(e);

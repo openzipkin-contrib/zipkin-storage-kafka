@@ -13,6 +13,9 @@
  */
 package zipkin2.storage.kafka;
 
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -27,6 +30,7 @@ import zipkin2.Span;
 import zipkin2.storage.StorageComponent;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
@@ -36,11 +40,14 @@ import static zipkin2.TestObjects.TODAY;
 
 public class KafkaStorageIT {
     @Rule
-    public KafkaContainer kafka = new KafkaContainer("4.1.2");
+    public KafkaContainer kafka = new KafkaContainer("5.1.0");
 
     @Test
-    public void should_consume_spans() {
-        StorageComponent storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers()).build();
+    public void should_consume_spans() throws InterruptedException {
+        StorageComponent storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers())
+                .stateStoreDir("target/kafka-streams/" + Instant.now().getEpochSecond())
+                .build();
+        Thread.sleep(1000);
         Span root = Span.newBuilder().traceId("a").id("a").timestamp(TODAY).duration(10).build();
         storage.spanConsumer().accept(Collections.singletonList(root)).enqueue(new Callback<Void>() {
             @Override
@@ -68,11 +75,19 @@ public class KafkaStorageIT {
 
     @Test
     public void should_get_trace() throws Exception {
-        StorageComponent storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers()).build();
+        Properties props = new Properties();
+        props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
+        AdminClient adminClient = AdminClient.create(props);
+        adminClient.createTopics(Collections.singletonList(new NewTopic(KafkaSpanConsumer.TOPIC, 1, (short) 1))).all().get();
+
+        StorageComponent storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers())
+                .stateStoreDir("target/kafka-streams/" + Instant.now().getEpochSecond())
+                .build();
+        Thread.sleep(1000);
         Span root = Span.newBuilder().traceId("a").id("a").timestamp(TODAY).duration(10).build();
         storage.spanConsumer().accept(Collections.singletonList(root)).execute();
 
-        List<Span> result = storage.spanStore().getTrace("a").execute();
+        List<Span> result = storage.spanStore().getTrace("000000000000000a").execute();
         assertEquals(1, result.size());
     }
 

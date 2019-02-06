@@ -17,17 +17,19 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.state.KeyValueBytesStoreSupplier;
+import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
@@ -38,8 +40,9 @@ public class KafkaStorage extends StorageComponent {
         String bootstrapServers = "localhost:29092";
         String applicationId = "zipkin-server_v2";
         String traceStoreName = "zipkin-traces-store";
-        String serviceSpanStoreName = "zipkin-service-operations-store";
+        String serviceStoreName = "zipkin-service-operations-store";
         String dependencyStoreName = "zipkin-dependencies-store";
+        String stateStoreDir = "/tmp/kafka-streams";
 
         @Override
         public StorageComponent.Builder strictTraceId(boolean strictTraceId) {
@@ -80,14 +83,20 @@ public class KafkaStorage extends StorageComponent {
 
         public Builder serviceOperationsStoreName(String serviceOperationsStoreName) {
             if (serviceOperationsStoreName == null)
-                throw new NullPointerException("serviceSpanStoreName == null");
-            this.serviceSpanStoreName = serviceOperationsStoreName;
+                throw new NullPointerException("serviceStoreName == null");
+            this.serviceStoreName = serviceOperationsStoreName;
             return this;
         }
 
         public Builder dependenciesStoreName(String dependenciesStoreName) {
             if (dependenciesStoreName == null) throw new NullPointerException("dependencyStoreName == null");
             this.dependencyStoreName = dependenciesStoreName;
+            return this;
+        }
+
+        public Builder stateStoreDir(String stateStoreDir) {
+            if (stateStoreDir == null) throw new NullPointerException("stateStoreDir == null");
+            this.stateStoreDir = stateStoreDir;
             return this;
         }
 
@@ -102,9 +111,12 @@ public class KafkaStorage extends StorageComponent {
 
     final Producer<String, byte[]> producer;
     final KafkaStreams kafkaStreams;
-    final KeyValueBytesStoreSupplier traceStoreSupplier;
-    final KeyValueBytesStoreSupplier serviceSpanStoreSupplier;
-    final KeyValueBytesStoreSupplier dependencyStoreSupplier;
+    final String traceStoreName;
+    final String serviceStoreName;
+    final String dependencyStoreName;
+//    final ReadOnlyKeyValueStore<String, byte[]> traceStore;
+//    final ReadOnlyKeyValueStore<String, byte[]> serviceStore;
+//    final ReadOnlyKeyValueStore<String, byte[]> dependencyStore;
 
     KafkaStorage(Builder builder) {
         final Properties producerConfigs = new Properties();
@@ -115,19 +127,40 @@ public class KafkaStorage extends StorageComponent {
         //TODO add a way to introduce custom properties
         this.producer = new KafkaProducer<>(producerConfigs);
 
-        this.traceStoreSupplier = Stores.persistentKeyValueStore(builder.traceStoreName);
-        this.serviceSpanStoreSupplier = Stores.persistentKeyValueStore(builder.serviceSpanStoreName);
-        this.dependencyStoreSupplier = Stores.persistentKeyValueStore(builder.dependencyStoreName);
+        StoreBuilder<KeyValueStore<String, byte[]>> traceStoreBuilder = Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStore(builder.traceStoreName),
+                Serdes.String(),
+                Serdes.ByteArray());
+        StoreBuilder<KeyValueStore<String, byte[]>> serviceStoreBuilder = Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStore(builder.serviceStoreName),
+                Serdes.String(),
+                Serdes.ByteArray());
+        StoreBuilder<KeyValueStore<String, byte[]>> dependencyStoreBuilder = Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStore(builder.dependencyStoreName),
+                Serdes.String(),
+                Serdes.ByteArray());
 
         final Properties streamsConfig = new Properties();
         streamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
+        streamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+        streamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
         streamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, builder.applicationId);
         streamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
-        streamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, "target/kafka-streams" + Instant.now().getEpochSecond());
-        this.kafkaStreams = new StreamsSupplier(
-                streamsConfig, traceStoreSupplier, serviceSpanStoreSupplier, dependencyStoreSupplier)
-                .get();
+        streamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.stateStoreDir);
+
+        final Topology topology = new TopologySupplier(
+                traceStoreBuilder.name(), serviceStoreBuilder.name(), dependencyStoreBuilder.name()).get();
+
+        this.kafkaStreams = new KafkaStreams(topology, streamsConfig);
+
+        this.traceStoreName = builder.traceStoreName;
+        this.serviceStoreName = builder.serviceStoreName;
+        this.dependencyStoreName =builder.dependencyStoreName;
+
         kafkaStreams.start();
+//        this.traceStore = traceStoreBuilder.withCachingEnabled().build();
+//        this.serviceStore = serviceStoreBuilder.withCachingEnabled().build();
+//        this.dependencyStore = dependencyStoreBuilder.withCachingEnabled().build();
     }
 
     @Override
