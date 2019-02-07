@@ -16,18 +16,33 @@ package zipkin2.storage.kafka;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
+import org.apache.lucene.document.Document;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.*;
+import org.apache.lucene.store.Directory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.Call;
+import zipkin2.Callback;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
 import zipkin2.storage.SpanStore;
+import zipkin2.storage.kafka.internal.LuceneStateStore;
+import zipkin2.storage.kafka.internal.LuceneStoreType;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class KafkaSpanStore implements SpanStore {
+    private static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
 
     final KafkaStreams kafkaStreams;
 
@@ -35,6 +50,8 @@ public class KafkaSpanStore implements SpanStore {
     final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
     final ReadOnlyKeyValueStore<String, DependencyLink> dependencyStore;
 //    final IndexSearcher indexSearcher;
+final String indexStoreName;
+    final KafkaStreams luceneKafkaStreams;
 
     KafkaSpanStore(KafkaStorage storage) {
         kafkaStreams = storage.kafkaStreams;
@@ -42,12 +59,84 @@ public class KafkaSpanStore implements SpanStore {
         serviceStore = kafkaStreams.store(storage.serviceStoreName, QueryableStoreTypes.keyValueStore());
         dependencyStore = kafkaStreams.store(storage.dependencyStoreName, QueryableStoreTypes.keyValueStore());
 //        indexSearcher = storage.indexSearcher;
+//        directory = storage.directory;
+        indexStoreName = storage.indexStoreName;
+        luceneKafkaStreams = storage.luceneKafkaStreams;
     }
 
     @Override
     public Call<List<List<Span>>> getTraces(QueryRequest request) {
-        //TODO implement get traces
-        return Call.emptyList();
+        return new GetTracesCall(luceneKafkaStreams, request, traceStore, indexStoreName);
+    }
+
+    static class GetTracesCall extends Call.Base<List<List<Span>>> {
+        final KafkaStreams kafkaStreams;
+        final String indexStoreName;
+        final Directory directory;
+        final QueryRequest queryRequest;
+        final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
+
+        GetTracesCall(KafkaStreams kafkaStreams,
+                      QueryRequest queryRequest,
+                      ReadOnlyKeyValueStore<String, List<Span>> traceStore,
+                      String indexStoreName) {
+            this.kafkaStreams = kafkaStreams;
+            this.indexStoreName = indexStoreName;
+            LuceneStateStore lucene = kafkaStreams.store(indexStoreName, new LuceneStoreType());
+            this.directory = lucene.directory();
+            this.queryRequest = queryRequest;
+            this.traceStore = traceStore;
+        }
+
+        @Override
+        protected List<List<Span>> doExecute() throws IOException {
+            return query();
+        }
+
+        private List<List<Span>> query() throws IOException {
+            IndexReader reader = DirectoryReader.open(directory);
+            IndexSearcher indexSearcher = new IndexSearcher(reader);
+            List<List<Span>> result = new ArrayList<>();
+            String serviceName = queryRequest.serviceName() == null ? "*" : queryRequest.serviceName();
+            TermQuery serviceNameQuery = new TermQuery(new Term("local_service_name", serviceName));
+//            String spanName = queryRequest.spanName() == null ? "*" : queryRequest.spanName();
+//            TermQuery spanNameQuery = new TermQuery(new Term("name", spanName));
+            BooleanQuery query = new BooleanQuery.Builder()
+                    .add(serviceNameQuery, BooleanClause.Occur.MUST)
+//                    .add(spanNameQuery, BooleanClause.Occur.MUST)
+                    .build();
+
+            int total = queryRequest.limit();
+            Sort sort = Sort.RELEVANCE;
+
+            Set<String> traceIds = new HashSet<>();
+
+            TopFieldDocs docs = indexSearcher.search(query, total, sort);
+            LOG.info("Total results: {}", docs.totalHits);
+            for (ScoreDoc doc : docs.scoreDocs) {
+                Document document = indexSearcher.doc(doc.doc);
+                String traceId = document.get("trace_id");
+                traceIds.add(traceId);
+            }
+//            GroupByTraceId.create(false).map(result);
+            return traceIds.stream()
+                    .map(traceStore::get)
+                    .collect(Collectors.toList());
+        }
+
+        @Override
+        protected void doEnqueue(Callback<List<List<Span>>> callback) {
+            try {
+                callback.onSuccess(query());
+            } catch (Exception e) {
+                callback.onError(e);
+            }
+        }
+
+        @Override
+        public Call<List<List<Span>>> clone() {
+            return new GetTracesCall(kafkaStreams, queryRequest, traceStore, indexStoreName);
+        }
     }
 
     @Override

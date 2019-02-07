@@ -26,10 +26,7 @@ import zipkin2.codec.DependencyLinkBytesEncoder;
 import zipkin2.codec.SpanBytesDecoder;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.DependencyLinker;
-import zipkin2.storage.kafka.internal.DependencyLinkSerde;
-import zipkin2.storage.kafka.internal.SpanNamesSerde;
-import zipkin2.storage.kafka.internal.SpanSerde;
-import zipkin2.storage.kafka.internal.SpansSerde;
+import zipkin2.storage.kafka.internal.*;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -52,14 +49,12 @@ public class TopologySupplier implements Supplier<Topology> {
     final DependencyLinkBytesEncoder dependencyLinkBytesEncoder;
     final SpanNamesSerde spanNamesSerde;
 
-//    final IndexWriter indexWriter;
-
-    TopologySupplier(String traceStoreName, String serviceStoreName, String dependencyStoreName//, IndexWriter indexWriter
-    ) {
+    TopologySupplier(String traceStoreName,
+                     String serviceStoreName,
+                     String dependencyStoreName) {
         this.traceStoreName = traceStoreName;
         this.serviceStoreName = serviceStoreName;
         this.dependencyStoreName = dependencyStoreName;
-//        this.indexWriter = indexWriter;
 
         spanBytesDecoder = SpanBytesDecoder.PROTO3;
         spanBytesEncoder = SpanBytesEncoder.PROTO3;
@@ -76,18 +71,6 @@ public class TopologySupplier implements Supplier<Topology> {
                         .withKeySerde(Serdes.String())
                         .withValueSerde(Serdes.ByteArray()))
                 .mapValues(spanBytesDecoder::decodeOne);
-
-//        spanStream.foreach((key, span) -> {
-//            String kind = span.kind() != null ? span.kind().name() : "";
-//            Document doc = new Document();
-//            doc.add(new StringField("trace_id", span.traceId(), Field.Store.YES));
-//            doc.add(new StringField("parent_id", span.parentId(), Field.Store.YES));
-//            doc.add(new StringField("id", span.id(), Field.Store.YES));
-//            doc.add(new StringField("kind", kind, Field.Store.YES));
-//            doc.add(new StringField("local_service_name", span.localServiceName(), Field.Store.YES));
-//            doc.add(new StringField("remote_service_name", span.remoteServiceName(), Field.Store.YES));
-//            doc.add(new StringField("name", span.name(), Field.Store.YES));
-//        });
 
         KStream<String, List<Span>> aggregatedSpans = spanStream.groupByKey(
                 Grouped.with(Serdes.String(), new SpanSerde()))

@@ -26,12 +26,17 @@ import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.CheckResult;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
+import zipkin2.storage.kafka.internal.LuceneStateStore;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -51,12 +56,13 @@ public class KafkaStorage extends StorageComponent {
 
     public static class Builder extends StorageComponent.Builder {
         String bootstrapServers = "localhost:29092";
-        String applicationId = "zipkin-server_v2";
-        String traceStoreName = "zipkin-traces-store";
-        String serviceStoreName = "zipkin-service-operations-store";
-        String dependencyStoreName = "zipkin-dependencies-store";
+        String applicationId = "zipkin-server_v1";
+        String traceStoreName = "zipkin-traces-store_v1";
+        String serviceStoreName = "zipkin-service-operations-store_v1";
+        String dependencyStoreName = "zipkin-dependencies-store_v1";
+        String indexStoreName = "zipkin-index-store_v1";
         String stateStoreDir = "/tmp/kafka-streams";
-        String indexDir = "/tmp/lucene-index";
+        String indexDirectory = "/tmp/lucene-index";
 
         @Override
         public StorageComponent.Builder strictTraceId(boolean strictTraceId) {
@@ -108,6 +114,12 @@ public class KafkaStorage extends StorageComponent {
             return this;
         }
 
+        public Builder indexStoreName(String indexStoreName) {
+            if (indexStoreName == null) throw new NullPointerException("indexStoreName == null");
+            this.indexStoreName = indexStoreName;
+            return this;
+        }
+
         public Builder stateStoreDir(String stateStoreDir) {
             if (stateStoreDir == null) throw new NullPointerException("stateStoreDir == null");
             this.stateStoreDir = stateStoreDir;
@@ -129,11 +141,12 @@ public class KafkaStorage extends StorageComponent {
 
     final Producer<String, byte[]> producer;
     final KafkaStreams kafkaStreams;
+    final KafkaStreams luceneKafkaStreams;
     final String traceStoreName;
     final String serviceStoreName;
     final String dependencyStoreName;
-//    final IndexWriter indexWriter;
-//    final IndexSearcher indexSearcher;
+    final String indexStoreName;
+//    final Directory directory;
 
     KafkaStorage(Builder builder) throws IOException {
         final Properties producerConfigs = new Properties();
@@ -158,14 +171,6 @@ public class KafkaStorage extends StorageComponent {
                 Serdes.String(),
                 Serdes.ByteArray());
 
-//        StandardAnalyzer analyzer = new StandardAnalyzer();
-//        Directory directory = new SimpleFSDirectory(Paths.get(builder.indexDir));
-//        IndexWriterConfig indexWriterConfigs = new IndexWriterConfig(analyzer);
-//        indexWriter = new IndexWriter(directory, indexWriterConfigs);
-//
-//        IndexReader reader = DirectoryReader.open(directory);
-//        indexSearcher = new IndexSearcher(reader);
-
         final Properties streamsConfig = new Properties();
         streamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
         streamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
@@ -176,16 +181,35 @@ public class KafkaStorage extends StorageComponent {
         streamsConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.ZSTD.name);
 
         final Topology topology = new TopologySupplier(
-                traceStoreBuilder.name(), serviceStoreBuilder.name(), dependencyStoreBuilder.name()//, indexWriter
-        ).get();
+                traceStoreBuilder.name(),
+                serviceStoreBuilder.name(),
+                dependencyStoreBuilder.name()).get();
 
         this.kafkaStreams = new KafkaStreams(topology, streamsConfig);
+
+        final Properties luceneStreamsConfig = new Properties();
+        luceneStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
+        luceneStreamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+        luceneStreamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
+        luceneStreamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, "lucene_" + builder.applicationId);
+        luceneStreamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
+        luceneStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.stateStoreDir + "_lucene");
+
+        LuceneStateStore.builder(builder.indexStoreName)
+                        .persistent().withIndexDirectory(builder.indexDirectory)
+                        .build();
+        Topology luceneTopology = new LuceneTopologySupplier(traceStoreBuilder.name(), builder.indexStoreName).get();
+        this.luceneKafkaStreams = new KafkaStreams(luceneTopology, luceneStreamsConfig);
 
         this.traceStoreName = builder.traceStoreName;
         this.serviceStoreName = builder.serviceStoreName;
         this.dependencyStoreName =builder.dependencyStoreName;
+        this.indexStoreName = builder.indexStoreName;
+        //TODO check where to instantiate correctly
+//        this.directory = luceneStateStore.directory();
 
         new KafkaStreamsWorker(kafkaStreams).get();
+        new KafkaStreamsWorker(luceneKafkaStreams).get();
     }
 
     @Override
@@ -230,7 +254,7 @@ public class KafkaStorage extends StorageComponent {
             try {
                 maybePool.awaitTermination(1, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
-
+                e.printStackTrace();
             }
         }
 
