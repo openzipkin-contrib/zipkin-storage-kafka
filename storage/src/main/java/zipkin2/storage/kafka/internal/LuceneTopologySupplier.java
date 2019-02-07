@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka;
+package zipkin2.storage.kafka.internal;
 
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -42,8 +42,8 @@ public class LuceneTopologySupplier implements Supplier<Topology> {
 
     final SpanNamesSerde spanNamesSerde;
 
-    LuceneTopologySupplier(String traceStoreName,
-                           String indexStoreName) {
+    public LuceneTopologySupplier(String traceStoreName,
+                                  String indexStoreName) {
         this.traceStoreName = traceStoreName;
         this.indexStoreName = indexStoreName;
 

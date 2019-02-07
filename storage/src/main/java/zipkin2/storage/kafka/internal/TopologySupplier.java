@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka;
+package zipkin2.storage.kafka.internal;
 
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
@@ -26,7 +26,7 @@ import zipkin2.codec.DependencyLinkBytesEncoder;
 import zipkin2.codec.SpanBytesDecoder;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.DependencyLinker;
-import zipkin2.storage.kafka.internal.*;
+import zipkin2.storage.kafka.KafkaSpanConsumer;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -49,9 +49,9 @@ public class TopologySupplier implements Supplier<Topology> {
     final DependencyLinkBytesEncoder dependencyLinkBytesEncoder;
     final SpanNamesSerde spanNamesSerde;
 
-    TopologySupplier(String traceStoreName,
-                     String serviceStoreName,
-                     String dependencyStoreName) {
+    public TopologySupplier(String traceStoreName,
+                            String serviceStoreName,
+                            String dependencyStoreName) {
         this.traceStoreName = traceStoreName;
         this.serviceStoreName = serviceStoreName;
         this.dependencyStoreName = dependencyStoreName;
@@ -66,7 +66,7 @@ public class TopologySupplier implements Supplier<Topology> {
     public Topology get() {
         StreamsBuilder builder = new StreamsBuilder();
         KStream<String, Span> spanStream = builder.stream(
-                KafkaSpanConsumer.TOPIC,
+                KafkaSpanConsumer.TOPIC, //TODO make a config param
                 Consumed.<String, byte[]>with(Topology.AutoOffsetReset.EARLIEST)
                         .withKeySerde(Serdes.String())
                         .withValueSerde(Serdes.ByteArray()))

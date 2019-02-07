@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka;
+package zipkin2.storage.kafka.internal;
 
 import no.sysco.middleware.kafka.util.KafkaStreamsTopologyGraphvizPrinter;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
@@ -23,9 +23,13 @@ import org.apache.kafka.streams.TopologyTestDriver;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.test.ConsumerRecordFactory;
+import org.junit.Assert;
 import org.junit.Test;
 import zipkin2.Span;
+import zipkin2.TestObjects;
 import zipkin2.codec.SpanBytesEncoder;
+import zipkin2.storage.kafka.KafkaSpanConsumer;
+import zipkin2.storage.kafka.internal.TopologySupplier;
 
 import java.time.Instant;
 import java.util.List;
@@ -55,10 +59,10 @@ public class StreamsSupplierTest {
         TopologyTestDriver driver = new TopologyTestDriver(topology, props);
         ConsumerRecordFactory<String, byte[]> factory = new ConsumerRecordFactory<>(
                 KafkaSpanConsumer.TOPIC, new StringSerializer(), new ByteArraySerializer());
-        Span root = Span.newBuilder().traceId("a").id("a").timestamp(TODAY).duration(10).build();
+        Span root = Span.newBuilder().traceId("a").id("a").timestamp(TestObjects.TODAY).duration(10).build();
         byte[] encode = SpanBytesEncoder.PROTO3.encode(root);
         driver.pipeInput(factory.create(KafkaSpanConsumer.TOPIC, "000000000000000a", encode));
-        Span child = Span.newBuilder().traceId("a").id("b").timestamp(TODAY).duration(2).build();
+        Span child = Span.newBuilder().traceId("a").id("b").timestamp(TestObjects.TODAY).duration(2).build();
         byte[] encodedChild = SpanBytesEncoder.PROTO3.encode(child);
         driver.pipeInput(factory.create(KafkaSpanConsumer.TOPIC, "000000000000000a", encodedChild));
         driver.advanceWallClockTime(1000);

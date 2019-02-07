@@ -205,6 +205,7 @@ final String indexStoreName;
         @Override
         Function<ReadOnlyKeyValueStore<String, Set<String>>, List<String>> query() {
             return store -> {
+                if (serviceName == null || serviceName.equals("all")) return new ArrayList<>();
                 Set<String> spanNames = store.get(serviceName);
                 return new ArrayList<>(spanNames);
             };
