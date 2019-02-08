@@ -27,10 +27,10 @@ public abstract class KafkaProducerCall<V> extends Call.Base<V> {
     final String key;
     final byte[] value;
 
-    public KafkaProducerCall(Producer<String, byte[]> kafkaProducer,
-                             String topic,
-                             String key,
-                             byte[] value) {
+    KafkaProducerCall(Producer<String, byte[]> kafkaProducer,
+                      String topic,
+                      String key,
+                      byte[] value) {
         this.kafkaProducer = kafkaProducer;
         this.topic = topic;
         this.key = key;
@@ -60,10 +60,5 @@ public abstract class KafkaProducerCall<V> extends Call.Base<V> {
                 callback.onError(e);
             }
         });
-    }
-
-    @Override
-    public Call<V> clone() {
-        return null;
     }
 }

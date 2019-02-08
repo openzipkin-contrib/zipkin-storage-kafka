@@ -16,6 +16,7 @@ package zipkin2.storage.kafka;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -31,6 +32,9 @@ import zipkin2.CheckResult;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
+import zipkin2.storage.kafka.internal.stores.IndexStateStore;
+import zipkin2.storage.kafka.internal.IndexTopologySupplier;
+import zipkin2.storage.kafka.internal.ProcessTopologySupplier;
 
 import java.time.Duration;
 import java.util.List;
@@ -49,11 +53,14 @@ public class KafkaStorage extends StorageComponent {
 
     public static class Builder extends StorageComponent.Builder {
         String bootstrapServers = "localhost:29092";
-        String applicationId = "zipkin-server_v2";
-        String traceStoreName = "zipkin-traces-store";
-        String serviceStoreName = "zipkin-service-operations-store";
-        String dependencyStoreName = "zipkin-dependencies-store";
+        String spansTopic = "zipkin-spans_v1";
+        String applicationId = "zipkin-server_v1";
+        String traceStoreName = "zipkin-traces-store_v1";
+        String serviceStoreName = "zipkin-service-operations-store_v1";
+        String dependencyStoreName = "zipkin-dependencies-store_v1";
+        String indexStoreName = "zipkin-index-store_v1";
         String stateStoreDir = "/tmp/kafka-streams";
+        String indexDirectory = "/tmp/lucene-index";
 
         @Override
         public StorageComponent.Builder strictTraceId(boolean strictTraceId) {
@@ -77,6 +84,12 @@ public class KafkaStorage extends StorageComponent {
         public Builder bootstrapServers(String bootstrapServers) {
             if (bootstrapServers == null) throw new NullPointerException("bootstrapServers == null");
             this.bootstrapServers = bootstrapServers;
+            return this;
+        }
+
+        public Builder spansTopic(String spansTopic) {
+            if (spansTopic == null) throw new NullPointerException("spansTopic == null");
+            this.spansTopic = spansTopic;
             return this;
         }
 
@@ -105,6 +118,12 @@ public class KafkaStorage extends StorageComponent {
             return this;
         }
 
+        public Builder indexStoreName(String indexStoreName) {
+            if (indexStoreName == null) throw new NullPointerException("indexStoreName == null");
+            this.indexStoreName = indexStoreName;
+            return this;
+        }
+
         public Builder stateStoreDir(String stateStoreDir) {
             if (stateStoreDir == null) throw new NullPointerException("stateStoreDir == null");
             this.stateStoreDir = stateStoreDir;
@@ -113,27 +132,41 @@ public class KafkaStorage extends StorageComponent {
 
         @Override
         public StorageComponent build() {
-            return new KafkaStorage(this);
+                return new KafkaStorage(this);
         }
 
         Builder() {
         }
     }
 
-    final Producer<String, byte[]> producer;
-    final KafkaStreams kafkaStreams;
+    final Producer<String, byte[]> kafkaProducer;
+    final String spansTopic;
+
+    final KafkaStreamsWorker kafkaStreamsWorker;
+    final KafkaStreams processKafkaStreams;
+    final KafkaStreamsWorker indexKafkaStreamsWorker;
+    final KafkaStreams indexKafkaStreams;
+
     final String traceStoreName;
     final String serviceStoreName;
     final String dependencyStoreName;
+    final String indexStoreName;
 
     KafkaStorage(Builder builder) {
+        this.traceStoreName = builder.traceStoreName;
+        this.serviceStoreName = builder.serviceStoreName;
+        this.dependencyStoreName = builder.dependencyStoreName;
+        this.indexStoreName = builder.indexStoreName;
+
+        this.spansTopic = builder.spansTopic;
         final Properties producerConfigs = new Properties();
         producerConfigs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
         producerConfigs.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        producerConfigs.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class); //TODO validate format
+        producerConfigs.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
         producerConfigs.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        producerConfigs.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.ZSTD.name);
         //TODO add a way to introduce custom properties
-        this.producer = new KafkaProducer<>(producerConfigs);
+        this.kafkaProducer = new KafkaProducer<>(producerConfigs);
 
         StoreBuilder<KeyValueStore<String, byte[]>> traceStoreBuilder = Stores.keyValueStoreBuilder(
                 Stores.persistentKeyValueStore(builder.traceStoreName),
@@ -155,20 +188,34 @@ public class KafkaStorage extends StorageComponent {
         streamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, builder.applicationId);
         streamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
         streamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.stateStoreDir);
+        streamsConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.ZSTD.name);
 
-        final Topology topology = new TopologySupplier(
-                traceStoreBuilder.name(), serviceStoreBuilder.name(), dependencyStoreBuilder.name()).get();
+        final Topology topology = new ProcessTopologySupplier(
+                spansTopic, traceStoreBuilder.name(),
+                serviceStoreBuilder.name(),
+                dependencyStoreBuilder.name()).get();
 
-        this.kafkaStreams = new KafkaStreams(topology, streamsConfig);
+        this.processKafkaStreams = new KafkaStreams(topology, streamsConfig);
 
-        this.traceStoreName = builder.traceStoreName;
-        this.serviceStoreName = builder.serviceStoreName;
-        this.dependencyStoreName =builder.dependencyStoreName;
+        kafkaStreamsWorker = new KafkaStreamsWorker(processKafkaStreams);
+        kafkaStreamsWorker.get();
 
-        new KafkaStreamsWorker(kafkaStreams).get();
-//        this.traceStore = traceStoreBuilder.withCachingEnabled().build();
-//        this.serviceStore = serviceStoreBuilder.withCachingEnabled().build();
-//        this.dependencyStore = dependencyStoreBuilder.withCachingEnabled().build();
+        final Properties luceneStreamsConfig = new Properties();
+        luceneStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
+        luceneStreamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+        luceneStreamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
+        luceneStreamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, "lucene_" + builder.applicationId);
+        luceneStreamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
+        luceneStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.stateStoreDir + "_lucene");
+
+        IndexStateStore.Builder indexStoreBuilder = IndexStateStore
+                .builder(builder.indexStoreName)
+                .persistent(builder.indexDirectory);
+        Topology luceneTopology = new IndexTopologySupplier(traceStoreBuilder.name(), indexStoreBuilder).get();
+        this.indexKafkaStreams = new KafkaStreams(luceneTopology, luceneStreamsConfig);
+
+        indexKafkaStreamsWorker = new KafkaStreamsWorker(indexKafkaStreams);
+        indexKafkaStreamsWorker.get();
     }
 
     @Override
@@ -183,8 +230,11 @@ public class KafkaStorage extends StorageComponent {
 
     @Override
     public void close() {
-        producer.close(1, TimeUnit.SECONDS);
-        kafkaStreams.close(Duration.ofSeconds(1));
+        kafkaProducer.close(1, TimeUnit.SECONDS);
+        processKafkaStreams.close(Duration.ofSeconds(1));
+        indexKafkaStreams.close(Duration.ofSeconds(1));
+        kafkaStreamsWorker.close();
+        indexKafkaStreamsWorker.close();
     }
 
     public static final class KafkaStreamsWorker {
@@ -213,7 +263,7 @@ public class KafkaStorage extends StorageComponent {
             try {
                 maybePool.awaitTermination(1, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
-
+                e.printStackTrace();
             }
         }
 

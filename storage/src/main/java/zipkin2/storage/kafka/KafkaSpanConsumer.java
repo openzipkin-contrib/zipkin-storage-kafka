@@ -26,33 +26,32 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class KafkaSpanConsumer implements SpanConsumer {
+    final String spansTopic;
+    final Producer<String, byte[]> kafkaProducer;
 
-    static final String TOPIC = "zipkin-spans-proto3_v1";
-    final Producer<String, byte[]> producer;
-
-    KafkaSpanConsumer(KafkaStorage kafkaStorage) {
-        producer = kafkaStorage.producer;
+    KafkaSpanConsumer(KafkaStorage storage) {
+        spansTopic = storage.spansTopic;
+        kafkaProducer = storage.kafkaProducer;
     }
 
     @Override
     public Call<Void> accept(List<Span> spans) {
         if (spans.isEmpty()) return Call.create(null);
         List<Call<Void>> calls = new ArrayList<>();
-        for (Span span : spans) calls.add(StoreSpanProto3Call.create(producer, span));
+        for (Span span : spans) calls.add(StoreSpanCall.create(kafkaProducer, spansTopic, span));
         return AggregateCall.create(calls);
     }
 
-    static final class StoreSpanProto3Call extends KafkaProducerCall<Void> implements Call.ErrorHandler<Void> {
+    static final class StoreSpanCall extends KafkaProducerCall<Void> implements Call.ErrorHandler<Void> {
 
-        StoreSpanProto3Call(Producer<String, byte[]> kafkaProducer, String topic, String key, byte[] value) {
+        StoreSpanCall(Producer<String, byte[]> kafkaProducer, String topic, String key, byte[] value) {
             super(kafkaProducer, topic, key, value);
         }
 
-
-        static Call<Void> create(Producer<String, byte[]> producer, Span span) {
+        static Call<Void> create(Producer<String, byte[]> producer, String spansTopic, Span span) {
             byte[] encodedSpan = SpanBytesEncoder.PROTO3.encode(span);
-            StoreSpanProto3Call call = new StoreSpanProto3Call(
-                    producer, TOPIC, span.traceId(), encodedSpan);
+            StoreSpanCall call = new StoreSpanCall(
+                    producer, spansTopic, span.traceId(), encodedSpan);
             return call.handleError(call);
         }
 
@@ -64,6 +63,11 @@ public class KafkaSpanConsumer implements SpanConsumer {
         @Override
         Void convert(RecordMetadata recordMetadata) {
             return null;
+        }
+
+        @Override
+        public Call<Void> clone() {
+            return new StoreSpanCall(kafkaProducer, topic, key, value);
         }
     }
 }
