@@ -11,25 +11,26 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.internal;
+package zipkin2.storage.kafka.internal.stores;
 
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.state.QueryableStoreType;
 import org.apache.kafka.streams.state.internals.StateStoreProvider;
+import zipkin2.storage.kafka.internal.stores.IndexStateStore;
 
 import java.util.List;
 import java.util.Optional;
 
-public class LuceneStoreType implements QueryableStoreType<LuceneStateStore> {
+public class IndexStoreType implements QueryableStoreType<IndexStateStore> {
     @Override
     public boolean accepts(StateStore stateStore) {
         return stateStore.isOpen();
     }
 
     @Override
-    public LuceneStateStore create(StateStoreProvider storeProvider, String storeName) {
-        List<LuceneStateStore> stores = storeProvider.stores(storeName, this);
-        final Optional<LuceneStateStore> value = stores.stream().findFirst();
+    public IndexStateStore create(StateStoreProvider storeProvider, String storeName) {
+        List<IndexStateStore> stores = storeProvider.stores(storeName, this);
+        final Optional<IndexStateStore> value = stores.stream().findFirst();
         return value.get();
     }
 }

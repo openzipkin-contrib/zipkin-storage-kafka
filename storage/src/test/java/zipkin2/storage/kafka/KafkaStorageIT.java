@@ -70,7 +70,7 @@ public class KafkaStorageIT {
         properties.put(ConsumerConfig.GROUP_ID_CONFIG, "test");
         properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, OffsetResetStrategy.EARLIEST.name().toLowerCase());
         KafkaConsumer<String, byte[]> kafkaConsumer = new KafkaConsumer<>(properties);
-        kafkaConsumer.subscribe(Collections.singletonList(KafkaSpanConsumer.TOPIC));
+        kafkaConsumer.subscribe(Collections.singletonList("topic"));
         ConsumerRecords<String, byte[]> records = kafkaConsumer.poll(Duration.ofSeconds(5));
         assertEquals(1, records.count());
     }
@@ -80,7 +80,7 @@ public class KafkaStorageIT {
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
         AdminClient adminClient = AdminClient.create(props);
-        adminClient.createTopics(Collections.singletonList(new NewTopic(KafkaSpanConsumer.TOPIC, 1, (short) 1))).all().get();
+        adminClient.createTopics(Collections.singletonList(new NewTopic("topic", 1, (short) 1))).all().get();
 
         StorageComponent storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers())
                 .stateStoreDir("target/kafka-streams/" + Instant.now().getEpochSecond())
@@ -101,7 +101,7 @@ public class KafkaStorageIT {
         Properties props = new Properties();
         props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
         AdminClient adminClient = AdminClient.create(props);
-        adminClient.createTopics(Collections.singletonList(new NewTopic(KafkaSpanConsumer.TOPIC, 1, (short) 1))).all().get();
+        adminClient.createTopics(Collections.singletonList(new NewTopic("topic", 1, (short) 1))).all().get();
 
         StorageComponent storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers())
                 .stateStoreDir("target/kafka-streams/" + Instant.now().getEpochSecond())

@@ -23,13 +23,10 @@ import org.apache.kafka.streams.TopologyTestDriver;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.test.ConsumerRecordFactory;
-import org.junit.Assert;
 import org.junit.Test;
 import zipkin2.Span;
 import zipkin2.TestObjects;
 import zipkin2.codec.SpanBytesEncoder;
-import zipkin2.storage.kafka.KafkaSpanConsumer;
-import zipkin2.storage.kafka.internal.TopologySupplier;
 
 import java.time.Instant;
 import java.util.List;
@@ -37,7 +34,6 @@ import java.util.Map;
 import java.util.Properties;
 
 import static org.junit.Assert.assertEquals;
-import static zipkin2.TestObjects.TODAY;
 
 public class StreamsSupplierTest {
 
@@ -50,21 +46,22 @@ public class StreamsSupplierTest {
         props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
         props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
 
-        TopologySupplier topologySupplier = new TopologySupplier(
-                "traces",
+        String topic = "topic";
+        ProcessTopologySupplier processTopologySupplier = new ProcessTopologySupplier(
+                topic, "traces",
                 "services",
                 "dependencies");
-        Topology topology = topologySupplier.get();
+        Topology topology = processTopologySupplier.get();
         System.out.println(KafkaStreamsTopologyGraphvizPrinter.print(topology));
         TopologyTestDriver driver = new TopologyTestDriver(topology, props);
         ConsumerRecordFactory<String, byte[]> factory = new ConsumerRecordFactory<>(
-                KafkaSpanConsumer.TOPIC, new StringSerializer(), new ByteArraySerializer());
+                topic, new StringSerializer(), new ByteArraySerializer());
         Span root = Span.newBuilder().traceId("a").id("a").timestamp(TestObjects.TODAY).duration(10).build();
         byte[] encode = SpanBytesEncoder.PROTO3.encode(root);
-        driver.pipeInput(factory.create(KafkaSpanConsumer.TOPIC, "000000000000000a", encode));
+        driver.pipeInput(factory.create(topic, "000000000000000a", encode));
         Span child = Span.newBuilder().traceId("a").id("b").timestamp(TestObjects.TODAY).duration(2).build();
         byte[] encodedChild = SpanBytesEncoder.PROTO3.encode(child);
-        driver.pipeInput(factory.create(KafkaSpanConsumer.TOPIC, "000000000000000a", encodedChild));
+        driver.pipeInput(factory.create(topic, "000000000000000a", encodedChild));
         driver.advanceWallClockTime(1000);
         for (Map.Entry<String, StateStore> storeEntry : driver.getAllStateStores().entrySet()) {
             storeEntry.getValue().flush();

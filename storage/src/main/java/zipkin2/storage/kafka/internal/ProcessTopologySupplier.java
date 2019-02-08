@@ -22,11 +22,12 @@ import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.state.KeyValueStore;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
-import zipkin2.codec.DependencyLinkBytesEncoder;
 import zipkin2.codec.SpanBytesDecoder;
-import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.DependencyLinker;
-import zipkin2.storage.kafka.KafkaSpanConsumer;
+import zipkin2.storage.kafka.internal.serdes.DependencyLinkSerde;
+import zipkin2.storage.kafka.internal.serdes.SpanNamesSerde;
+import zipkin2.storage.kafka.internal.serdes.SpanSerde;
+import zipkin2.storage.kafka.internal.serdes.SpansSerde;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -34,43 +35,43 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 
-public class TopologySupplier implements Supplier<Topology> {
+public class ProcessTopologySupplier implements Supplier<Topology> {
     static final String DEPENDENCY_PAIR_PATTERN = "%s|%s";
+
+    final String spansTopic;
 
     final String traceStoreName;
     final String serviceStoreName;
     final String dependencyStoreName;
 
-    final SpansSerde spansSerde = new SpansSerde();
-    final DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
-
-    final SpanBytesDecoder spanBytesDecoder;
-    final SpanBytesEncoder spanBytesEncoder;
-    final DependencyLinkBytesEncoder dependencyLinkBytesEncoder;
+    final SpansSerde spansSerde;
+    final DependencyLinkSerde dependencyLinkSerde;
     final SpanNamesSerde spanNamesSerde;
 
-    public TopologySupplier(String traceStoreName,
-                            String serviceStoreName,
-                            String dependencyStoreName) {
+    public ProcessTopologySupplier(String spansTopic,
+                                   String traceStoreName,
+                                   String serviceStoreName,
+                                   String dependencyStoreName) {
+        this.spansTopic = spansTopic;
         this.traceStoreName = traceStoreName;
         this.serviceStoreName = serviceStoreName;
         this.dependencyStoreName = dependencyStoreName;
 
-        spanBytesDecoder = SpanBytesDecoder.PROTO3;
-        spanBytesEncoder = SpanBytesEncoder.PROTO3;
-        dependencyLinkBytesEncoder = DependencyLinkBytesEncoder.JSON_V1;
+        spansSerde = new SpansSerde();
+        dependencyLinkSerde = new DependencyLinkSerde();
         spanNamesSerde = new SpanNamesSerde();
     }
 
     @Override
     public Topology get() {
         StreamsBuilder builder = new StreamsBuilder();
+
         KStream<String, Span> spanStream = builder.stream(
-                KafkaSpanConsumer.TOPIC, //TODO make a config param
+                spansTopic,
                 Consumed.<String, byte[]>with(Topology.AutoOffsetReset.EARLIEST)
                         .withKeySerde(Serdes.String())
                         .withValueSerde(Serdes.ByteArray()))
-                .mapValues(spanBytesDecoder::decodeOne);
+                .mapValues(SpanBytesDecoder.PROTO3::decodeOne);
 
         KStream<String, List<Span>> aggregatedSpans = spanStream.groupByKey(
                 Grouped.with(Serdes.String(), new SpanSerde()))

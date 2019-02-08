@@ -17,6 +17,7 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
@@ -30,14 +31,15 @@ import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
 import zipkin2.storage.SpanStore;
-import zipkin2.storage.kafka.internal.LuceneStateStore;
-import zipkin2.storage.kafka.internal.LuceneStoreType;
+import zipkin2.storage.kafka.internal.stores.IndexStateStore;
+import zipkin2.storage.kafka.internal.stores.IndexStoreType;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.time.Instant;
+import java.time.temporal.ChronoField;
+import java.time.temporal.TemporalField;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -54,14 +56,14 @@ final String indexStoreName;
     final KafkaStreams luceneKafkaStreams;
 
     KafkaSpanStore(KafkaStorage storage) {
-        kafkaStreams = storage.kafkaStreams;
+        kafkaStreams = storage.processKafkaStreams;
         traceStore = kafkaStreams.store(storage.traceStoreName, QueryableStoreTypes.keyValueStore());
         serviceStore = kafkaStreams.store(storage.serviceStoreName, QueryableStoreTypes.keyValueStore());
         dependencyStore = kafkaStreams.store(storage.dependencyStoreName, QueryableStoreTypes.keyValueStore());
 //        indexSearcher = storage.indexSearcher;
 //        directory = storage.directory;
         indexStoreName = storage.indexStoreName;
-        luceneKafkaStreams = storage.luceneKafkaStreams;
+        luceneKafkaStreams = storage.indexKafkaStreams;
     }
 
     @Override
@@ -82,7 +84,7 @@ final String indexStoreName;
                       String indexStoreName) {
             this.kafkaStreams = kafkaStreams;
             this.indexStoreName = indexStoreName;
-            LuceneStateStore lucene = kafkaStreams.store(indexStoreName, new LuceneStoreType());
+            IndexStateStore lucene = kafkaStreams.store(indexStoreName, new IndexStoreType());
             this.directory = lucene.directory();
             this.queryRequest = queryRequest;
             this.traceStore = traceStore;
@@ -96,29 +98,48 @@ final String indexStoreName;
         private List<List<Span>> query() throws IOException {
             IndexReader reader = DirectoryReader.open(directory);
             IndexSearcher indexSearcher = new IndexSearcher(reader);
-            List<List<Span>> result = new ArrayList<>();
-            String serviceName = queryRequest.serviceName() == null ? "*" : queryRequest.serviceName();
-            TermQuery serviceNameQuery = new TermQuery(new Term("local_service_name", serviceName));
-//            String spanName = queryRequest.spanName() == null ? "*" : queryRequest.spanName();
-//            TermQuery spanNameQuery = new TermQuery(new Term("name", spanName));
-            BooleanQuery query = new BooleanQuery.Builder()
-                    .add(serviceNameQuery, BooleanClause.Occur.MUST)
-//                    .add(spanNameQuery, BooleanClause.Occur.MUST)
-                    .build();
+
+            BooleanQuery.Builder builder = new BooleanQuery.Builder();
+
+            if (queryRequest.serviceName() != null) {
+                String serviceName = queryRequest.serviceName();
+                TermQuery serviceNameQuery = new TermQuery(new Term("local_service_name", serviceName));
+                builder.add(serviceNameQuery, BooleanClause.Occur.MUST);
+            }
+
+            if (queryRequest.spanName() != null) {
+                String spanName = queryRequest.spanName();
+                TermQuery spanNameQuery = new TermQuery(new Term("name", spanName));
+                builder.add(spanNameQuery, BooleanClause.Occur.MUST);
+            }
+
+            for (Map.Entry<String, String> entry : queryRequest.annotationQuery().entrySet()) {
+                TermQuery spanNameQuery = new TermQuery(new Term(entry.getKey(), entry.getValue()));
+                builder.add(spanNameQuery, BooleanClause.Occur.MUST);
+            }
+
+            if (queryRequest.maxDuration() != null) {
+                builder.add(LongPoint.newRangeQuery("duration", queryRequest.minDuration(), queryRequest.maxDuration()), BooleanClause.Occur.MUST);
+            }
+
+            long start = queryRequest.endTs() - queryRequest.lookback();
+            long end = queryRequest.endTs();
+            builder.add(LongPoint.newRangeQuery("ts", new Long(start + "000"), new Long(end + "000")), BooleanClause.Occur.MUST);
 
             int total = queryRequest.limit();
             Sort sort = Sort.RELEVANCE;
 
             Set<String> traceIds = new HashSet<>();
 
+            BooleanQuery query = builder.build();
             TopFieldDocs docs = indexSearcher.search(query, total, sort);
-            LOG.info("Total results: {}", docs.totalHits);
+            LOG.info("Total results of query {}: {}", query, docs.totalHits);
             for (ScoreDoc doc : docs.scoreDocs) {
                 Document document = indexSearcher.doc(doc.doc);
                 String traceId = document.get("trace_id");
                 traceIds.add(traceId);
             }
-//            GroupByTraceId.create(false).map(result);
+            reader.close();
             return traceIds.stream()
                     .map(traceStore::get)
                     .collect(Collectors.toList());

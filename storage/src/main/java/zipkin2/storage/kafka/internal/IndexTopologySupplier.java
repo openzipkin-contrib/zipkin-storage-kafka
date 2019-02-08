@@ -23,48 +23,53 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.StringField;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.Span;
-import zipkin2.storage.kafka.internal.LuceneStateStore;
-import zipkin2.storage.kafka.internal.SpanNamesSerde;
-import zipkin2.storage.kafka.internal.SpansSerde;
+import zipkin2.storage.kafka.internal.serdes.SpanNamesSerde;
+import zipkin2.storage.kafka.internal.serdes.SpansSerde;
+import zipkin2.storage.kafka.internal.stores.IndexStateStore;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
-public class LuceneTopologySupplier implements Supplier<Topology> {
+public class IndexTopologySupplier implements Supplier<Topology> {
+    private static final Logger LOG = LoggerFactory.getLogger(IndexTopologySupplier.class);
 
     final String traceStoreName;
     final String indexStoreName;
+    final IndexStateStore.Builder indexStateStoreBuilder;
 
-    final SpansSerde spansSerde = new SpansSerde();
-
+    final SpansSerde spansSerde;
     final SpanNamesSerde spanNamesSerde;
 
-    public LuceneTopologySupplier(String traceStoreName,
-                                  String indexStoreName) {
+    public IndexTopologySupplier(String traceStoreName,
+                                 IndexStateStore.Builder indexStateStoreBuilder) {
         this.traceStoreName = traceStoreName;
-        this.indexStoreName = indexStoreName;
+        this.indexStoreName = indexStateStoreBuilder.name();
+        this.indexStateStoreBuilder = indexStateStoreBuilder;
 
+        spansSerde = new SpansSerde();
         spanNamesSerde = new SpanNamesSerde();
     }
 
     @Override
     public Topology get() {
         StreamsBuilder builder = new StreamsBuilder();
+
         builder.addGlobalStore(
-                new LuceneStateStore.LuceneStateStoreBuilder(indexStoreName).persistent()
-                        .withIndexDirectory("/tmp/lucene-kafka-streams"),
+                indexStateStoreBuilder,
                 traceStoreName,
                 Consumed.with(Serdes.String(), spansSerde),
                 () -> new
                         Processor() {
-                            LuceneStateStore lucene;
+                            IndexStateStore lucene;
 
                             @Override
                             public void init(ProcessorContext context) {
-                                lucene = (LuceneStateStore) context.getStateStore(indexStoreName);
+                                lucene = (IndexStateStore) context.getStateStore(indexStoreName);
                             }
 
                             @Override
@@ -76,7 +81,6 @@ public class LuceneTopologySupplier implements Supplier<Topology> {
                                     String kind = span.kind() != null ? span.kind().name() : "";
                                     Document doc = new Document();
                                     doc.add(new StringField("trace_id", span.traceId(), Field.Store.YES));
-//                                    doc.add(new StringField("parent_id", span.parentId(), Field.Store.YES));
                                     doc.add(new StringField("id", span.id(), Field.Store.YES));
                                     doc.add(new StringField("kind", kind, Field.Store.YES));
                                     String localServiceName = span.localServiceName() != null ? span.localServiceName() : "";
@@ -85,8 +89,10 @@ public class LuceneTopologySupplier implements Supplier<Topology> {
                                     doc.add(new StringField("remote_service_name", remoteServiceName, Field.Store.YES));
                                     String name = span.name() != null ? span.name() : "";
                                     doc.add(new StringField("name", name, Field.Store.YES));
-                                    doc.add(new LongPoint("ts", span.timestamp()));
-//                                    doc.add(new LongPoint("duration", span.duration()));
+                                    long micros = span.timestampAsLong();
+//                                    LOG.info("Ts: {}", micros);
+                                    doc.add(new LongPoint("ts", micros));
+                                    doc.add(new LongPoint("duration", span.durationAsLong()));
                                     for (Map.Entry<String, String> tag : span.tags().entrySet()) {
                                         doc.add(new StringField(tag.getKey(), tag.getValue(), Field.Store.YES));
                                     }
