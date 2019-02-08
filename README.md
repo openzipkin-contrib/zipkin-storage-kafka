@@ -4,7 +4,7 @@ Proof of concept of fully-featured Kafka-based storage for Zipkin.
 
 *This is not production ready at the moment. Things will change!*
 
-## Design goals
+## Design goals 
 
 * Remove need for additional storage when Kafka is in place.
 * Provide a fast and reliable storage that enable extensability via Kafka
