@@ -341,7 +341,7 @@
                             <goal>report</goal>
                         </goals>
                         <configuration>
-                            <dataFile>target/coverage-reports/jacoco-it.exec</dataFile>
+                            <dataFile>target/jacoco-it.exec</dataFile>
                         </configuration>
                     </execution>
                 </executions>
