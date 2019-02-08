@@ -1,4 +1,6 @@
-# zipkin-kafka-storage
+# Zipkin Storage: Kafka
+
+![](https://www.travis-ci.org/jeqo/zipkin-storage-kafka.svg?branch=master)
 
 Proof of concept of fully-featured Kafka-based storage for Zipkin.
 
@@ -83,6 +85,12 @@ that are not supported by Kafka Streams yet: we need an index that support
 `QueryRequest` properties. As an initial option, Lucene or 
 [Luwak](https://github.com/flaxsearch/luwak) will be used to create an
 in-memory index that can handle these queries.
+
+## Get started
+
+### With Docker
+
+//TODO
 
 ## Acknowledged
 
