@@ -210,8 +210,7 @@ public class KafkaStorage extends StorageComponent {
 
         IndexStateStore.Builder indexStoreBuilder = IndexStateStore
                 .builder(builder.indexStoreName)
-                .persistent()
-                .withIndexDirectory(builder.indexDirectory);
+                .persistent(builder.indexDirectory);
         Topology luceneTopology = new IndexTopologySupplier(traceStoreBuilder.name(), indexStoreBuilder).get();
         this.indexKafkaStreams = new KafkaStreams(luceneTopology, luceneStreamsConfig);
 

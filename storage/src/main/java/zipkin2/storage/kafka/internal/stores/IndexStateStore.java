@@ -40,12 +40,13 @@ public class IndexStateStore implements StateStore {
 
         boolean loggingEnabled;
 
-        public Builder(String name) {
+        Builder(String name) {
             this.name = name;
         }
 
-        public Builder persistent() {
+        public Builder persistent(String indexDirectory) {
             this.persistent = true;
+            this.indexDirectory = indexDirectory;
             return this;
         }
 
@@ -56,11 +57,6 @@ public class IndexStateStore implements StateStore {
 
         public boolean isPersistent() {
             return persistent;
-        }
-
-        public Builder withIndexDirectory(String indexDirectory) {
-            this.indexDirectory = indexDirectory;
-            return this;
         }
 
         public String indexDirectory() {
@@ -123,8 +119,13 @@ public class IndexStateStore implements StateStore {
     final IndexWriter indexWriter;
 
     IndexStateStore(Builder builder) throws IOException {
-        LOG.info("Storing index on path={}", builder.indexDirectory);
-        Directory directory = new NIOFSDirectory(Paths.get(builder.indexDirectory));
+        final Directory directory;
+        if (builder.isPersistent()) {
+            LOG.info("Storing index on path={}", builder.indexDirectory);
+            directory = new NIOFSDirectory(Paths.get(builder.indexDirectory));
+        } else {
+            directory = new RAMDirectory();
+        }
         StandardAnalyzer analyzer = new StandardAnalyzer();
         IndexWriterConfig indexWriterConfigs = new IndexWriterConfig(analyzer);
         indexWriter = new IndexWriter(directory, indexWriterConfigs);

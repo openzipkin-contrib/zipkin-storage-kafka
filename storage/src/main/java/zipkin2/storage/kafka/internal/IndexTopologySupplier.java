@@ -23,8 +23,6 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.StringField;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import zipkin2.Span;
 import zipkin2.storage.kafka.internal.serdes.SpanNamesSerde;
 import zipkin2.storage.kafka.internal.serdes.SpansSerde;
@@ -36,7 +34,6 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 public class IndexTopologySupplier implements Supplier<Topology> {
-    private static final Logger LOG = LoggerFactory.getLogger(IndexTopologySupplier.class);
 
     final String traceStoreName;
     final String indexStoreName;
@@ -90,7 +87,6 @@ public class IndexTopologySupplier implements Supplier<Topology> {
                                     String name = span.name() != null ? span.name() : "";
                                     doc.add(new StringField("name", name, Field.Store.YES));
                                     long micros = span.timestampAsLong();
-//                                    LOG.info("Ts: {}", micros);
                                     doc.add(new LongPoint("ts", micros));
                                     doc.add(new LongPoint("duration", span.durationAsLong()));
                                     for (Map.Entry<String, String> tag : span.tags().entrySet()) {

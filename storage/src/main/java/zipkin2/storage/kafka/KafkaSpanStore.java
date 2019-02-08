@@ -35,11 +35,7 @@ import zipkin2.storage.kafka.internal.stores.IndexStateStore;
 import zipkin2.storage.kafka.internal.stores.IndexStoreType;
 
 import java.io.IOException;
-import java.time.Instant;
-import java.time.temporal.ChronoField;
-import java.time.temporal.TemporalField;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -51,8 +47,7 @@ public class KafkaSpanStore implements SpanStore {
     final ReadOnlyKeyValueStore<String, Set<String>> serviceStore;
     final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
     final ReadOnlyKeyValueStore<String, DependencyLink> dependencyStore;
-//    final IndexSearcher indexSearcher;
-final String indexStoreName;
+    final String indexStoreName;
     final KafkaStreams luceneKafkaStreams;
 
     KafkaSpanStore(KafkaStorage storage) {
@@ -60,8 +55,6 @@ final String indexStoreName;
         traceStore = kafkaStreams.store(storage.traceStoreName, QueryableStoreTypes.keyValueStore());
         serviceStore = kafkaStreams.store(storage.serviceStoreName, QueryableStoreTypes.keyValueStore());
         dependencyStore = kafkaStreams.store(storage.dependencyStoreName, QueryableStoreTypes.keyValueStore());
-//        indexSearcher = storage.indexSearcher;
-//        directory = storage.directory;
         indexStoreName = storage.indexStoreName;
         luceneKafkaStreams = storage.indexKafkaStreams;
     }
@@ -119,12 +112,17 @@ final String indexStoreName;
             }
 
             if (queryRequest.maxDuration() != null) {
-                builder.add(LongPoint.newRangeQuery("duration", queryRequest.minDuration(), queryRequest.maxDuration()), BooleanClause.Occur.MUST);
+                builder.add(LongPoint.newRangeQuery(
+                        "duration",
+                        queryRequest.minDuration(),
+                        queryRequest.maxDuration()),
+                        BooleanClause.Occur.MUST);
             }
 
             long start = queryRequest.endTs() - queryRequest.lookback();
             long end = queryRequest.endTs();
-            builder.add(LongPoint.newRangeQuery("ts", new Long(start + "000"), new Long(end + "000")), BooleanClause.Occur.MUST);
+            builder.add(LongPoint.newRangeQuery(
+                    "ts", new Long(start + "000"), new Long(end + "000")), BooleanClause.Occur.MUST);
 
             int total = queryRequest.limit();
             Sort sort = Sort.RELEVANCE;
@@ -133,13 +131,17 @@ final String indexStoreName;
 
             BooleanQuery query = builder.build();
             TopFieldDocs docs = indexSearcher.search(query, total, sort);
-            LOG.info("Total results of query {}: {}", query, docs.totalHits);
+
+            LOG.debug("Total results of query {}: {}", query, docs.totalHits);
+
             for (ScoreDoc doc : docs.scoreDocs) {
                 Document document = indexSearcher.doc(doc.doc);
                 String traceId = document.get("trace_id");
                 traceIds.add(traceId);
             }
+
             reader.close();
+
             return traceIds.stream()
                     .map(traceStore::get)
                     .collect(Collectors.toList());

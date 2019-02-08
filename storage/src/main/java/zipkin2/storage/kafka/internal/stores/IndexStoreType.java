@@ -16,7 +16,6 @@ package zipkin2.storage.kafka.internal.stores;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.state.QueryableStoreType;
 import org.apache.kafka.streams.state.internals.StateStoreProvider;
-import zipkin2.storage.kafka.internal.stores.IndexStateStore;
 
 import java.util.List;
 import java.util.Optional;
@@ -31,6 +30,7 @@ public class IndexStoreType implements QueryableStoreType<IndexStateStore> {
     public IndexStateStore create(StateStoreProvider storeProvider, String storeName) {
         List<IndexStateStore> stores = storeProvider.stores(storeName, this);
         final Optional<IndexStateStore> value = stores.stream().findFirst();
-        return value.get();
+        if (value.isPresent()) return value.get();
+        else throw new Error("Non index storage found");
     }
 }
