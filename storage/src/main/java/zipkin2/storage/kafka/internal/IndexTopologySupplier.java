@@ -35,76 +35,80 @@ import java.util.function.Supplier;
 
 public class IndexTopologySupplier implements Supplier<Topology> {
 
-    final String traceStoreName;
-    final String indexDirectory;
-    final String indexStoreName;
-    final SpansSerde spansSerde;
-    final SpanNamesSerde spanNamesSerde;
+  final String traceStoreName;
+  final String indexDirectory;
+  final String indexStoreName;
+  final SpansSerde spansSerde;
+  final SpanNamesSerde spanNamesSerde;
 
-    public IndexTopologySupplier(String traceStoreName, String indexStoreName, String indexDirectory) {
-        this.traceStoreName = traceStoreName;
-        this.indexStoreName = indexStoreName;
-        this.indexDirectory = indexDirectory;
+  public IndexTopologySupplier(String traceStoreName, String indexStoreName,
+      String indexDirectory) {
+    this.traceStoreName = traceStoreName;
+    this.indexStoreName = indexStoreName;
+    this.indexDirectory = indexDirectory;
 
-        spansSerde = new SpansSerde();
-        spanNamesSerde = new SpanNamesSerde();
+    spansSerde = new SpansSerde();
+    spanNamesSerde = new SpanNamesSerde();
+  }
+
+  @Override
+  public Topology get() {
+    IndexStateStore.Builder indexStoreBuilder = IndexStateStore.builder(indexStoreName);
+    if (indexDirectory != null) {
+      indexStoreBuilder.persistent(indexDirectory);
     }
 
-    @Override
-    public Topology get() {
-        IndexStateStore.Builder indexStoreBuilder = IndexStateStore.builder(indexStoreName);
-        if (indexDirectory != null) {
-            indexStoreBuilder.persistent(indexDirectory);
-        }
+    StreamsBuilder builder = new StreamsBuilder();
 
-        StreamsBuilder builder = new StreamsBuilder();
+    builder.addGlobalStore(
+        indexStoreBuilder,
+        traceStoreName,
+        Consumed.with(Serdes.String(), spansSerde),
+        () -> new
+            Processor() {
+              IndexStateStore lucene;
 
-        builder.addGlobalStore(
-                indexStoreBuilder,
-                traceStoreName,
-                Consumed.with(Serdes.String(), spansSerde),
-                () -> new
-                        Processor() {
-                            IndexStateStore lucene;
+              @Override
+              public void init(ProcessorContext context) {
+                lucene = (IndexStateStore) context.getStateStore(indexStoreName);
+              }
 
-                            @Override
-                            public void init(ProcessorContext context) {
-                                lucene = (IndexStateStore) context.getStateStore(indexStoreName);
-                            }
+              @Override
+              public void process(Object key, Object value) {
+                List<Document> docs = new ArrayList<>();
+                List spans = (ArrayList) value;
+                for (Object s : spans) {
+                  Span span = (Span) s;
+                  String kind = span.kind() != null ? span.kind().name() : "";
+                  Document doc = new Document();
+                  doc.add(new StringField("trace_id", span.traceId(), Field.Store.YES));
+                  doc.add(new StringField("id", span.id(), Field.Store.YES));
+                  doc.add(new StringField("kind", kind, Field.Store.YES));
+                  String localServiceName =
+                      span.localServiceName() != null ? span.localServiceName() : "";
+                  doc.add(new StringField("local_service_name", localServiceName, Field.Store.YES));
+                  String remoteServiceName =
+                      span.remoteServiceName() != null ? span.remoteServiceName() : "";
+                  doc.add(
+                      new StringField("remote_service_name", remoteServiceName, Field.Store.YES));
+                  String name = span.name() != null ? span.name() : "";
+                  doc.add(new StringField("name", name, Field.Store.YES));
+                  long micros = span.timestampAsLong();
+                  doc.add(new LongPoint("ts", micros));
+                  doc.add(new LongPoint("duration", span.durationAsLong()));
+                  for (Map.Entry<String, String> tag : span.tags().entrySet()) {
+                    doc.add(new StringField(tag.getKey(), tag.getValue(), Field.Store.YES));
+                  }
+                  docs.add(doc);
+                }
+                lucene.put(docs);
+              }
 
-                            @Override
-                            public void process(Object key, Object value) {
-                                List<Document> docs = new ArrayList<>();
-                                List spans = (ArrayList) value;
-                                for (Object s : spans) {
-                                    Span span = (Span) s;
-                                    String kind = span.kind() != null ? span.kind().name() : "";
-                                    Document doc = new Document();
-                                    doc.add(new StringField("trace_id", span.traceId(), Field.Store.YES));
-                                    doc.add(new StringField("id", span.id(), Field.Store.YES));
-                                    doc.add(new StringField("kind", kind, Field.Store.YES));
-                                    String localServiceName = span.localServiceName() != null ? span.localServiceName() : "";
-                                    doc.add(new StringField("local_service_name", localServiceName, Field.Store.YES));
-                                    String remoteServiceName = span.remoteServiceName() != null ? span.remoteServiceName() : "";
-                                    doc.add(new StringField("remote_service_name", remoteServiceName, Field.Store.YES));
-                                    String name = span.name() != null ? span.name() : "";
-                                    doc.add(new StringField("name", name, Field.Store.YES));
-                                    long micros = span.timestampAsLong();
-                                    doc.add(new LongPoint("ts", micros));
-                                    doc.add(new LongPoint("duration", span.durationAsLong()));
-                                    for (Map.Entry<String, String> tag : span.tags().entrySet()) {
-                                        doc.add(new StringField(tag.getKey(), tag.getValue(), Field.Store.YES));
-                                    }
-                                    docs.add(doc);
-                                }
-                                lucene.put(docs);
-                            }
-
-                            @Override
-                            public void close() {
-                                lucene.close();
-                            }
-                        });
-        return builder.build();
-    }
+              @Override
+              public void close() {
+                lucene.close();
+              }
+            });
+    return builder.build();
+  }
 }

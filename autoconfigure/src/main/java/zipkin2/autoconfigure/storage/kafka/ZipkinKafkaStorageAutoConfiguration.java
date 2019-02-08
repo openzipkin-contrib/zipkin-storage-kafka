@@ -13,7 +13,6 @@
  */
 package zipkin2.autoconfigure.storage.kafka;
 
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -27,13 +26,13 @@ import zipkin2.storage.StorageComponent;
 @EnableConfigurationProperties(ZipkinKafkaStorageProperties.class)
 @ConditionalOnProperty(name = "zipkin.storage.type", havingValue = "kafka")
 @ConditionalOnMissingBean(StorageComponent.class)
-// This component is named .*Kafka.* even though the package already says kafka because
-// Spring Boot configuration endpoints only printout the simple name of the class
+    // This component is named .*Kafka.* even though the package already says kafka because
+    // Spring Boot configuration endpoints only printout the simple name of the class
 class ZipkinKafkaStorageAutoConfiguration {
 
-    @Bean
-    @ConditionalOnMissingBean
-    StorageComponent storage(ZipkinKafkaStorageProperties properties) {
-        return properties.toBuilder().build();
-    }
+  @Bean
+  @ConditionalOnMissingBean
+  StorageComponent storage(ZipkinKafkaStorageProperties properties) {
+    return properties.toBuilder().build();
+  }
 }

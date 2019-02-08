@@ -21,8 +21,8 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
  */
 public final class Access {
 
-    public static void registerKafka(AnnotationConfigApplicationContext context) {
-        context.register(
-                PropertyPlaceholderAutoConfiguration.class, ZipkinKafkaStorageAutoConfiguration.class);
-    }
+  public static void registerKafka(AnnotationConfigApplicationContext context) {
+    context.register(
+        PropertyPlaceholderAutoConfiguration.class, ZipkinKafkaStorageAutoConfiguration.class);
+  }
 }

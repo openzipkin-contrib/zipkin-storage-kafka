@@ -26,48 +26,48 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class KafkaSpanConsumer implements SpanConsumer {
-    final String spansTopic;
-    final Producer<String, byte[]> kafkaProducer;
+  final String spansTopic;
+  final Producer<String, byte[]> kafkaProducer;
 
-    KafkaSpanConsumer(KafkaStorage storage) {
-        spansTopic = storage.spansTopic;
-        kafkaProducer = storage.producer;
+  KafkaSpanConsumer(KafkaStorage storage) {
+    spansTopic = storage.spansTopic;
+    kafkaProducer = storage.producer;
+  }
+
+  @Override
+  public Call<Void> accept(List<Span> spans) {
+    if (spans.isEmpty()) return Call.create(null);
+    List<Call<Void>> calls = new ArrayList<>();
+    for (Span span : spans) calls.add(StoreSpanCall.create(kafkaProducer, spansTopic, span));
+    return AggregateCall.create(calls);
+  }
+
+  static final class StoreSpanCall extends KafkaProducerCall<Void>
+      implements Call.ErrorHandler<Void> {
+
+    StoreSpanCall(Producer<String, byte[]> kafkaProducer, String topic, String key, byte[] value) {
+      super(kafkaProducer, topic, key, value);
+    }
+
+    static Call<Void> create(Producer<String, byte[]> producer, String spansTopic, Span span) {
+      byte[] encodedSpan = SpanBytesEncoder.PROTO3.encode(span);
+      StoreSpanCall call = new StoreSpanCall(producer, spansTopic, span.traceId(), encodedSpan);
+      return call.handleError(call);
     }
 
     @Override
-    public Call<Void> accept(List<Span> spans) {
-        if (spans.isEmpty()) return Call.create(null);
-        List<Call<Void>> calls = new ArrayList<>();
-        for (Span span : spans) calls.add(StoreSpanCall.create(kafkaProducer, spansTopic, span));
-        return AggregateCall.create(calls);
+    public void onErrorReturn(Throwable error, Callback<Void> callback) {
+      callback.onError(error);
     }
 
-    static final class StoreSpanCall extends KafkaProducerCall<Void> implements Call.ErrorHandler<Void> {
-
-        StoreSpanCall(Producer<String, byte[]> kafkaProducer, String topic, String key, byte[] value) {
-            super(kafkaProducer, topic, key, value);
-        }
-
-        static Call<Void> create(Producer<String, byte[]> producer, String spansTopic, Span span) {
-            byte[] encodedSpan = SpanBytesEncoder.PROTO3.encode(span);
-            StoreSpanCall call = new StoreSpanCall(
-                    producer, spansTopic, span.traceId(), encodedSpan);
-            return call.handleError(call);
-        }
-
-        @Override
-        public void onErrorReturn(Throwable error, Callback<Void> callback) {
-            callback.onError(error);
-        }
-
-        @Override
-        Void convert(RecordMetadata recordMetadata) {
-            return null;
-        }
-
-        @Override
-        public Call<Void> clone() {
-            return new StoreSpanCall(kafkaProducer, topic, key, value);
-        }
+    @Override
+    Void convert(RecordMetadata recordMetadata) {
+      return null;
     }
+
+    @Override
+    public Call<Void> clone() {
+      return new StoreSpanCall(kafkaProducer, topic, key, value);
+    }
+  }
 }

@@ -30,35 +30,6 @@ import java.util.logging.Logger;
 // TODO: this is copy/pasted from cassandra
 public abstract class AggregateCall<I, O> extends Call.Base<O> {
 
-  public static Call<Void> create(List<Call<Void>> calls) {
-    if (calls.size() == 1) return calls.get(0);
-    return new AggregateVoidCall(calls);
-  }
-
-  static final class AggregateVoidCall extends AggregateCall<Void, Void> {
-    AggregateVoidCall(List<Call<Void>> calls) {
-      super(calls);
-    }
-
-    volatile boolean empty = true;
-
-    @Override protected Void newOutput() {
-      return null;
-    }
-
-    @Override protected void append(Void input, Void output) {
-      empty = false;
-    }
-
-    @Override protected boolean isEmpty(Void output) {
-      return empty;
-    }
-
-    @Override public AggregateVoidCall clone() {
-      return new AggregateVoidCall(cloneCalls());
-    }
-  }
-
   final Logger log = Logger.getLogger(getClass().getName());
   final List<Call<I>> calls;
 
@@ -66,6 +37,11 @@ public abstract class AggregateCall<I, O> extends Call.Base<O> {
     assert !calls.isEmpty() : "do not create empty aggregate calls";
     assert calls.size() > 1 : "do not create single-element aggregates";
     this.calls = calls;
+  }
+
+  public static Call<Void> create(List<Call<Void>> calls) {
+    if (calls.size() == 1) return calls.get(0);
+    return new AggregateVoidCall(calls);
   }
 
   protected abstract O newOutput();
@@ -135,6 +111,40 @@ public abstract class AggregateCall<I, O> extends Call.Base<O> {
     }
   }
 
+  protected List<Call<I>> cloneCalls() {
+    int length = calls.size();
+    if (length == 1) return Collections.singletonList(calls.get(0).clone());
+    List<Call<I>> result = new ArrayList<>(length);
+    for (int i = 0; i < length; i++) {
+      result.add(calls.get(i).clone());
+    }
+    return result;
+  }
+
+  static final class AggregateVoidCall extends AggregateCall<Void, Void> {
+    volatile boolean empty = true;
+
+    AggregateVoidCall(List<Call<Void>> calls) {
+      super(calls);
+    }
+
+    @Override protected Void newOutput() {
+      return null;
+    }
+
+    @Override protected void append(Void input, Void output) {
+      empty = false;
+    }
+
+    @Override protected boolean isEmpty(Void output) {
+      return empty;
+    }
+
+    @Override public AggregateVoidCall clone() {
+      return new AggregateVoidCall(cloneCalls());
+    }
+  }
+
   class CountdownCallback implements Callback<I> {
     final Call<I> call;
     final AtomicInteger remaining;
@@ -173,15 +183,5 @@ public abstract class AggregateCall<I, O> extends Call.Base<O> {
         }
       }
     }
-  }
-
-  protected List<Call<I>> cloneCalls() {
-    int length = calls.size();
-    if (length == 1) return Collections.singletonList(calls.get(0).clone());
-    List<Call<I>> result = new ArrayList<>(length);
-    for (int i = 0; i < length; i++) {
-      result.add(calls.get(i).clone());
-    }
-    return result;
   }
 }

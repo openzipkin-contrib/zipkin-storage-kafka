@@ -21,16 +21,19 @@ import java.util.List;
 import java.util.Optional;
 
 public class IndexStoreType implements QueryableStoreType<IndexStateStore> {
-    @Override
-    public boolean accepts(StateStore stateStore) {
-        return stateStore.isOpen();
-    }
+  @Override
+  public boolean accepts(StateStore stateStore) {
+    return stateStore.isOpen();
+  }
 
-    @Override
-    public IndexStateStore create(StateStoreProvider storeProvider, String storeName) {
-        List<IndexStateStore> stores = storeProvider.stores(storeName, this);
-        final Optional<IndexStateStore> value = stores.stream().findFirst();
-        if (value.isPresent()) return value.get();
-        else throw new Error("Non index storage found");
+  @Override
+  public IndexStateStore create(StateStoreProvider storeProvider, String storeName) {
+    List<IndexStateStore> stores = storeProvider.stores(storeName, this);
+    final Optional<IndexStateStore> value = stores.stream().findFirst();
+    if (value.isPresent()) {
+      return value.get();
+    } else {
+      throw new Error("Non index storage found");
     }
+  }
 }

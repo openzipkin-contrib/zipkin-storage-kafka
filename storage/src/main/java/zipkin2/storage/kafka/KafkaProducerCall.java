@@ -22,44 +22,44 @@ import zipkin2.Callback;
 import java.io.IOException;
 
 public abstract class KafkaProducerCall<V> extends Call.Base<V> {
-    final Producer<String, byte[]> kafkaProducer;
-    final String topic;
-    final String key;
-    final byte[] value;
+  final Producer<String, byte[]> kafkaProducer;
+  final String topic;
+  final String key;
+  final byte[] value;
 
-    KafkaProducerCall(Producer<String, byte[]> kafkaProducer,
-                      String topic,
-                      String key,
-                      byte[] value) {
-        this.kafkaProducer = kafkaProducer;
-        this.topic = topic;
-        this.key = key;
-        this.value = value;
+  KafkaProducerCall(Producer<String, byte[]> kafkaProducer,
+      String topic,
+      String key,
+      byte[] value) {
+    this.kafkaProducer = kafkaProducer;
+    this.topic = topic;
+    this.key = key;
+    this.value = value;
+  }
+
+  @Override
+  protected V doExecute() throws IOException {
+    try {
+      ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
+      RecordMetadata recordMetadata = kafkaProducer.send(producerRecord).get();
+      return convert(recordMetadata);
+    } catch (Exception e) {
+      throw new IOException(e);
     }
+  }
 
-    @Override
-    protected V doExecute() throws IOException {
-        try {
-            ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
-            RecordMetadata recordMetadata = kafkaProducer.send(producerRecord).get();
-            return convert(recordMetadata);
-        } catch (Exception e) {
-            throw new IOException(e);
-        }
-    }
+  abstract V convert(RecordMetadata recordMetadata);
 
-    abstract V convert(RecordMetadata recordMetadata);
-
-    @Override
-    @SuppressWarnings("FutureReturnValueIgnored")
-    protected void doEnqueue(Callback<V> callback) {
-        ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
-        kafkaProducer.send(producerRecord, (recordMetadata, e) -> {
-            if (e == null) {
-                callback.onSuccess(convert(recordMetadata));
-            } else {
-                callback.onError(e);
-            }
-        });
-    }
+  @Override
+  @SuppressWarnings("FutureReturnValueIgnored")
+  protected void doEnqueue(Callback<V> callback) {
+    ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
+    kafkaProducer.send(producerRecord, (recordMetadata, e) -> {
+      if (e == null) {
+        callback.onSuccess(convert(recordMetadata));
+      } else {
+        callback.onError(e);
+      }
+    });
+  }
 }

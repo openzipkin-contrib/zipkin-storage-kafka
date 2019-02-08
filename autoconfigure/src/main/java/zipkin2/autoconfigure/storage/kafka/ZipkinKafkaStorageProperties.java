@@ -20,19 +20,90 @@ import java.io.Serializable;
 
 @ConfigurationProperties("zipkin.storage.kafka")
 public class ZipkinKafkaStorageProperties implements Serializable {
-    private static final long serialVersionUID = 0L;
+  private static final long serialVersionUID = 0L;
 
-    private String bootstrapServers = "localhost:29092";
+  private String bootstrapServers = "localhost:29092";
 
-    public KafkaStorage.Builder toBuilder() {
-        return KafkaStorage.newBuilder().bootstrapServers(bootstrapServers);
-    }
+  private String spansTopic = "zipkin-spans_v1";
+  private String tracesTopic = "zipkin-traces_v1";
+  private String servicesTopic = "zipkin-services_v1";
+  private String dependenciesTopic = "zipkin-dependencies_v1";
 
-    public String getBootstrapServers() {
-        return bootstrapServers;
-    }
+  private String processStateStoreDirectory = "/tmp/zipkin/kafka-streams/process";
+  private String indexStateStoreDirectory = "/tmp/zipkin/kafka-streams/index";
+  private String indexStorageDirectory = "/tmp/zipkin/index";
 
-    public void setBootstrapServers(String bootstrapServers) {
-        this.bootstrapServers = bootstrapServers;
-    }
+  KafkaStorage.Builder toBuilder() {
+    return KafkaStorage.newBuilder().bootstrapServers(bootstrapServers)
+        .spansTopic(spansTopic)
+        .tracesTopic(tracesTopic)
+        .servicesTopic(servicesTopic)
+        .dependenciesTopic(dependenciesTopic)
+        .processStreamStoreDirectory(processStateStoreDirectory)
+        .indexStreamStoreDirectory(indexStateStoreDirectory);
+  }
+
+  public String getBootstrapServers() {
+    return bootstrapServers;
+  }
+
+  public void setBootstrapServers(String bootstrapServers) {
+    this.bootstrapServers = bootstrapServers;
+  }
+
+  public String getSpansTopic() {
+    return spansTopic;
+  }
+
+  public void setSpansTopic(String spansTopic) {
+    this.spansTopic = spansTopic;
+  }
+
+  public String getTracesTopic() {
+    return tracesTopic;
+  }
+
+  public void setTracesTopic(String tracesTopic) {
+    this.tracesTopic = tracesTopic;
+  }
+
+  public String getServicesTopic() {
+    return servicesTopic;
+  }
+
+  public void setServicesTopic(String servicesTopic) {
+    this.servicesTopic = servicesTopic;
+  }
+
+  public String getDependenciesTopic() {
+    return dependenciesTopic;
+  }
+
+  public void setDependenciesTopic(String dependenciesTopic) {
+    this.dependenciesTopic = dependenciesTopic;
+  }
+
+  public String getProcessStateStoreDirectory() {
+    return processStateStoreDirectory;
+  }
+
+  public void setProcessStateStoreDirectory(String processStateStoreDirectory) {
+    this.processStateStoreDirectory = processStateStoreDirectory;
+  }
+
+  public String getIndexStateStoreDirectory() {
+    return indexStateStoreDirectory;
+  }
+
+  public void setIndexStateStoreDirectory(String indexStateStoreDirectory) {
+    this.indexStateStoreDirectory = indexStateStoreDirectory;
+  }
+
+  public String getIndexStorageDirectory() {
+    return indexStorageDirectory;
+  }
+
+  public void setIndexStorageDirectory(String indexStorageDirectory) {
+    this.indexStorageDirectory = indexStorageDirectory;
+  }
 }

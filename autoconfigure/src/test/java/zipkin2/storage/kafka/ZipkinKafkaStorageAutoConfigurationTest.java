@@ -25,54 +25,54 @@ import zipkin2.autoconfigure.storage.kafka.Access;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-
 public class ZipkinKafkaStorageAutoConfigurationTest {
 
-    @Rule
-    public ExpectedException thrown = ExpectedException.none();
+  @Rule
+  public ExpectedException thrown = ExpectedException.none();
 
-    AnnotationConfigApplicationContext context;
+  AnnotationConfigApplicationContext context;
 
-    @After
-    public void close() {
-        if (context != null) {
-            context.close();
-        }
+  @After
+  public void close() {
+    if (context != null) {
+      context.close();
     }
+  }
 
-    @Test
-    public void doesNotProvidesStorageComponent_whenStorageTypeNotKafka() {
-        context = new AnnotationConfigApplicationContext();
-        TestPropertyValues.of("zipkin.storage.type:elasticsearch").applyTo(context);
-        Access.registerKafka(context);
-        context.refresh();
+  @Test
+  public void doesNotProvidesStorageComponent_whenStorageTypeNotKafka() {
+    context = new AnnotationConfigApplicationContext();
+    TestPropertyValues.of("zipkin.storage.type:elasticsearch").applyTo(context);
+    Access.registerKafka(context);
+    context.refresh();
 
-        thrown.expect(NoSuchBeanDefinitionException.class);
-        context.getBean(KafkaStorage.class);
-    }
+    thrown.expect(NoSuchBeanDefinitionException.class);
+    context.getBean(KafkaStorage.class);
+  }
 
-    @Test
-    public void providesStorageComponent_whenStorageTypeKafka() {
-        context = new AnnotationConfigApplicationContext();
-        TestPropertyValues.of(
-                "zipkin.storage.type:kafka"
-        ).applyTo(context);
-        Access.registerKafka(context);
-        context.refresh();
+  @Test
+  public void providesStorageComponent_whenStorageTypeKafka() {
+    context = new AnnotationConfigApplicationContext();
+    TestPropertyValues.of(
+        "zipkin.storage.type:kafka"
+    ).applyTo(context);
+    Access.registerKafka(context);
+    context.refresh();
 
-        assertThat(context.getBean(KafkaStorage.class)).isNotNull();
-    }
+    assertThat(context.getBean(KafkaStorage.class)).isNotNull();
+  }
 
-    @Test
-    public void canOverridesProperty_bootstrapServers() {
-        context = new AnnotationConfigApplicationContext();
-        TestPropertyValues.of(
-                "zipkin.storage.type:kafka",
-                "zipkin.storage.kafka.bootstrap_servers:host1:9092"
-        ).applyTo(context);
-        Access.registerKafka(context);
-        context.refresh();
+  @Test
+  public void canOverridesProperty_bootstrapServers() {
+    context = new AnnotationConfigApplicationContext();
+    TestPropertyValues.of(
+        "zipkin.storage.type:kafka",
+        "zipkin.storage.kafka.bootstrap_servers:host1:9092"
+    ).applyTo(context);
+    Access.registerKafka(context);
+    context.refresh();
 
-        assertThat(context.getBean(KafkaStorage.class).producerConfigs.get(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG)).isEqualTo("host1:9092");
-    }
+    assertThat(context.getBean(KafkaStorage.class).producerConfigs.get(
+        ProducerConfig.BOOTSTRAP_SERVERS_CONFIG)).isEqualTo("host1:9092");
+  }
 }
