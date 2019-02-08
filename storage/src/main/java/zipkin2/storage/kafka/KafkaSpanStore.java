@@ -122,7 +122,7 @@ public class KafkaSpanStore implements SpanStore {
             long start = queryRequest.endTs() - queryRequest.lookback();
             long end = queryRequest.endTs();
             builder.add(LongPoint.newRangeQuery(
-                    "ts", new Long(start + "000"), new Long(end + "000")), BooleanClause.Occur.MUST);
+                    "ts", Long.valueOf(start + "000"), Long.valueOf(end + "000")), BooleanClause.Occur.MUST);
 
             int total = queryRequest.limit();
             Sort sort = Sort.RELEVANCE;

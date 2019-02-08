@@ -32,12 +32,11 @@ import java.util.Map;
 public class IndexStateStore implements StateStore {
     private static final Logger LOG = LoggerFactory.getLogger(IndexStateStore.class);
 
-
     public static class Builder implements StoreBuilder<IndexStateStore> {
         final String name;
+
         boolean persistent;
         String indexDirectory;
-
         boolean loggingEnabled;
 
         Builder(String name) {
@@ -160,7 +159,7 @@ public class IndexStateStore implements StateStore {
         try {
             indexWriter.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Error closing index writer", e);
         }
     }
 
@@ -176,14 +175,13 @@ public class IndexStateStore implements StateStore {
 
     public void put(List<Document> value) {
         try {
-            LOG.info("Indexing {} documents", value.size());
             for (Document doc : value) {
                 indexWriter.addDocument(doc);
             }
             indexWriter.commit();
             LOG.info("{} indexed documents", value.size());
         } catch (IOException e) {
-            e.printStackTrace();
+            LOG.error("Error indexing documents", e);
         }
     }
 

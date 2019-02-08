@@ -263,7 +263,7 @@ public class KafkaStorage extends StorageComponent {
             try {
                 maybePool.awaitTermination(1, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                LOG.error("Error waiting for stream poll to close", e);
             }
         }
 

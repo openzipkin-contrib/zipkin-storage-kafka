@@ -51,6 +51,7 @@ public abstract class KafkaProducerCall<V> extends Call.Base<V> {
     abstract V convert(RecordMetadata recordMetadata);
 
     @Override
+    @SuppressWarnings("FutureReturnValueIgnored")
     protected void doEnqueue(Callback<V> callback) {
         ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
         kafkaProducer.send(producerRecord, (recordMetadata, e) -> {
