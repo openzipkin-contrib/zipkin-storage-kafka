@@ -121,14 +121,14 @@ public class IndexStateStore implements StateStore {
         final Directory directory;
         if (builder.isPersistent()) {
             LOG.info("Storing index on path={}", builder.indexDirectory);
-            directory = new NIOFSDirectory(Paths.get(builder.indexDirectory));
+            directory = new MMapDirectory(Paths.get(builder.indexDirectory));
         } else {
-            directory = new RAMDirectory();
+            directory = new ByteBuffersDirectory();
         }
         StandardAnalyzer analyzer = new StandardAnalyzer();
         IndexWriterConfig indexWriterConfigs = new IndexWriterConfig(analyzer);
         indexWriter = new IndexWriter(directory, indexWriterConfigs);
-        indexWriter.commit();
+//        indexWriter.commit();
 
         name = builder.name();
         persistent = builder.isPersistent();

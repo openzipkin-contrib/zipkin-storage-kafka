@@ -20,6 +20,8 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.*;
 import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.StoreBuilder;
+import org.apache.kafka.streams.state.Stores;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.codec.SpanBytesDecoder;
@@ -64,6 +66,22 @@ public class ProcessTopologySupplier implements Supplier<Topology> {
 
     @Override
     public Topology get() {
+        StoreBuilder<KeyValueStore<String, byte[]>> traceStoreBuilder = Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStore(traceStoreName),
+                Serdes.String(),
+                Serdes.ByteArray());
+        traceStoreBuilder.build();
+        StoreBuilder<KeyValueStore<String, byte[]>> serviceStoreBuilder = Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStore(serviceStoreName),
+                Serdes.String(),
+                Serdes.ByteArray());
+        serviceStoreBuilder.build();
+        StoreBuilder<KeyValueStore<String, byte[]>> dependencyStoreBuilder = Stores.keyValueStoreBuilder(
+                Stores.persistentKeyValueStore(dependencyStoreName),
+                Serdes.String(),
+                Serdes.ByteArray());
+        dependencyStoreBuilder.build();
+
         StreamsBuilder builder = new StreamsBuilder();
 
         KStream<String, Span> spanStream = builder.stream(

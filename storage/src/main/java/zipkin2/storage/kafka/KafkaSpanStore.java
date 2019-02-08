@@ -51,12 +51,12 @@ public class KafkaSpanStore implements SpanStore {
     final KafkaStreams luceneKafkaStreams;
 
     KafkaSpanStore(KafkaStorage storage) {
-        kafkaStreams = storage.processKafkaStreams;
+        kafkaStreams = storage.processStreams;
         traceStore = kafkaStreams.store(storage.traceStoreName, QueryableStoreTypes.keyValueStore());
         serviceStore = kafkaStreams.store(storage.serviceStoreName, QueryableStoreTypes.keyValueStore());
         dependencyStore = kafkaStreams.store(storage.dependencyStoreName, QueryableStoreTypes.keyValueStore());
         indexStoreName = storage.indexStoreName;
-        luceneKafkaStreams = storage.indexKafkaStreams;
+        luceneKafkaStreams = storage.indexStreams;
     }
 
     @Override

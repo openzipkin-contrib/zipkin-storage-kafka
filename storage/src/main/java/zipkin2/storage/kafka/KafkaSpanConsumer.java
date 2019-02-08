@@ -31,7 +31,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
 
     KafkaSpanConsumer(KafkaStorage storage) {
         spansTopic = storage.spansTopic;
-        kafkaProducer = storage.kafkaProducer;
+        kafkaProducer = storage.producer;
     }
 
     @Override

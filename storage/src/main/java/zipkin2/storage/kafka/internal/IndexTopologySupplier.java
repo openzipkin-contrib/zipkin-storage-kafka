@@ -36,17 +36,15 @@ import java.util.function.Supplier;
 public class IndexTopologySupplier implements Supplier<Topology> {
 
     final String traceStoreName;
+    final String indexDirectory;
     final String indexStoreName;
-    final IndexStateStore.Builder indexStateStoreBuilder;
-
     final SpansSerde spansSerde;
     final SpanNamesSerde spanNamesSerde;
 
-    public IndexTopologySupplier(String traceStoreName,
-                                 IndexStateStore.Builder indexStateStoreBuilder) {
+    public IndexTopologySupplier(String traceStoreName, String indexStoreName, String indexDirectory) {
         this.traceStoreName = traceStoreName;
-        this.indexStoreName = indexStateStoreBuilder.name();
-        this.indexStateStoreBuilder = indexStateStoreBuilder;
+        this.indexStoreName = indexStoreName;
+        this.indexDirectory = indexDirectory;
 
         spansSerde = new SpansSerde();
         spanNamesSerde = new SpanNamesSerde();
@@ -54,10 +52,15 @@ public class IndexTopologySupplier implements Supplier<Topology> {
 
     @Override
     public Topology get() {
+        IndexStateStore.Builder indexStoreBuilder = IndexStateStore.builder(indexStoreName);
+        if (indexDirectory != null) {
+            indexStoreBuilder.persistent(indexDirectory);
+        }
+
         StreamsBuilder builder = new StreamsBuilder();
 
         builder.addGlobalStore(
-                indexStateStoreBuilder,
+                indexStoreBuilder,
                 traceStoreName,
                 Consumed.with(Serdes.String(), spansSerde),
                 () -> new

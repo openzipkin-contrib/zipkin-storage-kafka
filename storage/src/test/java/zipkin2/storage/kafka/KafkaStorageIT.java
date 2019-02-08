@@ -30,6 +30,7 @@ import org.testcontainers.containers.KafkaContainer;
 import zipkin2.Callback;
 import zipkin2.Endpoint;
 import zipkin2.Span;
+import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 
 import java.io.IOException;
@@ -53,10 +54,12 @@ public class KafkaStorageIT {
     public void start() {
         if (!kafka.isRunning()) fail();
 
+        long epochMilli = Instant.now().toEpochMilli();
         storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers())
-            .stateStoreDir("target/kafka-streams/" + Instant.now().toEpochMilli())
-            .spansTopic("topic")
-            .build();
+                .stateStoreDir("target/kafka-streams/" + epochMilli)
+                .indexDirectory("target/index/" + epochMilli)
+                .spansTopic("topic")
+                .build();
     }
 
     @After
@@ -66,7 +69,7 @@ public class KafkaStorageIT {
     }
 
     @Test
-    public void should_consume_spans() throws InterruptedException, IOException {
+    public void should_consume_spans() throws InterruptedException {
         Thread.sleep(1000);
         Span root = Span.newBuilder().traceId("a").id("a").timestamp(TODAY).duration(10).build();
         storage.spanConsumer().accept(Collections.singletonList(root)).enqueue(new Callback<Void>() {
@@ -91,6 +94,7 @@ public class KafkaStorageIT {
         kafkaConsumer.subscribe(Collections.singletonList("topic"));
         ConsumerRecords<String, byte[]> records = kafkaConsumer.poll(Duration.ofSeconds(5));
         assertEquals(1, records.count());
+
     }
 
     @Test
@@ -125,11 +129,12 @@ public class KafkaStorageIT {
         Span child1 = Span.newBuilder().traceId("b").id("b").localEndpoint(Endpoint.newBuilder().serviceName("service_b").build()).name("operation_b").timestamp(TODAY).duration(2).build();
         storage.spanConsumer().accept(Arrays.asList(root1, child1)).execute();
         Thread.sleep(60000);
-        List<String> result = storage.spanStore().getServiceNames().execute();
+        SpanStore spanStore = storage.spanStore();
+        List<String> result = spanStore.getServiceNames().execute();
 
         assertEquals(2, result.size());
 
-        List<String> spans = storage.spanStore().getSpanNames("service_a").execute();
+        List<String> spans = spanStore.getSpanNames("service_a").execute();
 
         assertEquals(2, spans.size());
     }

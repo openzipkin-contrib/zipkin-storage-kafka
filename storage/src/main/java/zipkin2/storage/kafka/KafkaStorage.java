@@ -23,16 +23,12 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.state.StoreBuilder;
-import org.apache.kafka.streams.state.Stores;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.CheckResult;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
-import zipkin2.storage.kafka.internal.stores.IndexStateStore;
 import zipkin2.storage.kafka.internal.IndexTopologySupplier;
 import zipkin2.storage.kafka.internal.ProcessTopologySupplier;
 
@@ -130,6 +126,12 @@ public class KafkaStorage extends StorageComponent {
             return this;
         }
 
+        public Builder indexDirectory(String indexDirectory) {
+            if (indexDirectory == null) throw new NullPointerException("indexDirectory == null");
+            this.indexDirectory = indexDirectory;
+            return this;
+        }
+
         @Override
         public StorageComponent build() {
                 return new KafkaStorage(this);
@@ -139,13 +141,19 @@ public class KafkaStorage extends StorageComponent {
         }
     }
 
-    final Producer<String, byte[]> kafkaProducer;
+    final Properties producerConfigs;
     final String spansTopic;
 
-    final KafkaStreamsWorker kafkaStreamsWorker;
-    final KafkaStreams processKafkaStreams;
-    final KafkaStreamsWorker indexKafkaStreamsWorker;
-    final KafkaStreams indexKafkaStreams;
+    final Properties processStreamsConfig;
+    final Properties indexStreamsConfig;
+    final Topology processTopology;
+    final Topology indexTopology;
+
+    Producer<String, byte[]> producer;
+    KafkaStreamsWorker processStreamsWorker;
+    KafkaStreams processStreams;
+    KafkaStreamsWorker indexStreamsWorker;
+    KafkaStreams indexStreams;
 
     final String traceStoreName;
     final String serviceStoreName;
@@ -157,84 +165,104 @@ public class KafkaStorage extends StorageComponent {
         this.serviceStoreName = builder.serviceStoreName;
         this.dependencyStoreName = builder.dependencyStoreName;
         this.indexStoreName = builder.indexStoreName;
-
         this.spansTopic = builder.spansTopic;
-        final Properties producerConfigs = new Properties();
+
+        producerConfigs = new Properties();
         producerConfigs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
         producerConfigs.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         producerConfigs.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
         producerConfigs.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
         producerConfigs.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.ZSTD.name);
-        //TODO add a way to introduce custom properties
-        this.kafkaProducer = new KafkaProducer<>(producerConfigs);
 
-        StoreBuilder<KeyValueStore<String, byte[]>> traceStoreBuilder = Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore(builder.traceStoreName),
-                Serdes.String(),
-                Serdes.ByteArray());
-        StoreBuilder<KeyValueStore<String, byte[]>> serviceStoreBuilder = Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore(builder.serviceStoreName),
-                Serdes.String(),
-                Serdes.ByteArray());
-        StoreBuilder<KeyValueStore<String, byte[]>> dependencyStoreBuilder = Stores.keyValueStoreBuilder(
-                Stores.persistentKeyValueStore(builder.dependencyStoreName),
-                Serdes.String(),
-                Serdes.ByteArray());
+        processStreamsConfig = new Properties();
+        processStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
+        processStreamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+        processStreamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
+        processStreamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, builder.applicationId);
+        processStreamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
+        processStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.stateStoreDir);
+        processStreamsConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.ZSTD.name);
 
-        final Properties streamsConfig = new Properties();
-        streamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
-        streamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
-        streamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
-        streamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, builder.applicationId);
-        streamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
-        streamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.stateStoreDir);
-        streamsConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.ZSTD.name);
+        processTopology = new ProcessTopologySupplier(spansTopic, traceStoreName, serviceStoreName, dependencyStoreName).get();
 
-        final Topology topology = new ProcessTopologySupplier(
-                spansTopic, traceStoreBuilder.name(),
-                serviceStoreBuilder.name(),
-                dependencyStoreBuilder.name()).get();
+        indexStreamsConfig = new Properties();
+        indexStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
+        indexStreamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+        indexStreamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
+        indexStreamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, "lucene_" + builder.applicationId);
+        indexStreamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
+        indexStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.stateStoreDir + "_lucene");
 
-        this.processKafkaStreams = new KafkaStreams(topology, streamsConfig);
+        indexTopology = new IndexTopologySupplier(traceStoreName, indexStoreName, builder.indexDirectory).get();
+    }
 
-        kafkaStreamsWorker = new KafkaStreamsWorker(processKafkaStreams);
-        kafkaStreamsWorker.get();
+    volatile boolean closeCalled, connected;
 
-        final Properties luceneStreamsConfig = new Properties();
-        luceneStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
-        luceneStreamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
-        luceneStreamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
-        luceneStreamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, "lucene_" + builder.applicationId);
-        luceneStreamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
-        luceneStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.stateStoreDir + "_lucene");
+    void connect() {
+        if (closeCalled) throw new IllegalStateException("closed");
+        if (!connected) {
+            // blocking to prevent access while initializing
+            synchronized (this) {
+                if (closeCalled) throw new IllegalStateException("closed");
+                if (!connected) {
+                    connectConsumer();
+                    connectStore();
+                    connected = true;
+                }
+            }
+        }
+    }
 
-        IndexStateStore.Builder indexStoreBuilder = IndexStateStore
-                .builder(builder.indexStoreName)
-                .persistent(builder.indexDirectory);
-        Topology luceneTopology = new IndexTopologySupplier(traceStoreBuilder.name(), indexStoreBuilder).get();
-        this.indexKafkaStreams = new KafkaStreams(luceneTopology, luceneStreamsConfig);
+    void connectConsumer() {
+        producer = new KafkaProducer<>(producerConfigs);
+    }
 
-        indexKafkaStreamsWorker = new KafkaStreamsWorker(indexKafkaStreams);
-        indexKafkaStreamsWorker.get();
+    void connectStore() {
+        processStreams = new KafkaStreams(processTopology, processStreamsConfig);
+        processStreamsWorker = new KafkaStreamsWorker(processStreams);
+        processStreamsWorker.get();
+
+        indexStreams = new KafkaStreams(indexTopology, indexStreamsConfig);
+        indexStreamsWorker = new KafkaStreamsWorker(indexStreams);
+        indexStreamsWorker.get();
     }
 
     @Override
     public SpanStore spanStore() {
+        connect();
         return new KafkaSpanStore(this);
     }
 
     @Override
     public SpanConsumer spanConsumer() {
+        connect();
         return new KafkaSpanConsumer(this);
     }
 
     @Override
     public void close() {
-        kafkaProducer.close(1, TimeUnit.SECONDS);
-        processKafkaStreams.close(Duration.ofSeconds(1));
-        indexKafkaStreams.close(Duration.ofSeconds(1));
-        kafkaStreamsWorker.close();
-        indexKafkaStreamsWorker.close();
+        if (closeCalled) return;
+        // blocking to prevent access while initializing
+        synchronized (this) {
+            if (!closeCalled) {
+                doClose();
+                closeCalled = true;
+            }
+        }
+
+    }
+
+    void doClose() {
+        try {
+            producer.flush();
+            producer.close(1, TimeUnit.SECONDS);
+            processStreams.close(Duration.ofSeconds(1));
+            indexStreams.close(Duration.ofSeconds(1));
+            processStreamsWorker.close();
+            indexStreamsWorker.close();
+        } catch (Exception | Error e) {
+            LOG.warn("error closing client {}", e.getMessage(), e);
+        }
     }
 
     public static final class KafkaStreamsWorker {
