@@ -1,6 +1,6 @@
 # Zipkin Storage: Kafka
 
-![](https://www.travis-ci.org/jeqo/zipkin-storage-kafka.svg?branch=master)
+[![Build Status](https://www.travis-ci.org/jeqo/zipkin-storage-kafka.svg?branch=master)](https://www.travis-ci.org/jeqo/zipkin-storage-kafka)
 
 Proof of concept of fully-featured Kafka-based storage for Zipkin.
 
