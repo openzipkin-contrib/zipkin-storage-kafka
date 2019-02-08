@@ -59,6 +59,7 @@ public class KafkaStorage extends StorageComponent {
   KafkaStreamsWorker indexStreamsWorker;
   KafkaStreams indexStreams;
   volatile boolean closeCalled, connected;
+
   KafkaStorage(Builder builder) {
     this.tracesTopic = builder.tracesTopic;
     this.servicesTopic = builder.servicesTopic;

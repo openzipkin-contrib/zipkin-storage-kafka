@@ -38,6 +38,7 @@ public class IndexTopologySupplier implements Supplier<Topology> {
   final String traceStoreName;
   final String indexDirectory;
   final String indexStoreName;
+
   final SpansSerde spansSerde;
   final SpanNamesSerde spanNamesSerde;
 
@@ -66,11 +67,11 @@ public class IndexTopologySupplier implements Supplier<Topology> {
         Consumed.with(Serdes.String(), spansSerde),
         () -> new
             Processor() {
-              IndexStateStore lucene;
+              IndexStateStore index;
 
               @Override
               public void init(ProcessorContext context) {
-                lucene = (IndexStateStore) context.getStateStore(indexStoreName);
+                index = (IndexStateStore) context.getStateStore(indexStoreName);
               }
 
               @Override
@@ -101,12 +102,12 @@ public class IndexTopologySupplier implements Supplier<Topology> {
                   }
                   docs.add(doc);
                 }
-                lucene.put(docs);
+                index.put(docs);
               }
 
               @Override
               public void close() {
-                lucene.close();
+                index.close();
               }
             });
     return builder.build();

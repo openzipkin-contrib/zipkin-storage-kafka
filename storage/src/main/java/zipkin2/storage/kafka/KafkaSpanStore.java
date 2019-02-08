@@ -42,27 +42,27 @@ import java.util.stream.Collectors;
 public class KafkaSpanStore implements SpanStore {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
 
-  final KafkaStreams kafkaStreams;
-
+  final KafkaStreams processKafkaStreams;
   final ReadOnlyKeyValueStore<String, Set<String>> serviceStore;
   final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
   final ReadOnlyKeyValueStore<String, DependencyLink> dependencyStore;
+
+  final KafkaStreams indexKafkaStreams;
   final String indexStoreName;
-  final KafkaStreams luceneKafkaStreams;
 
   KafkaSpanStore(KafkaStorage storage) {
-    kafkaStreams = storage.processStreams;
-    traceStore = kafkaStreams.store(storage.tracesTopic, QueryableStoreTypes.keyValueStore());
-    serviceStore = kafkaStreams.store(storage.servicesTopic, QueryableStoreTypes.keyValueStore());
+    processKafkaStreams = storage.processStreams;
+    traceStore = processKafkaStreams.store(storage.tracesTopic, QueryableStoreTypes.keyValueStore());
+    serviceStore = processKafkaStreams.store(storage.servicesTopic, QueryableStoreTypes.keyValueStore());
     dependencyStore =
-        kafkaStreams.store(storage.dependenciesTopic, QueryableStoreTypes.keyValueStore());
+        processKafkaStreams.store(storage.dependenciesTopic, QueryableStoreTypes.keyValueStore());
     indexStoreName = storage.indexStoreName;
-    luceneKafkaStreams = storage.indexStreams;
+    indexKafkaStreams = storage.indexStreams;
   }
 
   @Override
   public Call<List<List<Span>>> getTraces(QueryRequest request) {
-    return new GetTracesCall(luceneKafkaStreams, request, traceStore, indexStoreName);
+    return new GetTracesCall(indexKafkaStreams, request, traceStore, indexStoreName);
   }
 
   @Override
