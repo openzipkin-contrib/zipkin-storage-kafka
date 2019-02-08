@@ -2,4 +2,4 @@
 zipkin:
   storage:
     kafka:
-      bootstrapServers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+      bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
