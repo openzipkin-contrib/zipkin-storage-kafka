@@ -36,12 +36,4 @@ class ZipkinKafkaStorageAutoConfiguration {
     StorageComponent storage(ZipkinKafkaStorageProperties properties) {
         return properties.toBuilder().build();
     }
-
-//    @Bean
-//    @ConditionalOnProperty(
-//            value = "zipkin.storage.voltdb.scheduling.enabled", havingValue = "true", matchIfMissing = true
-//    )
-//    VoltDBScheduledTasks scheduledTasks(VoltDBStorage storage) {
-//        return new VoltDBScheduledTasks(storage);
-//    }
 }

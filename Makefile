@@ -1,5 +1,23 @@
 .PHONY: all
-all: build zipkin-local
+all: build
+
+.PHONY: run
+run: build zipkin-local
+
+.PHONY: run-docker
+run-docker: docker-build docker-up
+
+.PHONY: docker-build
+docker-build: build
+	docker-compose build
+
+.PHONY: docker-up
+docker-up:
+	docker-compose up -d
+
+.PHONY: docker-kafka-up
+docker-kafka-up:
+	docker-compose up -d kafka zookeeper
 
 .PHONY: license-header
 license-header:

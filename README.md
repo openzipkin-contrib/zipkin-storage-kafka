@@ -88,9 +88,38 @@ in-memory index that can handle these queries.
 
 ## Get started
 
-### With Docker
+To build the project you will need Java 8.
 
-//TODO
+### Run locally
+
+To run locally, first you need to get Zipkin binaries:
+
+```bash
+make get-zipkin
+```
+
+By default Zipkin will be waiting for a Kafka broker to be running on `localhost:29092`. If you don't have one, 
+this service is available via Docker Compose:
+
+```bash
+make docker-kafka-up
+```
+
+Then run Zipkin locally:
+
+```bash
+make run
+```
+
+### Run with Docker
+
+Run:
+
+```bash
+make run-docker
+```
+
+And Docker image will be built and Docker compose will start.
 
 ## Acknowledged
 
