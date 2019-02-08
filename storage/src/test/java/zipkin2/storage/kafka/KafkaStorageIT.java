@@ -48,6 +48,7 @@ public class KafkaStorageIT {
     public void should_consume_spans() throws InterruptedException {
         StorageComponent storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers())
                 .stateStoreDir("target/kafka-streams/" + Instant.now().getEpochSecond())
+                .spansTopic("topic")
                 .build();
         Thread.sleep(1000);
         Span root = Span.newBuilder().traceId("a").id("a").timestamp(TODAY).duration(10).build();
@@ -84,6 +85,7 @@ public class KafkaStorageIT {
 
         StorageComponent storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers())
                 .stateStoreDir("target/kafka-streams/" + Instant.now().getEpochSecond())
+                .spansTopic("topic")
                 .build();
         Thread.sleep(3000);
         Span root = Span.newBuilder().traceId("a").id("a").timestamp(TODAY).duration(10).build();
@@ -105,6 +107,7 @@ public class KafkaStorageIT {
 
         StorageComponent storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers())
                 .stateStoreDir("target/kafka-streams/" + Instant.now().getEpochSecond())
+                .spansTopic("topic")
                 .build();
         Thread.sleep(3000);
         Span root = Span.newBuilder().traceId("a").id("a").localEndpoint(Endpoint.newBuilder().serviceName("service_a").build()).name("operation_a").timestamp(TODAY).duration(10).build();
