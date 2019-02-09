@@ -13,6 +13,8 @@
  */
 package zipkin2.storage.kafka;
 
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -42,6 +44,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 public class KafkaStorage extends StorageComponent {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
+
   final Properties producerConfigs;
   final Properties processStreamsConfig;
   final Properties indexStreamsConfig;
@@ -53,11 +56,14 @@ public class KafkaStorage extends StorageComponent {
   final String dependenciesTopic;
   final String indexStoreName;
   final boolean indexPersistent;
+
+  AdminClient adminClient;
   Producer<String, byte[]> producer;
   KafkaStreamsWorker processStreamsWorker;
   KafkaStreams processStreams;
   KafkaStreamsWorker indexStreamsWorker;
   KafkaStreams indexStreams;
+
   volatile boolean closeCalled, connected;
 
   KafkaStorage(Builder builder) {
@@ -67,6 +73,10 @@ public class KafkaStorage extends StorageComponent {
     this.indexStoreName = builder.indexStoreName;
     this.spansTopic = builder.spansTopic;
     this.indexPersistent = builder.indexPersistent;
+
+    Properties adminConfigs = new Properties();
+    adminConfigs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
+    adminClient = AdminClient.create(adminConfigs);
 
     producerConfigs = new Properties();
     producerConfigs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -189,6 +199,8 @@ public class KafkaStorage extends StorageComponent {
     String servicesTopic = "zipkin-services_v1";
     String dependenciesTopic = "zipkin-dependencies_v1";
 
+    boolean ensureTopics = true;
+
     Builder() {
     }
 
@@ -211,15 +223,12 @@ public class KafkaStorage extends StorageComponent {
       return this;
     }
 
+    /**
+     * Kafka Bootstrap Servers list to establish connection with a Cluster.
+     */
     public Builder bootstrapServers(String bootstrapServers) {
       if (bootstrapServers == null) throw new NullPointerException("bootstrapServers == null");
       this.bootstrapServers = bootstrapServers;
-      return this;
-    }
-
-    public Builder spansTopic(String spansTopic) {
-      if (spansTopic == null) throw new NullPointerException("spansTopic == null");
-      this.spansTopic = spansTopic;
       return this;
     }
 
@@ -239,28 +248,27 @@ public class KafkaStorage extends StorageComponent {
       return this;
     }
 
-    public Builder processStreamStoreDirectory(String processStreamStoreDirectory) {
-      if (processStreamStoreDirectory == null) {
-        throw new NullPointerException("processStreamStoreDirectory == null");
-      }
-      this.processStreamStoreDirectory = processStreamStoreDirectory;
+    /**
+     * Kafka topic name where incoming list of Spans are stored.
+     */
+    public Builder spansTopic(String spansTopic) {
+      if (spansTopic == null) throw new NullPointerException("spansTopic == null");
+      this.spansTopic = spansTopic;
       return this;
     }
 
-    public Builder indexStreamStoreDirectory(String indexStreamStoreDirectory) {
-      if (indexStreamStoreDirectory == null) {
-        throw new NullPointerException("processStreamStoreDirectory == null");
-      }
-      this.indexStreamStoreDirectory = indexStreamStoreDirectory;
-      return this;
-    }
-
+    /**
+     * Kafka topic name where traces are stored.
+     */
     public Builder tracesTopic(String tracesStoreName) {
       if (tracesStoreName == null) throw new NullPointerException("tracesTopic == null");
       this.tracesTopic = tracesStoreName;
       return this;
     }
 
+    /**
+     * Kafka topic name where Service names are stored.
+     */
     public Builder servicesTopic(String serviceOperationsStoreName) {
       if (serviceOperationsStoreName == null) {
         throw new NullPointerException("servicesTopic == null");
@@ -269,6 +277,9 @@ public class KafkaStorage extends StorageComponent {
       return this;
     }
 
+    /**
+     * Kafka topic name where Dependencies are stored.
+     */
     public Builder dependenciesTopic(String dependenciesStoreName) {
       if (dependenciesStoreName == null) {
         throw new NullPointerException("dependenciesTopic == null");
@@ -277,18 +288,50 @@ public class KafkaStorage extends StorageComponent {
       return this;
     }
 
+    /**
+     * Kafka Streams local state directory where processing results (e.g., traces, services,
+     * dependencies) are stored.
+     */
+    public Builder processStreamStoreDirectory(String processStreamStoreDirectory) {
+      if (processStreamStoreDirectory == null) {
+        throw new NullPointerException("processStreamStoreDirectory == null");
+      }
+      this.processStreamStoreDirectory = processStreamStoreDirectory;
+      return this;
+    }
+
+    /**
+     * Directory where local state from index processing is stored.
+     */
+    public Builder indexStreamStoreDirectory(String indexStreamStoreDirectory) {
+      if (indexStreamStoreDirectory == null) {
+        throw new NullPointerException("processStreamStoreDirectory == null");
+      }
+      this.indexStreamStoreDirectory = indexStreamStoreDirectory;
+      return this;
+    }
+
+    /**
+     * Kafka Streams store name for indexing processing.
+     */
     public Builder indexStoreName(String indexStoreName) {
       if (indexStoreName == null) throw new NullPointerException("indexStoreName == null");
       this.indexStoreName = indexStoreName;
       return this;
     }
 
+    /**
+     * Index storage directory.
+     */
     public Builder indexDirectory(String indexDirectory) {
       if (indexDirectory == null) throw new NullPointerException("indexDirectory == null");
       this.indexDirectory = indexDirectory;
       return this;
     }
 
+    /**
+     * Condition to use persistent index or not.
+     */
     public Builder indexPersistent(boolean indexPersistent) {
       this.indexPersistent = indexPersistent;
       return this;
