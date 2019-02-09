@@ -12,7 +12,7 @@
 # the License.
 #
 
-FROM openzipkin/jre-full:1.8.0_191
+FROM openjdk:11
 
 ENV ZIPKIN_REPO https://jcenter.bintray.com
 ENV ZIPKIN_VERSION 2.12.1
