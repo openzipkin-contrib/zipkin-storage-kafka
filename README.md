@@ -121,6 +121,16 @@ make run-docker
 
 And Docker image will be built and Docker compose will start.
 
+### Testing
+
+To validate storage:
+
+```bash
+make zipkin-test
+```
+
+This will start a browser and check a traces has been registered.
+
 ## Acknowledged
 
 This project is inspired in Adrian Cole's <https://github.com/adriancole/zipkin-voltdb>
