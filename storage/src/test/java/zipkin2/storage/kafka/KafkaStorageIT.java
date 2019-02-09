@@ -13,161 +13,158 @@
  */
 package zipkin2.storage.kafka;
 
-import org.apache.kafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.AdminClientConfig;
-import org.apache.kafka.clients.admin.NewTopic;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.testcontainers.containers.KafkaContainer;
-import zipkin2.Callback;
 import zipkin2.Endpoint;
 import zipkin2.Span;
-import zipkin2.storage.SpanStore;
-import zipkin2.storage.StorageComponent;
+import zipkin2.storage.QueryRequest;
 
-import java.io.IOException;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
-
-import static org.junit.Assert.*;
+import static org.awaitility.Awaitility.await;
+import static org.junit.Assert.fail;
 import static zipkin2.TestObjects.TODAY;
 
 public class KafkaStorageIT {
   @Rule
   public KafkaContainer kafka = new KafkaContainer("5.1.0");
 
-  private StorageComponent storage;
+  private KafkaStorage storage;
+  private Properties testConsumerConfig;
 
   @Before
   public void start() {
+    testConsumerConfig = new Properties();
+    testConsumerConfig.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
+    testConsumerConfig.put(ConsumerConfig.GROUP_ID_CONFIG, "test");
+    testConsumerConfig.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+        ByteArrayDeserializer.class);
+    testConsumerConfig.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+        ByteArrayDeserializer.class);
+
     if (!kafka.isRunning()) fail();
 
     long epochMilli = Instant.now().toEpochMilli();
-    storage = new KafkaStorage.Builder().bootstrapServers(kafka.getBootstrapServers())
-        .processStreamStoreDirectory("target/kafka-streams/" + epochMilli)
-        .indexDirectory("target/index/" + epochMilli)
-        .spansTopic("topic")
+    storage = (KafkaStorage) new KafkaStorage.Builder().ensureTopics(true)
+        .bootstrapServers(kafka.getBootstrapServers())
+        .processStreamStoreDirectory("target/kafka-streams/process/" + epochMilli)
+        .indexStreamStoreDirectory("target/kafka-streams/index/" + epochMilli)
+        .indexStorageDirectory("target/index/" + epochMilli)
+        .spansTopic(KafkaStorage.Topic.builder("topic").build())
         .build();
   }
 
   @After
-  public void closeStorageReleaseLock() throws IOException {
+  public void closeStorageReleaseLock() {
     storage.close();
     storage = null;
   }
 
   @Test
-  public void should_consume_spans() throws InterruptedException {
-    Thread.sleep(1000);
-    Span root = Span.newBuilder().traceId("a").id("a").timestamp(TODAY).duration(10).build();
-    storage.spanConsumer().accept(Collections.singletonList(root)).enqueue(new Callback<Void>() {
-      @Override
-      public void onSuccess(Void value) {
-        assertTrue(true);
-      }
+  public void shouldStoreSpansAndServices() throws Exception {
+    Span root0 = Span.newBuilder()
+        .traceId("a")
+        .id("a")
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+        .name("op_a")
+        .timestamp(TODAY)
+        .duration(10)
+        .build();
+    Span child0 = Span.newBuilder()
+        .traceId("a")
+        .id("b")
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+        .name("op_b")
+        .timestamp(TODAY)
+        .duration(2)
+        .build();
+    List<Span> spans0 = Arrays.asList(root0, child0);
 
-      @Override
-      public void onError(Throwable t) {
-        fail("Error consuming span");
-      }
-    });
+    storage.spanConsumer().accept(spans0).execute();
 
-    Properties properties = new Properties();
-    properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
-    properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-    properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
-    properties.put(ConsumerConfig.GROUP_ID_CONFIG, "test");
-    properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,
-        OffsetResetStrategy.EARLIEST.name().toLowerCase());
-    KafkaConsumer<String, byte[]> kafkaConsumer = new KafkaConsumer<>(properties);
-    kafkaConsumer.subscribe(Collections.singletonList("topic"));
-    ConsumerRecords<String, byte[]> records = kafkaConsumer.poll(Duration.ofSeconds(5));
-    assertEquals(1, records.count());
+    IntegrationTestUtils.waitUntilMinRecordsReceived(testConsumerConfig, storage.spansTopic.name, 2,
+        10000);
+    IntegrationTestUtils.waitUntilMinRecordsReceived(testConsumerConfig,
+        storage.servicesTopic.name,
+        2, 10000);
   }
 
   @Test
-  public void should_get_trace() throws Exception {
-    Properties props = new Properties();
-    props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
-    AdminClient adminClient = AdminClient.create(props);
-    adminClient.createTopics(Collections.singletonList(new NewTopic("topic", 1, (short) 1)))
-        .all()
-        .get();
-
-    Thread.sleep(3000);
-    Span root = Span.newBuilder().traceId("a").id("a").timestamp(TODAY).duration(10).build();
-    Span child = Span.newBuilder().traceId("a").id("b").timestamp(TODAY).duration(2).build();
-    storage.spanConsumer().accept(Arrays.asList(root, child)).execute();
-    Thread.sleep(10000);
-    List<Span> result = storage.spanStore().getTrace("000000000000000a").execute();
-
-    assertEquals(2, result.size());
-  }
-
-  @Test
-  public void should_get_service() throws Exception {
-    Properties props = new Properties();
-    props.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
-    AdminClient adminClient = AdminClient.create(props);
-    adminClient.createTopics(Collections.singletonList(new NewTopic("topic", 1, (short) 1)))
-        .all()
-        .get();
-
-    Thread.sleep(3000);
+  public void shouldCreateDependencyGraph() throws Exception {
     Span root = Span.newBuilder()
         .traceId("a")
         .id("a")
-        .localEndpoint(Endpoint.newBuilder().serviceName("service_a").build())
-        .name("operation_a")
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+        .remoteEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+        .name("op_a")
+        .kind(Span.Kind.CLIENT)
         .timestamp(TODAY)
         .duration(10)
         .build();
     Span child = Span.newBuilder()
         .traceId("a")
         .id("b")
-        .localEndpoint(Endpoint.newBuilder().serviceName("service_a").build())
-        .name("operation_b")
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+        .name("op_b")
+        .kind(Span.Kind.SERVER)
         .timestamp(TODAY)
         .duration(2)
         .build();
-    storage.spanConsumer().accept(Arrays.asList(root, child)).execute();
-    Span root1 = Span.newBuilder()
-        .traceId("b")
+    List<Span> spans = Arrays.asList(root, child);
+    storage.spanConsumer().accept(spans).execute();
+
+    IntegrationTestUtils.waitUntilMinRecordsReceived(testConsumerConfig,
+        storage.dependenciesTopic.name, 1, 10000);
+  }
+
+  @Test
+  public void shouldFindTraces() throws Exception {
+    Span root = Span.newBuilder()
+        .traceId("a")
         .id("a")
-        .localEndpoint(Endpoint.newBuilder().serviceName("service_b").build())
-        .name("operation_a")
-        .timestamp(TODAY)
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+        .remoteEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+        .name("op_a")
+        .kind(Span.Kind.CLIENT)
+        .timestamp(Long.valueOf(TODAY + "000"))
         .duration(10)
         .build();
-    Span child1 = Span.newBuilder()
-        .traceId("b")
+    Span child = Span.newBuilder()
+        .traceId("a")
         .id("b")
-        .localEndpoint(Endpoint.newBuilder().serviceName("service_b").build())
-        .name("operation_b")
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+        .name("op_b")
+        .kind(Span.Kind.SERVER)
+        .timestamp(Long.valueOf(TODAY + "000"))
         .timestamp(TODAY)
         .duration(2)
         .build();
-    storage.spanConsumer().accept(Arrays.asList(root1, child1)).execute();
-    Thread.sleep(60000);
-    SpanStore spanStore = storage.spanStore();
-    List<String> result = spanStore.getServiceNames().execute();
+    List<Span> spans = Arrays.asList(root, child);
+    storage.spanConsumer().accept(spans).execute();
 
-    assertEquals(2, result.size());
-
-    List<String> spans = spanStore.getSpanNames("service_a").execute();
-
-    assertEquals(2, spans.size());
+    IntegrationTestUtils.waitUntilMinRecordsReceived(testConsumerConfig, storage.spansTopic.name, 2,
+        10000);
+    await().atMost(5, TimeUnit.SECONDS)
+        .until(() -> {
+          List<List<Span>> traces =
+              storage.spanStore()
+                  .getTraces(QueryRequest.newBuilder()
+                      .endTs(TODAY + 1)
+                      .limit(10)
+                      .lookback(Duration.ofMinutes(1).toMillis())
+                      .build())
+                  .execute();
+          return traces.size() == 1 && traces.get(0).size() == 2;
+        });
   }
 }

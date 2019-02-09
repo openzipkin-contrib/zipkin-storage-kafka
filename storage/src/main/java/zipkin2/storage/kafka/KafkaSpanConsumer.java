@@ -30,7 +30,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
   final Producer<String, byte[]> kafkaProducer;
 
   KafkaSpanConsumer(KafkaStorage storage) {
-    spansTopic = storage.spansTopic;
+    spansTopic = storage.spansTopic.name;
     kafkaProducer = storage.producer;
   }
 

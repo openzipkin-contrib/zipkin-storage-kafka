@@ -45,7 +45,7 @@ public class IndexStateStore implements StateStore {
     StandardAnalyzer analyzer = new StandardAnalyzer();
     IndexWriterConfig indexWriterConfigs = new IndexWriterConfig(analyzer);
     indexWriter = new IndexWriter(directory, indexWriterConfigs);
-    //        indexWriter.commit();
+    indexWriter.commit();
 
     name = builder.name();
     persistent = builder.isPersistent();

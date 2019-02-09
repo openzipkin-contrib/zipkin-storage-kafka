@@ -13,6 +13,14 @@
  */
 package zipkin2.storage.kafka;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
@@ -21,7 +29,13 @@ import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.search.*;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TopFieldDocs;
 import org.apache.lucene.store.Directory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,72 +48,42 @@ import zipkin2.storage.SpanStore;
 import zipkin2.storage.kafka.internal.stores.IndexStateStore;
 import zipkin2.storage.kafka.internal.stores.IndexStoreType;
 
-import java.io.IOException;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
 public class KafkaSpanStore implements SpanStore {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
 
-  final KafkaStreams kafkaStreams;
-
-  final ReadOnlyKeyValueStore<String, Set<String>> serviceStore;
-  final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
-  final ReadOnlyKeyValueStore<String, DependencyLink> dependencyStore;
+  final String tracesStoreName;
+  final String serviceStoreName;
+  final String dependenciesStoreName;
   final String indexStoreName;
-  final KafkaStreams luceneKafkaStreams;
+  final KafkaStreams processStreams;
+  final KafkaStreams indexStreams;
 
   KafkaSpanStore(KafkaStorage storage) {
-    kafkaStreams = storage.processStreams;
-    traceStore = kafkaStreams.store(storage.tracesTopic, QueryableStoreTypes.keyValueStore());
-    serviceStore = kafkaStreams.store(storage.servicesTopic, QueryableStoreTypes.keyValueStore());
-    dependencyStore =
-        kafkaStreams.store(storage.dependenciesTopic, QueryableStoreTypes.keyValueStore());
+    tracesStoreName = storage.tracesTopic.name;
+    serviceStoreName = storage.servicesTopic.name;
+    dependenciesStoreName = storage.dependenciesTopic.name;
     indexStoreName = storage.indexStoreName;
-    luceneKafkaStreams = storage.indexStreams;
+    processStreams = storage.processStreams;
+    indexStreams = storage.indexStreams;
   }
 
   @Override
   public Call<List<List<Span>>> getTraces(QueryRequest request) {
-    return new GetTracesCall(luceneKafkaStreams, request, traceStore, indexStoreName);
-  }
-
-  @Override
-  public Call<List<Span>> getTrace(String traceId) {
-    return new GetTraceProto3Call(traceStore, traceId);
-  }
-
-  @Override
-  public Call<List<String>> getServiceNames() {
-    return new GetServiceNamesCall(serviceStore);
-  }
-
-  @Override
-  public Call<List<String>> getSpanNames(String serviceName) {
-    return new GetSpanNamesCall(serviceStore, serviceName);
-  }
-
-  @Override
-  public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
-    return new GetDependenciesJsonCall(dependencyStore);
+    ReadOnlyKeyValueStore<String, List<Span>> traceStore =
+        processStreams.store(tracesStoreName, QueryableStoreTypes.keyValueStore());
+    IndexStateStore indexStateStore = indexStreams.store(indexStoreName, new IndexStoreType());
+    return new GetTracesCall(indexStateStore, request, traceStore);
   }
 
   static class GetTracesCall extends Call.Base<List<List<Span>>> {
-    final KafkaStreams kafkaStreams;
-    final String indexStoreName;
-    final Directory directory;
+    final IndexStateStore indexStateStore;
     final QueryRequest queryRequest;
     final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
 
-    GetTracesCall(KafkaStreams kafkaStreams,
+    GetTracesCall(IndexStateStore indexStateStore,
         QueryRequest queryRequest,
-        ReadOnlyKeyValueStore<String, List<Span>> traceStore,
-        String indexStoreName) {
-      this.kafkaStreams = kafkaStreams;
-      this.indexStoreName = indexStoreName;
-      IndexStateStore lucene = kafkaStreams.store(indexStoreName, new IndexStoreType());
-      this.directory = lucene.directory();
+        ReadOnlyKeyValueStore<String, List<Span>> traceStore) {
+      this.indexStateStore = indexStateStore;
       this.queryRequest = queryRequest;
       this.traceStore = traceStore;
     }
@@ -110,6 +94,7 @@ public class KafkaSpanStore implements SpanStore {
     }
 
     private List<List<Span>> query() throws IOException {
+      Directory directory = indexStateStore.directory();
       IndexReader reader = DirectoryReader.open(directory);
       IndexSearcher indexSearcher = new IndexSearcher(reader);
 
@@ -142,8 +127,10 @@ public class KafkaSpanStore implements SpanStore {
 
       long start = queryRequest.endTs() - queryRequest.lookback();
       long end = queryRequest.endTs();
-      builder.add(LongPoint.newRangeQuery(
-          "ts", Long.valueOf(start + "000"), Long.valueOf(end + "000")), BooleanClause.Occur.MUST);
+      //TODO No timestamp field in Lucene. Find a way to query timestamp instead of longs.
+      long lowerValue = Long.parseLong(start + "000");
+      long upperValue = Long.parseLong(end + "000");
+      builder.add(LongPoint.newRangeQuery("ts", lowerValue, upperValue), BooleanClause.Occur.MUST);
 
       int total = queryRequest.limit();
       Sort sort = Sort.RELEVANCE;
@@ -153,7 +140,7 @@ public class KafkaSpanStore implements SpanStore {
       BooleanQuery query = builder.build();
       TopFieldDocs docs = indexSearcher.search(query, total, sort);
 
-      LOG.debug("Total results of query {}: {}", query, docs.totalHits);
+      LOG.info("Total results of query {}: {}", query, docs.totalHits);
 
       for (ScoreDoc doc : docs.scoreDocs) {
         Document document = indexSearcher.doc(doc.doc);
@@ -179,92 +166,154 @@ public class KafkaSpanStore implements SpanStore {
 
     @Override
     public Call<List<List<Span>>> clone() {
-      return new GetTracesCall(kafkaStreams, queryRequest, traceStore, indexStoreName);
+      return new GetTracesCall(indexStateStore, queryRequest, traceStore);
     }
   }
 
-  static class GetTraceProto3Call extends KafkaStreamsStoreCall<String, List<Span>, List<Span>> {
-    final String key;
+  @Override
+  public Call<List<Span>> getTrace(String traceId) {
+    return new GetTraceCall(processStreams, tracesStoreName, traceId);
+  }
 
-    GetTraceProto3Call(ReadOnlyKeyValueStore<String, List<Span>> store, String key) {
-      super(store);
-      this.key = key;
+  static class GetTraceCall extends KafkaStreamsStoreCall<List<Span>> {
+    final KafkaStreams kafkaStreams;
+    final String storeName;
+    final String traceId;
+
+    GetTraceCall(KafkaStreams kafkaStreams, String storeName, String traceId) {
+      this.kafkaStreams = kafkaStreams;
+      this.storeName = storeName;
+      this.traceId = traceId;
     }
 
     @Override
-    Function<ReadOnlyKeyValueStore<String, List<Span>>, List<Span>> query() {
-      return store -> store.get(key);
+    Supplier<List<Span>> query() {
+      return () -> {
+        try {
+          ReadOnlyKeyValueStore<String, List<Span>> traceStore =
+              kafkaStreams.store(storeName, QueryableStoreTypes.keyValueStore());
+          return traceStore.get(traceId);
+        } catch (Exception e) {
+          LOG.error("Error getting trace with ID {}", traceId, e);
+          return null;
+        }
+      };
     }
 
     @Override
     public Call<List<Span>> clone() {
-      return new GetTraceProto3Call(store, key);
+      return new GetTraceCall(kafkaStreams, storeName, traceId);
     }
   }
 
-  static class GetServiceNamesCall
-      extends KafkaStreamsStoreCall<String, Set<String>, List<String>> {
-    GetServiceNamesCall(ReadOnlyKeyValueStore<String, Set<String>> store) {
-      super(store);
+  @Override
+  public Call<List<String>> getServiceNames() {
+    return new GetServiceNamesCall(processStreams, serviceStoreName);
+  }
+
+  static class GetServiceNamesCall extends KafkaStreamsStoreCall<List<String>> {
+    final KafkaStreams kafkaStreams;
+    final String storeName;
+
+    GetServiceNamesCall(KafkaStreams kafkaStreams, String storeName) {
+      this.kafkaStreams = kafkaStreams;
+      this.storeName = storeName;
     }
 
     @Override
-    Function<ReadOnlyKeyValueStore<String, Set<String>>, List<String>> query() {
-      return store -> {
-        List<String> keys = new ArrayList<>();
-        store.all().forEachRemaining(keyValue -> keys.add(keyValue.key));
-        return keys;
+    Supplier<List<String>> query() {
+      return () -> {
+        try {
+          ReadOnlyKeyValueStore<String, Set<String>> store =
+              kafkaStreams.store(storeName, QueryableStoreTypes.keyValueStore());
+          List<String> keys = new ArrayList<>();
+          store.all().forEachRemaining(keyValue -> keys.add(keyValue.key));
+          return keys;
+        } catch (Exception e) {
+          LOG.error("Error looking up services", e);
+          return new ArrayList<>();
+        }
       };
     }
 
     @Override
     public Call<List<String>> clone() {
-      return new GetServiceNamesCall(store);
+      return new GetServiceNamesCall(kafkaStreams, storeName);
     }
   }
 
-  static class GetSpanNamesCall extends KafkaStreamsStoreCall<String, Set<String>, List<String>> {
+  @Override
+  public Call<List<String>> getSpanNames(String serviceName) {
+    return new GetSpanNamesCall(processStreams, serviceStoreName, serviceName);
+  }
+
+  static class GetSpanNamesCall extends KafkaStreamsStoreCall<List<String>> {
+    final KafkaStreams kafkaStreams;
+    final String storeName;
     final String serviceName;
 
-    GetSpanNamesCall(ReadOnlyKeyValueStore<String, Set<String>> store, String serviceName) {
-      super(store);
+    GetSpanNamesCall(KafkaStreams kafkaStreams, String storeName, String serviceName) {
+      this.kafkaStreams = kafkaStreams;
+      this.storeName = storeName;
       this.serviceName = serviceName;
     }
 
     @Override
-    Function<ReadOnlyKeyValueStore<String, Set<String>>, List<String>> query() {
-      return store -> {
-        if (serviceName == null || serviceName.equals("all")) return new ArrayList<>();
-        Set<String> spanNames = store.get(serviceName);
-        return new ArrayList<>(spanNames);
+    Supplier<List<String>> query() {
+      return () -> {
+        try {
+          ReadOnlyKeyValueStore<String, Set<String>> store =
+              kafkaStreams.store(storeName, QueryableStoreTypes.keyValueStore());
+          if (serviceName == null || serviceName.equals("all")) return new ArrayList<>();
+          Set<String> spanNames = store.get(serviceName);
+          return new ArrayList<>(spanNames);
+        } catch (Exception e) {
+          LOG.error("Error looking up for span names for service {}", serviceName, e);
+          return new ArrayList<>();
+        }
       };
     }
 
     @Override
     public Call<List<String>> clone() {
-      return new GetSpanNamesCall(store, serviceName);
+      return new GetSpanNamesCall(kafkaStreams, storeName, serviceName);
     }
   }
 
-  static class GetDependenciesJsonCall
-      extends KafkaStreamsStoreCall<String, DependencyLink, List<DependencyLink>> {
+  @Override
+  public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
+    return new GetDependenciesCall(processStreams, dependenciesStoreName);
+  }
 
-    GetDependenciesJsonCall(ReadOnlyKeyValueStore<String, DependencyLink> store) {
-      super(store);
+  static class GetDependenciesCall
+      extends KafkaStreamsStoreCall<List<DependencyLink>> {
+    final KafkaStreams kafkaStreams;
+    final String storeName;
+
+    GetDependenciesCall(KafkaStreams kafkaStreams, String storeName) {
+      this.kafkaStreams = kafkaStreams;
+      this.storeName = storeName;
     }
 
     @Override
-    Function<ReadOnlyKeyValueStore<String, DependencyLink>, List<DependencyLink>> query() {
-      return store -> {
-        List<DependencyLink> dependencyLinks = new ArrayList<>();
-        store.all().forEachRemaining(dependencyLink -> dependencyLinks.add(dependencyLink.value));
-        return dependencyLinks;
+    Supplier<List<DependencyLink>> query() {
+      return () -> {
+        try {
+          ReadOnlyKeyValueStore<String, DependencyLink> store =
+              kafkaStreams.store(storeName, QueryableStoreTypes.keyValueStore());
+          List<DependencyLink> dependencyLinks = new ArrayList<>();
+          store.all().forEachRemaining(dependencyLink -> dependencyLinks.add(dependencyLink.value));
+          return dependencyLinks;
+        } catch (Exception e) {
+          LOG.error("Error looking up for dependencies", e);
+          return new ArrayList<>();
+        }
       };
     }
 
     @Override
     public Call<List<DependencyLink>> clone() {
-      return new GetDependenciesJsonCall(store);
+      return new GetDependenciesCall(kafkaStreams, storeName);
     }
   }
 }

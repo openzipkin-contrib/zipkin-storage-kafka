@@ -36,15 +36,18 @@ import java.util.function.Supplier;
 public class IndexTopologySupplier implements Supplier<Topology> {
 
   final String traceStoreName;
+  final boolean indexPersistent;
   final String indexDirectory;
   final String indexStoreName;
+
   final SpansSerde spansSerde;
   final SpanNamesSerde spanNamesSerde;
 
   public IndexTopologySupplier(String traceStoreName, String indexStoreName,
-      String indexDirectory) {
+      boolean indexPersistent, String indexDirectory) {
     this.traceStoreName = traceStoreName;
     this.indexStoreName = indexStoreName;
+    this.indexPersistent = indexPersistent;
     this.indexDirectory = indexDirectory;
 
     spansSerde = new SpansSerde();
@@ -54,7 +57,7 @@ public class IndexTopologySupplier implements Supplier<Topology> {
   @Override
   public Topology get() {
     IndexStateStore.Builder indexStoreBuilder = IndexStateStore.builder(indexStoreName);
-    if (indexDirectory != null) {
+    if (indexPersistent) {
       indexStoreBuilder.persistent(indexDirectory);
     }
 
@@ -66,11 +69,11 @@ public class IndexTopologySupplier implements Supplier<Topology> {
         Consumed.with(Serdes.String(), spansSerde),
         () -> new
             Processor() {
-              IndexStateStore lucene;
+              IndexStateStore index;
 
               @Override
               public void init(ProcessorContext context) {
-                lucene = (IndexStateStore) context.getStateStore(indexStoreName);
+                index = (IndexStateStore) context.getStateStore(indexStoreName);
               }
 
               @Override
@@ -101,12 +104,12 @@ public class IndexTopologySupplier implements Supplier<Topology> {
                   }
                   docs.add(doc);
                 }
-                lucene.put(docs);
+                index.put(docs);
               }
 
               @Override
               public void close() {
-                lucene.close();
+                index.close();
               }
             });
     return builder.build();

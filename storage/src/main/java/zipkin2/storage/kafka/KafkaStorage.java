@@ -13,9 +13,28 @@
  */
 package zipkin2.storage.kafka;
 
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.config.TopicConfig;
 import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serdes;
@@ -32,40 +51,48 @@ import zipkin2.storage.StorageComponent;
 import zipkin2.storage.kafka.internal.IndexTopologySupplier;
 import zipkin2.storage.kafka.internal.ProcessTopologySupplier;
 
-import java.time.Duration;
-import java.util.List;
-import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
 public class KafkaStorage extends StorageComponent {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
+
+  final boolean ensureTopics;
+  final Properties adminConfigs;
   final Properties producerConfigs;
   final Properties processStreamsConfig;
   final Properties indexStreamsConfig;
+
   final Topology processTopology;
   final Topology indexTopology;
-  final String spansTopic;
-  final String tracesTopic;
-  final String servicesTopic;
-  final String dependenciesTopic;
+
+  final Topic spansTopic;
+  final Topic tracesTopic;
+  final Topic servicesTopic;
+  final Topic dependenciesTopic;
+
   final String indexStoreName;
   final boolean indexPersistent;
+  final String indexStorageDirectory;
+
+  volatile AdminClient adminClient;
   Producer<String, byte[]> producer;
   KafkaStreamsWorker processStreamsWorker;
   KafkaStreams processStreams;
   KafkaStreamsWorker indexStreamsWorker;
   KafkaStreams indexStreams;
+
   volatile boolean closeCalled, connected;
+
   KafkaStorage(Builder builder) {
+    this.ensureTopics = builder.ensureTopics;
     this.tracesTopic = builder.tracesTopic;
     this.servicesTopic = builder.servicesTopic;
     this.dependenciesTopic = builder.dependenciesTopic;
     this.indexStoreName = builder.indexStoreName;
     this.spansTopic = builder.spansTopic;
     this.indexPersistent = builder.indexPersistent;
+    this.indexStorageDirectory = builder.indexStorageDirectory;
+
+    adminConfigs = new Properties();
+    adminConfigs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
 
     producerConfigs = new Properties();
     producerConfigs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -86,8 +113,9 @@ public class KafkaStorage extends StorageComponent {
     processStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.processStreamStoreDirectory);
     processStreamsConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.ZSTD.name);
 
-    processTopology = new ProcessTopologySupplier(spansTopic, tracesTopic, servicesTopic,
-        dependenciesTopic).get();
+    processTopology =
+        new ProcessTopologySupplier(spansTopic.name, tracesTopic.name, servicesTopic.name,
+            dependenciesTopic.name).get();
 
     indexStreamsConfig = new Properties();
     indexStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -99,7 +127,8 @@ public class KafkaStorage extends StorageComponent {
     indexStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.indexStreamStoreDirectory);
 
     indexTopology =
-        new IndexTopologySupplier(tracesTopic, indexStoreName, builder.indexDirectory).get();
+        new IndexTopologySupplier(tracesTopic.name, indexStoreName, builder.indexPersistent,
+            builder.indexStorageDirectory).get();
   }
 
   public static Builder newBuilder() {
@@ -113,12 +142,26 @@ public class KafkaStorage extends StorageComponent {
       synchronized (this) {
         if (closeCalled) throw new IllegalStateException("closed");
         if (!connected) {
-          connectConsumer();
-          connectStore();
-          connected = true;
+          doConnect();
         }
       }
     }
+  }
+
+  private void doConnect() {
+    if (ensureTopics) {
+      ensureTopics();
+    } else {
+      LOG.info("Skipping topics creation as ensureTopics was false");
+    }
+    connectStore();
+    connectAdmin();
+    connectConsumer();
+    connected = true;
+  }
+
+  void connectAdmin() {
+    adminClient = AdminClient.create(adminConfigs);
   }
 
   void connectConsumer() {
@@ -127,12 +170,64 @@ public class KafkaStorage extends StorageComponent {
 
   void connectStore() {
     processStreams = new KafkaStreams(processTopology, processStreamsConfig);
-    processStreamsWorker = new KafkaStreamsWorker(processStreams);
-    processStreamsWorker.get();
+    processStreams.start();
+    //processStreamsWorker = new KafkaStreamsWorker(processStreams);
+    //processStreamsWorker.get();
 
     indexStreams = new KafkaStreams(indexTopology, indexStreamsConfig);
-    indexStreamsWorker = new KafkaStreamsWorker(indexStreams);
-    indexStreamsWorker.get();
+    indexStreams.start();
+    //indexStreamsWorker = new KafkaStreamsWorker(indexStreams);
+    //indexStreamsWorker.get();
+  }
+
+  void ensureTopics() {
+    try {
+      Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
+      List<Topic> requiredTopics =
+          Arrays.asList(spansTopic, tracesTopic, servicesTopic, dependenciesTopic);
+      Set<NewTopic> newTopics = new HashSet<>();
+
+      for (Topic requiredTopic : requiredTopics) {
+        if (!topics.contains(requiredTopic.name)) {
+          NewTopic newTopic = requiredTopic.newTopic();
+          newTopics.add(newTopic);
+        } else {
+          LOG.info("Topic {} already exists.", requiredTopic.name);
+        }
+      }
+
+      getAdminClient().createTopics(newTopics).all().get();
+    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+      LOG.error("Error ensuring topics are created", e);
+    }
+  }
+
+  AdminClient getAdminClient() {
+    if (adminClient == null) {
+      synchronized (this) {
+        if (adminClient == null) {
+          adminClient = AdminClient.create(adminConfigs);
+        }
+      }
+    }
+    return adminClient;
+  }
+
+  @Override
+  public CheckResult check() {
+    try {
+      CheckResult processFailures =
+          processStreamsWorker.failure.get(); // check the kafka workers didn't quit
+      if (processFailures != null) return processFailures;
+      CheckResult indexFailures =
+          indexStreamsWorker.failure.get(); // check the kafka workers didn't quit
+      if (indexFailures != null) return indexFailures;
+      KafkaFuture<String> maybeClusterId = getAdminClient().describeCluster().clusterId();
+      maybeClusterId.get(1, TimeUnit.SECONDS);
+      return CheckResult.OK;
+    } catch (Exception e) {
+      return CheckResult.failed(e);
+    }
   }
 
   @Override
@@ -161,12 +256,15 @@ public class KafkaStorage extends StorageComponent {
 
   void doClose() {
     try {
-      producer.flush();
-      producer.close(1, TimeUnit.SECONDS);
-      processStreams.close(Duration.ofSeconds(1));
-      indexStreams.close(Duration.ofSeconds(1));
-      processStreamsWorker.close();
-      indexStreamsWorker.close();
+      if (adminClient != null) adminClient.close(1, TimeUnit.SECONDS);
+      if (producer != null) {
+        producer.flush();
+        producer.close(1, TimeUnit.SECONDS);
+      }
+      if (processStreams != null) processStreams.close(Duration.ofSeconds(1));
+      if (indexStreams != null) indexStreams.close(Duration.ofSeconds(1));
+      if (processStreamsWorker != null) processStreamsWorker.close();
+      if (indexStreamsWorker != null) indexStreamsWorker.close();
     } catch (Exception | Error e) {
       LOG.warn("error closing client {}", e.getMessage(), e);
     }
@@ -181,12 +279,20 @@ public class KafkaStorage extends StorageComponent {
     String processStreamStoreDirectory = "/tmp/kafka-streams/process";
     String indexStreamStoreDirectory = "/tmp/kafka-streams/index";
     boolean indexPersistent = true;
-    String indexDirectory = "/tmp/lucene-index";
+    String indexStorageDirectory = "/tmp/lucene-index";
 
-    String spansTopic = "zipkin-spans_v1";
-    String tracesTopic = "zipkin-traces_v1";
-    String servicesTopic = "zipkin-services_v1";
-    String dependenciesTopic = "zipkin-dependencies_v1";
+    Topic spansTopic = Topic.builder("zipkin-spans_v1").build();
+    Topic tracesTopic = Topic.builder("zipkin-traces_v1")
+        .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
+        .build();
+    Topic servicesTopic = Topic.builder("zipkin-services_v1")
+        .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
+        .build();
+    Topic dependenciesTopic = Topic.builder("zipkin-dependencies_v1")
+        .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
+        .build();
+
+    boolean ensureTopics = true;
 
     Builder() {
     }
@@ -210,34 +316,59 @@ public class KafkaStorage extends StorageComponent {
       return this;
     }
 
+    /**
+     * Kafka Bootstrap Servers list to establish connection with a Cluster.
+     */
     public Builder bootstrapServers(String bootstrapServers) {
       if (bootstrapServers == null) throw new NullPointerException("bootstrapServers == null");
       this.bootstrapServers = bootstrapServers;
       return this;
     }
 
-    public Builder spansTopic(String spansTopic) {
+    /**
+     * Kafka topic name where incoming list of Spans are stored.
+     */
+    public Builder spansTopic(Topic spansTopic) {
       if (spansTopic == null) throw new NullPointerException("spansTopic == null");
       this.spansTopic = spansTopic;
       return this;
     }
 
-    public Builder processStreamApplicationId(String processStreamApplicationId) {
-      if (processStreamApplicationId == null) {
-        throw new NullPointerException("processStreamApplicationId == null");
-      }
-      this.processStreamApplicationId = processStreamApplicationId;
+    /**
+     * Kafka topic name where traces are stored.
+     */
+    public Builder tracesTopic(Topic tracesTopic) {
+      if (tracesTopic == null) throw new NullPointerException("tracesTopic == null");
+      this.tracesTopic = tracesTopic;
       return this;
     }
 
-    public Builder indexStreamApplicationId(String indexStreamApplicationId) {
-      if (indexStreamApplicationId == null) {
-        throw new NullPointerException("processStreamApplicationId == null");
+    /**
+     * Kafka topic name where Service names are stored.
+     */
+    public Builder servicesTopic(Topic servicesTopic) {
+      if (servicesTopic == null) {
+        throw new NullPointerException("servicesTopic == null");
       }
-      this.indexStreamApplicationId = indexStreamApplicationId;
+      this.servicesTopic = servicesTopic;
       return this;
     }
 
+    /**
+     * Kafka topic name where Dependencies are stored.
+     */
+    public Builder dependenciesTopic(Topic dependenciesTopic) {
+      if (dependenciesTopic == null) {
+        throw new NullPointerException("dependenciesTopic == null");
+      }
+      this.dependenciesTopic = dependenciesTopic;
+      return this;
+    }
+
+    /**
+     * Kafka Streams local state directory where processing results (e.g., traces, services,
+     * dependencies) are stored.
+     */
     public Builder processStreamStoreDirectory(String processStreamStoreDirectory) {
       if (processStreamStoreDirectory == null) {
         throw new NullPointerException("processStreamStoreDirectory == null");
@@ -248,54 +379,107 @@ public class KafkaStorage extends StorageComponent {
 
     public Builder indexStreamStoreDirectory(String indexStreamStoreDirectory) {
       if (indexStreamStoreDirectory == null) {
-        throw new NullPointerException("processStreamStoreDirectory == null");
+        throw new NullPointerException("indexStreamStoreDirectory == null");
       }
       this.indexStreamStoreDirectory = indexStreamStoreDirectory;
       return this;
     }
 
-    public Builder tracesTopic(String tracesStoreName) {
-      if (tracesStoreName == null) throw new NullPointerException("tracesTopic == null");
-      this.tracesTopic = tracesStoreName;
-      return this;
-    }
-
-    public Builder servicesTopic(String serviceOperationsStoreName) {
-      if (serviceOperationsStoreName == null) {
-        throw new NullPointerException("servicesTopic == null");
+    /**
+     * Index storage directory.
+     */
+    public Builder indexStorageDirectory(String indexStorageDirectory) {
+      if (indexStorageDirectory == null) {
+        throw new NullPointerException("indexStorageDirectory == null");
       }
-      this.servicesTopic = serviceOperationsStoreName;
+      this.indexStorageDirectory = indexStorageDirectory;
       return this;
     }
 
-    public Builder dependenciesTopic(String dependenciesStoreName) {
-      if (dependenciesStoreName == null) {
-        throw new NullPointerException("dependenciesTopic == null");
-      }
-      this.dependenciesTopic = dependenciesStoreName;
-      return this;
-    }
-
-    public Builder indexStoreName(String indexStoreName) {
-      if (indexStoreName == null) throw new NullPointerException("indexStoreName == null");
-      this.indexStoreName = indexStoreName;
-      return this;
-    }
-
-    public Builder indexDirectory(String indexDirectory) {
-      if (indexDirectory == null) throw new NullPointerException("indexDirectory == null");
-      this.indexDirectory = indexDirectory;
-      return this;
-    }
-
+    /**
+     * Condition to use persistent index or not.
+     */
     public Builder indexPersistent(boolean indexPersistent) {
       this.indexPersistent = indexPersistent;
+      return this;
+    }
+
+    /**
+     * If enabled, will create Topics if they do not exist.
+     */
+    public Builder ensureTopics(boolean ensureTopics) {
+      this.ensureTopics = ensureTopics;
       return this;
     }
 
     @Override
     public StorageComponent build() {
       return new KafkaStorage(this);
+    }
+  }
+
+  public static class Topic {
+    final String name;
+    final Integer partitions;
+    final Short replicationFactor;
+    final Map<String, String> configs;
+
+    Topic(Builder builder) {
+      this.name = builder.name;
+      this.partitions = builder.partitions;
+      this.replicationFactor = builder.replicationFactor;
+      this.configs = builder.configs;
+    }
+
+    NewTopic newTopic() {
+      NewTopic newTopic = new NewTopic(name, partitions, replicationFactor);
+      newTopic.configs(configs);
+      return newTopic;
+    }
+
+    public static Builder builder(String name) {
+      return new Builder(name);
+    }
+
+    public static class Builder {
+      final String name;
+      Integer partitions = 1;
+      Short replicationFactor = 1;
+      Map<String, String> configs = new HashMap<>();
+
+      Builder(String name) {
+        if (name == null) throw new NullPointerException("topic name == null");
+        this.name = name;
+      }
+
+      Builder partitions(Integer partitions) {
+        if (partitions == null) throw new NullPointerException("topic partitions == null");
+        if (partitions < 1) throw new IllegalArgumentException("topic partitions < 1");
+        this.partitions = partitions;
+        return this;
+      }
+
+      Builder replicationFactor(Short replicationFactor) {
+        if (replicationFactor == null) {
+          throw new NullPointerException("topic replicationFactor == null");
+        }
+        if (replicationFactor < 1) {
+          throw new IllegalArgumentException("topic replicationFactor < 1");
+        }
+        this.replicationFactor = replicationFactor;
+        return this;
+      }
+
+      Builder config(String key, String value) {
+        if (key == null) throw new NullPointerException("topic config key == null");
+        if (value == null) throw new NullPointerException("topic config value == null");
+        this.configs.put(key, value);
+        return this;
+      }
+
+      public Topic build() {
+        return new Topic(this);
+      }
     }
   }
 
