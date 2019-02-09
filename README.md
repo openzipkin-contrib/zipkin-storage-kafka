@@ -86,6 +86,35 @@ that are not supported by Kafka Streams yet: we need an index that support
 [Luwak](https://github.com/flaxsearch/luwak) will be used to create an
 in-memory index that can handle these queries.
 
+## Implementation
+
+This Zipkin storage implementation is based on Kafka Streams State.
+
+### Kafka Span Consumer
+
+`KafkaSpanConsumer` implementation is based on Kafka Producer API, that stores spans individually on
+a Spans Kafka topic.
+
+### Kafka Span Store
+
+`KafkaSpanStore` is based on Kafka Streams and [Lucene](https://lucene.apache.org/).
+
+To support `getTrace`, `getServiceNames` and `getSpanNames` a stream-processor is:
+
+- Polling data from incoming spans created by `KafkaSpanConsumer`.
+- Group spans on traces.
+- Record service names and span names related.
+- Creating service dependencies.
+
+To support `getTraces` requires an index of spans tagged by service names, span names, id, 
+timestamp, tags, etc.
+
+A custom Kafka Stream store was implemented to collect traces and index them using Lucene.
+
+**All Stores are using Global state, which consumes all partitions. This means that every instance
+stores all data on a defined directory.** All these with the trade-off of removing the need for an
+additional database.
+
 ## Get started
 
 To build the project you will need Java 8.
