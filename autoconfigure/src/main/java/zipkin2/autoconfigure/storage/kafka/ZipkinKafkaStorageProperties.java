@@ -22,6 +22,7 @@ import java.io.Serializable;
 public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
 
+  private boolean ensureTopics = true;
   private String bootstrapServers = "localhost:29092";
 
   private String spansTopic = "zipkin-spans_v1";
@@ -34,13 +35,23 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String indexStorageDirectory = "/tmp/zipkin/index";
 
   KafkaStorage.Builder toBuilder() {
-    return KafkaStorage.newBuilder().bootstrapServers(bootstrapServers)
+    return KafkaStorage.newBuilder()
+        .ensureTopics(ensureTopics)
+        .bootstrapServers(bootstrapServers)
         .spansTopic(KafkaStorage.Topic.builder(spansTopic).build())
         .tracesTopic(KafkaStorage.Topic.builder(tracesTopic).build())
         .servicesTopic(KafkaStorage.Topic.builder(servicesTopic).build())
         .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic).build())
         .processStreamStoreDirectory(processStateStoreDirectory)
         .indexStorageDirectory(indexStorageDirectory);
+  }
+
+  public boolean isEnsureTopics() {
+    return ensureTopics;
+  }
+
+  public void setEnsureTopics(boolean ensureTopics) {
+    this.ensureTopics = ensureTopics;
   }
 
   public String getBootstrapServers() {
