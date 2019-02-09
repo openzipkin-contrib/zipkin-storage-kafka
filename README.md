@@ -4,7 +4,7 @@
 
 Proof of concept of fully-featured Kafka-based storage for Zipkin.
 
-*This is not production ready at the moment. Things will change!*
+*This is in experimentation phase at the moment. Don't use in production!*
 
 ## Design goals 
 
