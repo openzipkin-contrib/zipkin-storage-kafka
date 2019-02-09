@@ -149,15 +149,15 @@ public class KafkaStorage extends StorageComponent {
   }
 
   private void doConnect() {
-    connectAdmin();
-    connectConsumer();
-    connectStore();
-    connected = true;
     if (ensureTopics) {
       ensureTopics();
     } else {
       LOG.info("Skipping topics creation as ensureTopics was false");
     }
+    connectStore();
+    connectAdmin();
+    connectConsumer();
+    connected = true;
   }
 
   void connectAdmin() {
@@ -170,12 +170,14 @@ public class KafkaStorage extends StorageComponent {
 
   void connectStore() {
     processStreams = new KafkaStreams(processTopology, processStreamsConfig);
-    processStreamsWorker = new KafkaStreamsWorker(processStreams);
-    processStreamsWorker.get();
+    processStreams.start();
+    //processStreamsWorker = new KafkaStreamsWorker(processStreams);
+    //processStreamsWorker.get();
 
     indexStreams = new KafkaStreams(indexTopology, indexStreamsConfig);
-    indexStreamsWorker = new KafkaStreamsWorker(indexStreams);
-    indexStreamsWorker.get();
+    indexStreams.start();
+    //indexStreamsWorker = new KafkaStreamsWorker(indexStreams);
+    //indexStreamsWorker.get();
   }
 
   void ensureTopics() {
