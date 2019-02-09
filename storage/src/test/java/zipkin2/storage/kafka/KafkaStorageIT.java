@@ -18,6 +18,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
@@ -30,7 +31,7 @@ import zipkin2.Endpoint;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
 
-import static org.junit.Assert.assertEquals;
+import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.fail;
 import static zipkin2.TestObjects.TODAY;
 
@@ -153,16 +154,17 @@ public class KafkaStorageIT {
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(testConsumerConfig, storage.spansTopic.name, 2,
         10000);
-    Thread.sleep(1000);
-    List<List<Span>> traces =
-        storage.spanStore()
-            .getTraces(QueryRequest.newBuilder()
-                .endTs(TODAY + 1)
-                .limit(10)
-                .lookback(Duration.ofMinutes(1).toMillis())
-                .build())
-            .execute();
-    assertEquals(1, traces.size());
-    assertEquals(2, traces.get(0).size());
+    await().atMost(5, TimeUnit.SECONDS)
+        .until(() -> {
+          List<List<Span>> traces =
+              storage.spanStore()
+                  .getTraces(QueryRequest.newBuilder()
+                      .endTs(TODAY + 1)
+                      .limit(10)
+                      .lookback(Duration.ofMinutes(1).toMillis())
+                      .build())
+                  .execute();
+          return traces.size() == 1 && traces.get(0).size() == 2;
+        });
   }
 }
