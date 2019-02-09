@@ -36,6 +36,7 @@ import java.util.function.Supplier;
 public class IndexTopologySupplier implements Supplier<Topology> {
 
   final String traceStoreName;
+  final boolean indexPersistent;
   final String indexDirectory;
   final String indexStoreName;
 
@@ -43,9 +44,10 @@ public class IndexTopologySupplier implements Supplier<Topology> {
   final SpanNamesSerde spanNamesSerde;
 
   public IndexTopologySupplier(String traceStoreName, String indexStoreName,
-      String indexDirectory) {
+      boolean indexPersistent, String indexDirectory) {
     this.traceStoreName = traceStoreName;
     this.indexStoreName = indexStoreName;
+    this.indexPersistent = indexPersistent;
     this.indexDirectory = indexDirectory;
 
     spansSerde = new SpansSerde();
@@ -55,7 +57,7 @@ public class IndexTopologySupplier implements Supplier<Topology> {
   @Override
   public Topology get() {
     IndexStateStore.Builder indexStoreBuilder = IndexStateStore.builder(indexStoreName);
-    if (indexDirectory != null) {
+    if (indexPersistent) {
       indexStoreBuilder.persistent(indexDirectory);
     }
 

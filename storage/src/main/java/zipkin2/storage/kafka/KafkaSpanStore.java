@@ -58,10 +58,12 @@ public class KafkaSpanStore implements SpanStore {
 
   KafkaSpanStore(KafkaStorage storage) {
     KafkaStreams processStreams = storage.processStreams;
-    traceStore = processStreams.store(storage.tracesTopic, QueryableStoreTypes.keyValueStore());
-    serviceStore = processStreams.store(storage.servicesTopic, QueryableStoreTypes.keyValueStore());
+    traceStore =
+        processStreams.store(storage.tracesTopic.name, QueryableStoreTypes.keyValueStore());
+    serviceStore =
+        processStreams.store(storage.servicesTopic.name, QueryableStoreTypes.keyValueStore());
     dependencyStore =
-        processStreams.store(storage.dependenciesTopic, QueryableStoreTypes.keyValueStore());
+        processStreams.store(storage.dependenciesTopic.name, QueryableStoreTypes.keyValueStore());
     indexStateStore = storage.indexStreams.store(storage.indexStoreName, new IndexStoreType());
   }
 
@@ -142,8 +144,10 @@ public class KafkaSpanStore implements SpanStore {
 
       long start = queryRequest.endTs() - queryRequest.lookback();
       long end = queryRequest.endTs();
-      builder.add(LongPoint.newRangeQuery(
-          "ts", Long.valueOf(start + "000"), Long.valueOf(end + "000")), BooleanClause.Occur.MUST);
+      //TODO No timestamp field in Lucene. Find a way to query timestamp instead of longs.
+      long lowerValue = Long.parseLong(start + "000");
+      long upperValue = Long.parseLong(end + "000");
+      builder.add(LongPoint.newRangeQuery("ts", lowerValue, upperValue), BooleanClause.Occur.MUST);
 
       int total = queryRequest.limit();
       Sort sort = Sort.RELEVANCE;
@@ -153,7 +157,7 @@ public class KafkaSpanStore implements SpanStore {
       BooleanQuery query = builder.build();
       TopFieldDocs docs = indexSearcher.search(query, total, sort);
 
-      LOG.debug("Total results of query {}: {}", query, docs.totalHits);
+      LOG.info("Total results of query {}: {}", query, docs.totalHits);
 
       for (ScoreDoc doc : docs.scoreDocs) {
         Document document = indexSearcher.doc(doc.doc);
