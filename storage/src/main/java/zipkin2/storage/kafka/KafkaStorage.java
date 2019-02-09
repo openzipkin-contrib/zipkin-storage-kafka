@@ -13,6 +13,13 @@
  */
 package zipkin2.storage.kafka;
 
+import java.time.Duration;
+import java.util.List;
+import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -34,17 +41,10 @@ import zipkin2.storage.StorageComponent;
 import zipkin2.storage.kafka.internal.IndexTopologySupplier;
 import zipkin2.storage.kafka.internal.ProcessTopologySupplier;
 
-import java.time.Duration;
-import java.util.List;
-import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-
 public class KafkaStorage extends StorageComponent {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
 
+  final Properties adminConfigs;
   final Properties producerConfigs;
   final Properties processStreamsConfig;
   final Properties indexStreamsConfig;
@@ -74,9 +74,8 @@ public class KafkaStorage extends StorageComponent {
     this.spansTopic = builder.spansTopic;
     this.indexPersistent = builder.indexPersistent;
 
-    Properties adminConfigs = new Properties();
+    adminConfigs = new Properties();
     adminConfigs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
-    adminClient = AdminClient.create(adminConfigs);
 
     producerConfigs = new Properties();
     producerConfigs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -124,12 +123,17 @@ public class KafkaStorage extends StorageComponent {
       synchronized (this) {
         if (closeCalled) throw new IllegalStateException("closed");
         if (!connected) {
+          connectAdmin();
           connectConsumer();
           connectStore();
           connected = true;
         }
       }
     }
+  }
+
+  void connectAdmin() {
+    adminClient = AdminClient.create(adminConfigs);
   }
 
   void connectConsumer() {
@@ -172,6 +176,7 @@ public class KafkaStorage extends StorageComponent {
 
   void doClose() {
     try {
+      adminClient.close(1, TimeUnit.SECONDS);
       producer.flush();
       producer.close(1, TimeUnit.SECONDS);
       processStreams.close(Duration.ofSeconds(1));
