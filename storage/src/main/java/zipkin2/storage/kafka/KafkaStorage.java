@@ -22,11 +22,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -74,9 +71,7 @@ public class KafkaStorage extends StorageComponent {
 
   volatile AdminClient adminClient;
   Producer<String, byte[]> producer;
-  KafkaStreamsWorker processStreamsWorker;
   KafkaStreams processStreams;
-  KafkaStreamsWorker indexStreamsWorker;
   KafkaStreams indexStreams;
 
   volatile boolean closeCalled, connected;
@@ -171,13 +166,9 @@ public class KafkaStorage extends StorageComponent {
   void connectStore() {
     processStreams = new KafkaStreams(processTopology, processStreamsConfig);
     processStreams.start();
-    //processStreamsWorker = new KafkaStreamsWorker(processStreams);
-    //processStreamsWorker.get();
 
     indexStreams = new KafkaStreams(indexTopology, indexStreamsConfig);
     indexStreams.start();
-    //indexStreamsWorker = new KafkaStreamsWorker(indexStreams);
-    //indexStreamsWorker.get();
   }
 
   void ensureTopics() {
@@ -216,12 +207,6 @@ public class KafkaStorage extends StorageComponent {
   @Override
   public CheckResult check() {
     try {
-      CheckResult processFailures =
-          processStreamsWorker.failure.get(); // check the kafka workers didn't quit
-      if (processFailures != null) return processFailures;
-      CheckResult indexFailures =
-          indexStreamsWorker.failure.get(); // check the kafka workers didn't quit
-      if (indexFailures != null) return indexFailures;
       KafkaFuture<String> maybeClusterId = getAdminClient().describeCluster().clusterId();
       maybeClusterId.get(1, TimeUnit.SECONDS);
       return CheckResult.OK;
@@ -263,8 +248,6 @@ public class KafkaStorage extends StorageComponent {
       }
       if (processStreams != null) processStreams.close(Duration.ofSeconds(1));
       if (indexStreams != null) indexStreams.close(Duration.ofSeconds(1));
-      if (processStreamsWorker != null) processStreamsWorker.close();
-      if (indexStreamsWorker != null) indexStreamsWorker.close();
     } catch (Exception | Error e) {
       LOG.warn("error closing client {}", e.getMessage(), e);
     }
@@ -480,54 +463,6 @@ public class KafkaStorage extends StorageComponent {
       public Topic build() {
         return new Topic(this);
       }
-    }
-  }
-
-  public static final class KafkaStreamsWorker {
-    final KafkaStreams kafkaStreams;
-    final AtomicReference<CheckResult> failure = new AtomicReference<>();
-    volatile ExecutorService pool;
-
-    KafkaStreamsWorker(KafkaStreams kafkaStreams) {
-      this.kafkaStreams = kafkaStreams;
-    }
-
-    ExecutorService get() {
-      if (pool == null) {
-        synchronized (this) {
-          if (pool == null) {
-            pool = compute();
-          }
-        }
-      }
-      return pool;
-    }
-
-    void close() {
-      ExecutorService maybePool = pool;
-      if (maybePool == null) return;
-      try {
-        maybePool.awaitTermination(1, TimeUnit.SECONDS);
-      } catch (InterruptedException e) {
-        LOG.error("Error waiting for stream poll to close", e);
-      }
-    }
-
-    private ExecutorService compute() {
-      ExecutorService pool = Executors.newSingleThreadExecutor();
-      pool.execute(guardFailures(kafkaStreams));
-      return pool;
-    }
-
-    private Runnable guardFailures(KafkaStreams kafkaStreams) {
-      return () -> {
-        try {
-          kafkaStreams.start();
-        } catch (Exception e) {
-          LOG.error("Kafka Streams worker exited with error", e);
-          failure.set(CheckResult.failed(e));
-        }
-      };
     }
   }
 }
