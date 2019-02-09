@@ -35,12 +35,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   KafkaStorage.Builder toBuilder() {
     return KafkaStorage.newBuilder().bootstrapServers(bootstrapServers)
-        .spansTopic(spansTopic)
-        .tracesTopic(tracesTopic)
-        .servicesTopic(servicesTopic)
-        .dependenciesTopic(dependenciesTopic)
+        .spansTopic(KafkaStorage.Topic.builder(spansTopic).build())
+        .tracesTopic(KafkaStorage.Topic.builder(tracesTopic).build())
+        .servicesTopic(KafkaStorage.Topic.builder(servicesTopic).build())
+        .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic).build())
         .processStreamStoreDirectory(processStateStoreDirectory)
-        .indexStreamStoreDirectory(indexStateStoreDirectory);
+        .indexStorageDirectory(indexStorageDirectory);
   }
 
   public String getBootstrapServers() {
