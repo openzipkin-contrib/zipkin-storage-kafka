@@ -278,38 +278,30 @@
                 <version>0.8.3</version>
                 <executions>
                     <execution>
-                        <id>pre-unit-test</id>
+                        <id>default-prepare-agent</id>
                         <goals>
                             <goal>prepare-agent</goal>
                         </goals>
                     </execution>
                     <execution>
-                        <id>post-unit-test</id>
-                        <phase>test</phase>
+                        <id>default-report</id>
+                        <phase>prepare-package</phase>
                         <goals>
                             <goal>report</goal>
                         </goals>
                     </execution>
                     <execution>
-                        <id>pre-integration-test</id>
-                        <phase>pre-integration-test</phase>
+                        <id>default-prepare-agent-integration</id>
+                        <phase>package</phase>
                         <goals>
-                            <goal>prepare-agent</goal>
+                            <goal>prepare-agent-integration</goal>
                         </goals>
-                        <configuration>
-                            <destFile>target/jacoco-it.exec</destFile>
-                            <propertyName>failsafe.argLine</propertyName>
-                        </configuration>
                     </execution>
                     <execution>
-                        <id>post-integration-test</id>
-                        <phase>post-integration-test</phase>
+                        <id>default-report-integration</id>
                         <goals>
-                            <goal>report</goal>
+                            <goal>report-integration</goal>
                         </goals>
-                        <configuration>
-                            <dataFile>target/jacoco-it.exec</dataFile>
-                        </configuration>
                     </execution>
                 </executions>
             </plugin>
