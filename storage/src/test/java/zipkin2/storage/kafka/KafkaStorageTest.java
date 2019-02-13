@@ -97,7 +97,7 @@ public class KafkaStorageTest {
   @Test
   public void topicDefault() {
       try{
-          KafkaStorage.Topic.Builder topicBuilder = KafkaStorage.Topic.builder(null);
+          KafkaStorage.Topic.builder(null);
           fail();
       } catch (NullPointerException ignored){}
 
