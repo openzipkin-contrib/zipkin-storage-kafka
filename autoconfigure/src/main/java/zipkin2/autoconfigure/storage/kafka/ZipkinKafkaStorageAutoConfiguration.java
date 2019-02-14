@@ -22,12 +22,9 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import zipkin2.storage.StorageComponent;
 
 @Configuration
-@EnableScheduling
 @EnableConfigurationProperties(ZipkinKafkaStorageProperties.class)
-@ConditionalOnProperty(name = "zipkin.storage.type", havingValue = "kafka")
+@ConditionalOnProperty(name = "zipkin.storage.type", havingValue = "kafkastore")
 @ConditionalOnMissingBean(StorageComponent.class)
-    // This component is named .*Kafka.* even though the package already says kafka because
-    // Spring Boot configuration endpoints only printout the simple name of the class
 class ZipkinKafkaStorageAutoConfiguration {
 
   @Bean
