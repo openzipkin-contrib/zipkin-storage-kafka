@@ -95,7 +95,7 @@ public class KafkaStorage extends StorageComponent {
     producerConfigs.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
     producerConfigs.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
     producerConfigs.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-    producerConfigs.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, builder.compressionType);
+    producerConfigs.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, builder.compressionType.name);
 
     processStreamsConfig = new Properties();
     processStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -107,7 +107,7 @@ public class KafkaStorage extends StorageComponent {
         builder.processStreamApplicationId);
     processStreamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
     processStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.processStreamStoreDirectory());
-    processStreamsConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, builder.compressionType);
+    processStreamsConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, builder.compressionType.name);
 
     processTopology =
         new ProcessTopologySupplier(spansTopic.name, tracesTopic.name, servicesTopic.name,
