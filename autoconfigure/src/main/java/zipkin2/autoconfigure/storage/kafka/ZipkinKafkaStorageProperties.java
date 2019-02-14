@@ -13,6 +13,7 @@
  */
 package zipkin2.autoconfigure.storage.kafka;
 
+import org.apache.kafka.common.record.CompressionType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import zipkin2.storage.kafka.KafkaStorage;
 
@@ -24,26 +25,45 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private boolean ensureTopics = true;
   private String bootstrapServers = "localhost:9092";
+  private String compressionType = CompressionType.NONE.name();
 
   private String spansTopic = "zipkin-spans_v1";
+  private Integer spansTopicPartitions = 1;
+  private Short spansTopicReplicationFactor = 1;
   private String tracesTopic = "zipkin-traces_v1";
+  private Integer tracesTopicPartitions = 1;
+  private Short tracesTopicReplicationFactor = 1;
   private String servicesTopic = "zipkin-services_v1";
+  private Integer servicesTopicPartitions = 1;
+  private Short servicesTopicReplicationFactor = 1;
   private String dependenciesTopic = "zipkin-dependencies_v1";
+  private Integer dependenciesTopicPartitions = 1;
+  private Short dependenciesTopicReplicationFactor = 1;
 
-  private String processStateStoreDirectory = "/tmp/zipkin/kafka-streams/process";
-  private String indexStateStoreDirectory = "/tmp/zipkin/kafka-streams/index";
-  private String indexStorageDirectory = "/tmp/zipkin/index";
+  private String storeDirectory = "/tmp/zipkin";
 
   KafkaStorage.Builder toBuilder() {
     return KafkaStorage.newBuilder()
         .ensureTopics(ensureTopics)
         .bootstrapServers(bootstrapServers)
-        .spansTopic(KafkaStorage.Topic.builder(spansTopic).build())
-        .tracesTopic(KafkaStorage.Topic.builder(tracesTopic).build())
-        .servicesTopic(KafkaStorage.Topic.builder(servicesTopic).build())
-        .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic).build())
-        .processStreamStoreDirectory(processStateStoreDirectory)
-        .indexStorageDirectory(indexStorageDirectory);
+        .compressionType(compressionType)
+        .spansTopic(KafkaStorage.Topic.builder(spansTopic)
+            .partitions(spansTopicPartitions)
+            .replicationFactor(spansTopicReplicationFactor)
+            .build())
+        .tracesTopic(KafkaStorage.Topic.builder(tracesTopic)
+            .partitions(tracesTopicPartitions)
+            .replicationFactor(tracesTopicReplicationFactor)
+            .build())
+        .servicesTopic(KafkaStorage.Topic.builder(servicesTopic)
+            .partitions(servicesTopicPartitions)
+            .replicationFactor(servicesTopicReplicationFactor)
+            .build())
+        .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic)
+            .partitions(dependenciesTopicPartitions)
+            .replicationFactor(dependenciesTopicReplicationFactor)
+            .build())
+        .storeDirectory(storeDirectory);
   }
 
   public boolean isEnsureTopics() {
@@ -94,27 +114,83 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.dependenciesTopic = dependenciesTopic;
   }
 
-  public String getProcessStateStoreDirectory() {
-    return processStateStoreDirectory;
+  public String getStoreDirectory() {
+    return storeDirectory;
   }
 
-  public void setProcessStateStoreDirectory(String processStateStoreDirectory) {
-    this.processStateStoreDirectory = processStateStoreDirectory;
+  public void setStoreDirectory(String storeDirectory) {
+    this.storeDirectory = storeDirectory;
   }
 
-  public String getIndexStateStoreDirectory() {
-    return indexStateStoreDirectory;
+  public String getCompressionType() {
+    return compressionType;
   }
 
-  public void setIndexStateStoreDirectory(String indexStateStoreDirectory) {
-    this.indexStateStoreDirectory = indexStateStoreDirectory;
+  public void setCompressionType(String compressionType) {
+    this.compressionType = compressionType;
   }
 
-  public String getIndexStorageDirectory() {
-    return indexStorageDirectory;
+  public Integer getSpansTopicPartitions() {
+    return spansTopicPartitions;
   }
 
-  public void setIndexStorageDirectory(String indexStorageDirectory) {
-    this.indexStorageDirectory = indexStorageDirectory;
+  public void setSpansTopicPartitions(Integer spansTopicPartitions) {
+    this.spansTopicPartitions = spansTopicPartitions;
+  }
+
+  public Short getSpansTopicReplicationFactor() {
+    return spansTopicReplicationFactor;
+  }
+
+  public void setSpansTopicReplicationFactor(Short spansTopicReplicationFactor) {
+    this.spansTopicReplicationFactor = spansTopicReplicationFactor;
+  }
+
+  public Integer getTracesTopicPartitions() {
+    return tracesTopicPartitions;
+  }
+
+  public void setTracesTopicPartitions(Integer tracesTopicPartitions) {
+    this.tracesTopicPartitions = tracesTopicPartitions;
+  }
+
+  public Short getTracesTopicReplicationFactor() {
+    return tracesTopicReplicationFactor;
+  }
+
+  public void setTracesTopicReplicationFactor(Short tracesTopicReplicationFactor) {
+    this.tracesTopicReplicationFactor = tracesTopicReplicationFactor;
+  }
+
+  public Integer getServicesTopicPartitions() {
+    return servicesTopicPartitions;
+  }
+
+  public void setServicesTopicPartitions(Integer servicesTopicPartitions) {
+    this.servicesTopicPartitions = servicesTopicPartitions;
+  }
+
+  public Short getServicesTopicReplicationFactor() {
+    return servicesTopicReplicationFactor;
+  }
+
+  public void setServicesTopicReplicationFactor(Short servicesTopicReplicationFactor) {
+    this.servicesTopicReplicationFactor = servicesTopicReplicationFactor;
+  }
+
+  public Integer getDependenciesTopicPartitions() {
+    return dependenciesTopicPartitions;
+  }
+
+  public void setDependenciesTopicPartitions(Integer dependenciesTopicPartitions) {
+    this.dependenciesTopicPartitions = dependenciesTopicPartitions;
+  }
+
+  public Short getDependenciesTopicReplicationFactor() {
+    return dependenciesTopicReplicationFactor;
+  }
+
+  public void setDependenciesTopicReplicationFactor(Short dependenciesTopicReplicationFactor) {
+    this.dependenciesTopicReplicationFactor = dependenciesTopicReplicationFactor;
   }
 }

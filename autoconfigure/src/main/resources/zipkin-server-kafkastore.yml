@@ -2,5 +2,19 @@
 zipkin:
   storage:
     kafka:
-      bootstrapServers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      ensure-topics: ${KAFKA_STORE_ENSURE_TOPICS:true}
+      store-directory: ${KAFKA_STORE_DIRECTORY:/tmp/zipkin}
+      compression-type: ${KAFKA_COMPRESSION_TYPE:NONE}
+      spans-topic: ${KAFKA_STORE_SPANS_TOPIC:zipkin-spans}
+      spans-topic-partitions: ${KAFKA_STORE_SPANS_TOPIC_PARTITIONS:1}
+      spans-topic-replication-factor: ${KAFKA_STORE_SPANS_TOPIC_REPLICATION_FACTOR:1}
+      traces-topic: ${KAFKA_STORE_TRACES_TOPIC:zipkin-traces}
+      traces-topic-partitions: ${KAFKA_STORE_TRACES_TOPIC_PARTITIONS:1}
+      traces-topic-replication-factor: ${KAFKA_STORE_TRACES_TOPIC_REPLICATION_FACTOR:1}
+      services-topic: ${KAFKA_STORE_SERVICES_TOPIC:zipkin-services}
+      services-topic-partitions: ${KAFKA_STORE_SERVICES_TOPIC_PARTITIONS:1}
+      services-topic-replication-factor: ${KAFKA_STORE_SERVICES_TOPIC_REPLICATION_FACTOR:1}
+      dependencies-topic: ${KAFKA_STORE_DEPENDENCIES_TOPIC:zipkin-dependencies}
+      dependencies-topic-partitions: ${KAFKA_STORE_DEPENDENCIES_TOPIC_PARTITIONS:1}
+      dependencies-topic-replication-factor: ${KAFKA_STORE_DEPENDENCIES_TOPIC_REPLICATION_FACTOR:1}

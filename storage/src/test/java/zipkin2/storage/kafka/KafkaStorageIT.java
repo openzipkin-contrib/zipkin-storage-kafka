@@ -64,9 +64,7 @@ public class KafkaStorageIT {
     long epochMilli = Instant.now().toEpochMilli();
     storage = (KafkaStorage) new KafkaStorage.Builder().ensureTopics(true)
         .bootstrapServers(kafka.getBootstrapServers())
-        .processStreamStoreDirectory("target/kafka-streams/process/" + epochMilli)
-        .indexStreamStoreDirectory("target/kafka-streams/index/" + epochMilli)
-        .indexStorageDirectory("target/index/" + epochMilli)
+        .storeDirectory("target/zipkin_" + epochMilli)
         .spansTopic(KafkaStorage.Topic.builder("topic").build())
         .build();
   }
