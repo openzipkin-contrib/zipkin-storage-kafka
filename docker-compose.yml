@@ -38,7 +38,7 @@ services:
       - zookeeper
   zipkin:
     build: .
-    image: jeqo/zipkin-kafka
+    image: jeqo/zipkin-kafka:${TAG}
     ports:
       - 9411:9411
     environment:
