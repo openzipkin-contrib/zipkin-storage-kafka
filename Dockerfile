@@ -14,6 +14,8 @@
 
 FROM openjdk:11
 
+ARG KAFKA_STORAGE_VERSION=0.1.1
+
 ENV ZIPKIN_REPO https://jcenter.bintray.com
 ENV ZIPKIN_VERSION 2.12.1
 
@@ -24,8 +26,8 @@ WORKDIR /zipkin
 
 RUN curl -SL $ZIPKIN_REPO/io/zipkin/java/zipkin-server/$ZIPKIN_VERSION/zipkin-server-${ZIPKIN_VERSION}-exec.jar > zipkin.jar
 
-ADD storage/target/zipkin-storage-kafka-0.1.1-SNAPSHOT.jar zipkin-storage-kafka.jar
-ADD autoconfigure/target/zipkin-autoconfigure-storage-kafka-0.1.1-SNAPSHOT-module.jar zipkin-autoconfigure-storage-kafka.jar
+ADD storage/target/zipkin-storage-kafka-${KAFKA_STORAGE_VERSION}.jar zipkin-storage-kafka.jar
+ADD autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKA_STORAGE_VERSION}-module.jar zipkin-autoconfigure-storage-kafka.jar
 
 ENV STORAGE_TYPE=kafkastore
 

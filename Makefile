@@ -3,18 +3,23 @@ all: build
 
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
-VERSION := '0.1.1-SNAPSHOT'
+VERSION := '0.1.2-SNAPSHOT'
 
 .PHONY: run
 run: build zipkin-local
 
 .PHONY: run-docker
-run-docker: docker-build docker-up
+run-docker: build docker-build docker-up
 
 .PHONY: docker-build
-docker-build: build
+docker-build:
 	TAG=${VERSION} \
 	docker-compose build
+
+.PHONY: docker-push
+docker-push: docker-build
+	TAG=${VERSION} \
+	docker-compose push
 
 .PHONY: docker-up
 docker-up:
