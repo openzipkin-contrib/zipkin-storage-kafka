@@ -54,7 +54,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void providesStorageComponent_whenStorageTypeKafka() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka"
+        "zipkin.storage.type:kafkastore"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -66,13 +66,13 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_bootstrapServers() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.bootstrap_servers:host1:9092"
+        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.kafka.bootstrapServers:host1:19092"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class).producerConfigs.get(
-        ProducerConfig.BOOTSTRAP_SERVERS_CONFIG)).isEqualTo("host1:9092");
+        ProducerConfig.BOOTSTRAP_SERVERS_CONFIG)).isEqualTo("host1:19092");
   }
 }

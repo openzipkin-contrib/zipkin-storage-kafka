@@ -37,8 +37,11 @@ services:
     depends_on:
       - zookeeper
   zipkin:
-    build: .
-    image: jeqo/zipkin-kafka
+    build:
+      context: .
+      args:
+        KAFKA_STORAGE_VERSION: ${TAG}
+    image: jeqo/zipkin-kafka:${TAG}
     ports:
       - 9411:9411
     environment:

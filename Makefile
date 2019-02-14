@@ -3,19 +3,27 @@ all: build
 
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
+VERSION := '0.1.2-SNAPSHOT'
 
 .PHONY: run
 run: build zipkin-local
 
 .PHONY: run-docker
-run-docker: docker-build docker-up
+run-docker: build docker-build docker-up
 
 .PHONY: docker-build
-docker-build: build
+docker-build:
+	TAG=${VERSION} \
 	docker-compose build
+
+.PHONY: docker-push
+docker-push: docker-build
+	TAG=${VERSION} \
+	docker-compose push
 
 .PHONY: docker-up
 docker-up:
+	TAG=${VERSION} \
 	docker-compose up -d
 
 .PHONY: docker-kafka-up
@@ -36,7 +44,12 @@ test: build
 
 .PHONY: zipkin-local
 zipkin-local:
-	STORAGE_TYPE=kafka java -Dloader.path='storage/target/zipkin-storage-kafka-0.1.0-SNAPSHOT.jar,autoconfigure/target/zipkin-autoconfigure-storage-kafka-0.1.0-SNAPSHOT-module.jar' -Dspring.profiles.active=kafka -cp zipkin.jar org.springframework.boot.loader.PropertiesLauncher
+	STORAGE_TYPE=kafkastore \
+	java \
+	-Dloader.path='storage/target/zipkin-storage-kafka-${VERSION}.jar,autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar' \
+	-Dspring.profiles.active=kafkastore \
+	-cp zipkin.jar \
+	org.springframework.boot.loader.PropertiesLauncher
 
 .PHONY: get-zipkin
 get-zipkin:

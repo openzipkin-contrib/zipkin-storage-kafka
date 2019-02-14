@@ -23,7 +23,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
 
   private boolean ensureTopics = true;
-  private String bootstrapServers = "localhost:29092";
+  private String bootstrapServers = "localhost:9092";
 
   private String spansTopic = "zipkin-spans_v1";
   private String tracesTopic = "zipkin-traces_v1";

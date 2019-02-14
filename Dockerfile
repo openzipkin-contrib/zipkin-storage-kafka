@@ -14,21 +14,28 @@
 
 FROM openjdk:11
 
+ARG KAFKA_STORAGE_VERSION=0.1.1
+
 ENV ZIPKIN_REPO https://jcenter.bintray.com
 ENV ZIPKIN_VERSION 2.12.1
 
 # Use to set heap, trust store or other system properties.
 ENV JAVA_OPTS -Djava.security.egd=file:/dev/./urandom
-ENV STORAGE_TYPE=kafka
 # Add environment settings for supported storage types
 WORKDIR /zipkin
 
 RUN curl -SL $ZIPKIN_REPO/io/zipkin/java/zipkin-server/$ZIPKIN_VERSION/zipkin-server-${ZIPKIN_VERSION}-exec.jar > zipkin.jar
 
-ADD storage/target/zipkin-storage-kafka-0.1.0-SNAPSHOT.jar zipkin-storage-kafka.jar
-ADD autoconfigure/target/zipkin-autoconfigure-storage-kafka-0.1.0-SNAPSHOT-module.jar zipkin-autoconfigure-storage-kafka.jar
+ADD storage/target/zipkin-storage-kafka-${KAFKA_STORAGE_VERSION}.jar zipkin-storage-kafka.jar
+ADD autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKA_STORAGE_VERSION}-module.jar zipkin-autoconfigure-storage-kafka.jar
 
+ENV STORAGE_TYPE=kafkastore
 
 EXPOSE 9410 9411
 
-CMD exec java ${JAVA_OPTS} -Dloader.path='zipkin-storage-kafka.jar,zipkin-autoconfigure-storage-kafka.jar' -Dspring.profiles.active=kafka -cp zipkin.jar org.springframework.boot.loader.PropertiesLauncher
+CMD exec java \
+    ${JAVA_OPTS} \
+    -Dloader.path='zipkin-storage-kafka.jar,zipkin-autoconfigure-storage-kafka.jar' \
+    -Dspring.profiles.active=kafkastore \
+    -cp zipkin.jar \
+    org.springframework.boot.loader.PropertiesLauncher
