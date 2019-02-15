@@ -101,7 +101,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class).producerConfigs.get(
-        ProducerConfig.COMPRESSION_TYPE_CONFIG)).isEqualTo(CompressionType.SNAPPY);
+        ProducerConfig.COMPRESSION_TYPE_CONFIG)).isEqualTo(CompressionType.SNAPPY.name);
   }
 
   @Test
