@@ -137,7 +137,13 @@ public class ProcessTopologySupplier implements Supplier<Topology> {
             DEPENDENCY_PAIR_PATTERN, dependencyLink.parent(),
             dependencyLink.child()),
             Grouped.with(Serdes.String(), dependencyLinkSerde))
-        .reduce((l, r) -> r,
+        .reduce((l, r) ->
+                DependencyLink.newBuilder()
+                    .parent(r.parent())
+                    .child(r.child())
+                    .callCount(r.callCount() + l.callCount())
+                    .errorCount(r.errorCount() + l.errorCount())
+                    .build(),
             Materialized.<String, DependencyLink, KeyValueStore<Bytes, byte[]>>with(Serdes.String(),
                 dependencyLinkSerde)
                 .withLoggingDisabled().withCachingDisabled())

@@ -16,12 +16,16 @@ package zipkin2.storage.kafka;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.Callback;
 
 import java.io.IOException;
 
 public abstract class KafkaProducerCall<V> extends Call.Base<V> {
+  static final Logger LOG = LoggerFactory.getLogger(KafkaProducerCall.class);
+
   final Producer<String, byte[]> kafkaProducer;
   final String topic;
   final String key;
@@ -44,6 +48,7 @@ public abstract class KafkaProducerCall<V> extends Call.Base<V> {
       RecordMetadata recordMetadata = kafkaProducer.send(producerRecord).get();
       return convert(recordMetadata);
     } catch (Exception e) {
+      LOG.error("Error sending span to Kafka", e);
       throw new IOException(e);
     }
   }
@@ -58,6 +63,7 @@ public abstract class KafkaProducerCall<V> extends Call.Base<V> {
       if (e == null) {
         callback.onSuccess(convert(recordMetadata));
       } else {
+        LOG.error("Error sending span to Kafka", e);
         callback.onError(e);
       }
     });

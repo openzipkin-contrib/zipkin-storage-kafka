@@ -100,7 +100,7 @@ public class IndexStateStore implements StateStore {
         indexWriter.addDocument(doc);
       }
       indexWriter.commit();
-      LOG.info("{} indexed documents", value.size());
+      LOG.debug("{} indexed documents", value.size());
     } catch (IOException e) {
       LOG.error("Error indexing documents", e);
     }

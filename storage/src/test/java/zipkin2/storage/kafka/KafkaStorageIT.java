@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -332,7 +333,7 @@ public class KafkaStorageIT {
   }
 
   @Test
-  public void shouldFindTracesByServiceName() throws InterruptedException, IOException {
+  public void shouldFindTracesByServiceName() throws Exception {
     Span span1 =
         Span.newBuilder()
             .traceId("a")
@@ -397,7 +398,7 @@ public class KafkaStorageIT {
   }
 
   @Test
-  public void traceQueryEnque() {
+  public void traceQueryEnqueue() {
     Call<List<List<Span>>> callTraces =
         storage.spanStore()
             .getTraces(
@@ -429,7 +430,7 @@ public class KafkaStorageIT {
     try {
       callTraces.enqueue(callback);
       fail();
-    } catch (Exception e) {
+    } catch (Exception ignored) {
     }
   }
 

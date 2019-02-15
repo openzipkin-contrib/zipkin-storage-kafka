@@ -22,7 +22,11 @@ import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.LongPoint;
+import org.apache.lucene.document.NumericDocValuesField;
+import org.apache.lucene.document.SortedDocValuesField;
+import org.apache.lucene.document.SortedNumericDocValuesField;
 import org.apache.lucene.document.StringField;
+import org.apache.lucene.util.BytesRef;
 import zipkin2.Span;
 import zipkin2.storage.kafka.internal.serdes.SpanNamesSerde;
 import zipkin2.storage.kafka.internal.serdes.SpansSerde;
@@ -84,7 +88,7 @@ public class IndexTopologySupplier implements Supplier<Topology> {
                   Span span = (Span) s;
                   String kind = span.kind() != null ? span.kind().name() : "";
                   Document doc = new Document();
-                  doc.add(new StringField("trace_id", span.traceId(), Field.Store.YES));
+                  doc.add(new SortedDocValuesField("trace_id", new BytesRef(span.traceId())));
                   doc.add(new StringField("id", span.id(), Field.Store.YES));
                   doc.add(new StringField("kind", kind, Field.Store.YES));
                   String localServiceName =
@@ -98,6 +102,7 @@ public class IndexTopologySupplier implements Supplier<Topology> {
                   doc.add(new StringField("name", name, Field.Store.YES));
                   long micros = span.timestampAsLong();
                   doc.add(new LongPoint("ts", micros));
+                  doc.add(new NumericDocValuesField("ts_sorted", micros));
                   doc.add(new LongPoint("duration", span.durationAsLong()));
                   for (Map.Entry<String, String> tag : span.tags().entrySet()) {
                     doc.add(new StringField(tag.getKey(), tag.getValue(), Field.Store.YES));

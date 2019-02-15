@@ -13,7 +13,6 @@
  */
 package zipkin2.storage.kafka;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -24,7 +23,6 @@ import java.util.stream.Collectors;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
-import org.apache.lucene.document.Document;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
@@ -32,11 +30,14 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.Sort;
+import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.TopFieldDocs;
+import org.apache.lucene.search.grouping.GroupDocs;
+import org.apache.lucene.search.grouping.GroupingSearch;
+import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
@@ -89,70 +90,75 @@ public class KafkaSpanStore implements SpanStore {
     }
 
     @Override
-    protected List<List<Span>> doExecute() throws IOException {
+    protected List<List<Span>> doExecute() {
       return query();
     }
 
-    private List<List<Span>> query() throws IOException {
+    private List<List<Span>> query()  {
       Directory directory = indexStateStore.directory();
-      IndexReader reader = DirectoryReader.open(directory);
-      IndexSearcher indexSearcher = new IndexSearcher(reader);
+      try (IndexReader reader = DirectoryReader.open(directory)) {
+        IndexSearcher indexSearcher = new IndexSearcher(reader);
 
-      BooleanQuery.Builder builder = new BooleanQuery.Builder();
+        BooleanQuery.Builder builder = new BooleanQuery.Builder();
 
-      if (queryRequest.serviceName() != null) {
-        String serviceName = queryRequest.serviceName();
-        TermQuery serviceNameQuery = new TermQuery(new Term("local_service_name", serviceName));
-        builder.add(serviceNameQuery, BooleanClause.Occur.MUST);
-      }
+        if (queryRequest.serviceName() != null) {
+          String serviceName = queryRequest.serviceName();
+          TermQuery serviceNameQuery = new TermQuery(new Term("local_service_name", serviceName));
+          builder.add(serviceNameQuery, BooleanClause.Occur.MUST);
+        }
 
-      if (queryRequest.spanName() != null) {
-        String spanName = queryRequest.spanName();
-        TermQuery spanNameQuery = new TermQuery(new Term("name", spanName));
-        builder.add(spanNameQuery, BooleanClause.Occur.MUST);
-      }
+        if (queryRequest.spanName() != null) {
+          String spanName = queryRequest.spanName();
+          TermQuery spanNameQuery = new TermQuery(new Term("name", spanName));
+          builder.add(spanNameQuery, BooleanClause.Occur.MUST);
+        }
 
-      for (Map.Entry<String, String> entry : queryRequest.annotationQuery().entrySet()) {
-        TermQuery spanNameQuery = new TermQuery(new Term(entry.getKey(), entry.getValue()));
-        builder.add(spanNameQuery, BooleanClause.Occur.MUST);
-      }
+        for (Map.Entry<String, String> entry : queryRequest.annotationQuery().entrySet()) {
+          TermQuery spanNameQuery = new TermQuery(new Term(entry.getKey(), entry.getValue()));
+          builder.add(spanNameQuery, BooleanClause.Occur.MUST);
+        }
 
-      if (queryRequest.maxDuration() != null) {
-        builder.add(LongPoint.newRangeQuery(
-            "duration",
-            queryRequest.minDuration(),
-            queryRequest.maxDuration()),
+        if (queryRequest.maxDuration() != null) {
+          builder.add(LongPoint.newRangeQuery(
+              "duration",
+              queryRequest.minDuration(),
+              queryRequest.maxDuration()),
+              BooleanClause.Occur.MUST);
+        }
+
+        long start = queryRequest.endTs() - queryRequest.lookback();
+        long end = queryRequest.endTs();
+        //TODO No timestamp field in Lucene. Find a way to query timestamp instead of longs.
+        long lowerValue = Long.parseLong(start + "000");
+        long upperValue = Long.parseLong(end + "000");
+        builder.add(LongPoint.newRangeQuery("ts", lowerValue, upperValue),
             BooleanClause.Occur.MUST);
+
+        Sort sort = new Sort(new SortField("ts_sorted", SortField.Type.LONG, true));
+
+        BooleanQuery query = builder.build();
+
+        GroupingSearch groupingSearch = new GroupingSearch("trace_id");
+        groupingSearch.setGroupSort(sort);
+        TopGroups<BytesRef> docs =
+            groupingSearch.search(indexSearcher, query, 0, queryRequest.limit());
+
+        LOG.info("Total results of query {}: {}", query, docs.groups.length);
+
+        Set<String> traceIds = new HashSet<>();
+
+        for (GroupDocs<BytesRef> doc: docs.groups) {
+          String traceId = doc.groupValue.utf8ToString();
+          traceIds.add(traceId);
+        }
+
+        return traceIds.stream()
+            .map(traceStore::get)
+            .collect(Collectors.toList());
+      } catch (Exception e) {
+        LOG.error("Querying traces: {}", queryRequest, e);
+        return new ArrayList<>(new ArrayList<>());
       }
-
-      long start = queryRequest.endTs() - queryRequest.lookback();
-      long end = queryRequest.endTs();
-      //TODO No timestamp field in Lucene. Find a way to query timestamp instead of longs.
-      long lowerValue = Long.parseLong(start + "000");
-      long upperValue = Long.parseLong(end + "000");
-      builder.add(LongPoint.newRangeQuery("ts", lowerValue, upperValue), BooleanClause.Occur.MUST);
-
-      int total = queryRequest.limit();
-      Sort sort = Sort.RELEVANCE;
-
-      Set<String> traceIds = new HashSet<>();
-
-      BooleanQuery query = builder.build();
-      TopFieldDocs docs = indexSearcher.search(query, total, sort);
-
-      LOG.info("Total results of query {}: {}", query, docs.totalHits);
-
-      for (ScoreDoc doc : docs.scoreDocs) {
-        Document document = indexSearcher.doc(doc.doc);
-        String traceId = document.get("trace_id");
-        traceIds.add(traceId);
-      }
-
-      reader.close();
-
-      return traceIds.stream()
-          .map(traceStore::get)
-          .collect(Collectors.toList());
     }
 
     @Override

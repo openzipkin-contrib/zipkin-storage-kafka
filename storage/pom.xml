@@ -28,7 +28,7 @@
     <properties>
         <main.basedir>${project.basedir}/..</main.basedir>
         <kafka.version>2.1.0</kafka.version>
-        <lucene.version>7.6.0</lucene.version>
+      <lucene.version>7.7.0</lucene.version>
     </properties>
 
     <dependencies>
@@ -48,6 +48,11 @@
             <artifactId>lucene-core</artifactId>
             <version>${lucene.version}</version>
         </dependency>
+      <dependency>
+        <groupId>org.apache.lucene</groupId>
+        <artifactId>lucene-grouping</artifactId>
+        <version>${lucene.version}</version>
+      </dependency>
 
         <dependency>
             <groupId>org.apache.kafka</groupId>
