@@ -12,7 +12,7 @@
 # the License.
 #
 
-FROM openjdk:11
+FROM openjdk:8
 
 ARG KAFKA_STORAGE_VERSION=0.1.1
 
