@@ -21,10 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.stream.Stream;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -378,9 +375,6 @@ public class KafkaStorage extends StorageComponent {
 
     public Builder compressionType(String compressionType) {
       if (compressionType == null) throw new NullPointerException("compressionType == null");
-      if (!Stream.of(CompressionType.values()).map(CompressionType::name).findAny().isPresent()) {
-        throw new IllegalArgumentException("compressionType == invalid");
-      }
       this.compressionType = CompressionType.valueOf(compressionType);
       return this;
     }
