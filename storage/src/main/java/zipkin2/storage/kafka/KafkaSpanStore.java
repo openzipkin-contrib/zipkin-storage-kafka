@@ -266,6 +266,7 @@ public class KafkaSpanStore implements SpanStore {
               kafkaStreams.store(storeName, QueryableStoreTypes.keyValueStore());
           if (serviceName == null || serviceName.equals("all")) return new ArrayList<>();
           Set<String> spanNames = store.get(serviceName);
+          if (spanNames == null) return new ArrayList<>();
           return new ArrayList<>(spanNames);
         } catch (Exception e) {
           LOG.error("Error looking up for span names for service {}", serviceName, e);
