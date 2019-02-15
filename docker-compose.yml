@@ -46,7 +46,7 @@ services:
       - 9411:9411
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      KAFKA_STORE_DIRECTORY: /zipkin
+      KAFKA_STORE_DIRECTORY: /zipkin/data
       KAFKA_COMPRESSION_TYPE: SNAPPY
 
     volumes:
