@@ -3,7 +3,7 @@ all: build
 
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
-VERSION := '0.1.3-SNAPSHOT'
+VERSION := '0.1.4-SNAPSHOT'
 
 .PHONY: run
 run: build zipkin-local
