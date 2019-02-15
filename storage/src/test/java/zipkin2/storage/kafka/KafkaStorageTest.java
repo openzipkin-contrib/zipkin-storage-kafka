@@ -13,8 +13,9 @@
  */
 package zipkin2.storage.kafka;
 
-import org.junit.Test;
 import java.util.Arrays;
+import org.junit.Test;
+
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
@@ -53,9 +54,7 @@ public class KafkaStorageTest {
     assertNotNull(builder.tracesTopic);
     assertNotNull(builder.servicesTopic);
     assertNotNull(builder.dependenciesTopic);
-    assertNotNull(builder.processStreamStoreDirectory);
-    assertNotNull(builder.indexStreamStoreDirectory);
-    assertNotNull(builder.indexStorageDirectory);
+    assertNotNull(builder.storeDirectory);
 
     try {
       builder.tracesTopic(null);
@@ -76,19 +75,7 @@ public class KafkaStorageTest {
     }
 
     try {
-      builder.processStreamStoreDirectory(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    try {
-      builder.indexStreamStoreDirectory(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    try {
-      builder.indexStorageDirectory(null);
+      builder.storeDirectory(null);
       fail();
     } catch (NullPointerException ignored) {
     }
