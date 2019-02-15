@@ -13,8 +13,12 @@
  */
 package zipkin2.storage.kafka;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.Span;
@@ -22,10 +26,9 @@ import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.kafka.internal.AggregateCall;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class KafkaSpanConsumer implements SpanConsumer {
+  static final Logger LOG = LoggerFactory.getLogger(KafkaSpanConsumer.class);
+
   final String spansTopic;
   final Producer<String, byte[]> kafkaProducer;
 
@@ -57,6 +60,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
 
     @Override
     public void onErrorReturn(Throwable error, Callback<Void> callback) {
+      LOG.error("Error sending span to Kafka", error);
       callback.onError(error);
     }
 
