@@ -13,11 +13,11 @@
  */
 package zipkin2.autoconfigure.storage.kafka;
 
+import java.io.Serializable;
+import java.time.Duration;
 import org.apache.kafka.common.record.CompressionType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import zipkin2.storage.kafka.KafkaStorage;
-
-import java.io.Serializable;
 
 @ConfigurationProperties("zipkin.storage.kafka")
 public class ZipkinKafkaStorageProperties implements Serializable {
@@ -26,6 +26,9 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private boolean ensureTopics = true;
   private String bootstrapServers = "localhost:9092";
   private String compressionType = CompressionType.NONE.name();
+
+  private Long retentionScanFrequencyMs = Duration.ofDays(1).toMillis();
+  private Long retentionMaxAgeMs = Duration.ofDays(7).toMillis();
 
   private String spansTopic = "zipkin-spans_v1";
   private Integer spansTopicPartitions = 1;
@@ -47,6 +50,8 @@ public class ZipkinKafkaStorageProperties implements Serializable {
         .ensureTopics(ensureTopics)
         .bootstrapServers(bootstrapServers)
         .compressionType(compressionType)
+        .retentionMaxAge(Duration.ofMillis(retentionMaxAgeMs))
+        .retentionScanFrequency(Duration.ofMillis(retentionScanFrequencyMs))
         .spansTopic(KafkaStorage.Topic.builder(spansTopic)
             .partitions(spansTopicPartitions)
             .replicationFactor(spansTopicReplicationFactor)
@@ -80,6 +85,22 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setBootstrapServers(String bootstrapServers) {
     this.bootstrapServers = bootstrapServers;
+  }
+
+  public Long getRetentionScanFrequencyMs() {
+    return retentionScanFrequencyMs;
+  }
+
+  public void setRetentionScanFrequencyMs(Long retentionScanFrequencyMs) {
+    this.retentionScanFrequencyMs = retentionScanFrequencyMs;
+  }
+
+  public Long getRetentionMaxAgeMs() {
+    return retentionMaxAgeMs;
+  }
+
+  public void setRetentionMaxAgeMs(Long retentionMaxAgeMs) {
+    this.retentionMaxAgeMs = retentionMaxAgeMs;
   }
 
   public String getSpansTopic() {

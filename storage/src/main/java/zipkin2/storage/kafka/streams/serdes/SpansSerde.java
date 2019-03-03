@@ -11,8 +11,9 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.internal.serdes;
+package zipkin2.storage.kafka.streams.serdes;
 
+import java.util.ArrayList;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
@@ -63,6 +64,7 @@ public class SpansSerde implements Serde<List<Span>> {
 
     @Override
     public byte[] serialize(String topic, List<Span> data) {
+      if (data == null) return null;
       return spanBytesEncoder.encodeList(data);
     }
 
@@ -81,6 +83,7 @@ public class SpansSerde implements Serde<List<Span>> {
 
     @Override
     public List<Span> deserialize(String topic, byte[] data) {
+      if (data == null) return new ArrayList<>();
       return spanBytesDecoder.decodeList(data);
     }
 

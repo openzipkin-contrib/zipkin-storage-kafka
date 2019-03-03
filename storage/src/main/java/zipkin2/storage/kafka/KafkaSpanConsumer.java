@@ -13,10 +13,14 @@
  */
 package zipkin2.storage.kafka;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.Span;
@@ -24,6 +28,11 @@ import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.kafka.internal.AggregateCall;
 
+/**
+ * Processing of Spans consumed.
+ *
+ * Supported by a Kafka Producer, spans are stored in a Kafka Topic.
+ */
 public class KafkaSpanConsumer implements SpanConsumer {
 
   final String spansTopic;
@@ -68,6 +77,53 @@ public class KafkaSpanConsumer implements SpanConsumer {
     @Override
     public Call<Void> clone() {
       return new StoreSpanCall(kafkaProducer, topic, key, value);
+    }
+  }
+
+  abstract static class KafkaProducerCall<V> extends Call.Base<V> {
+    static final Logger LOG = LoggerFactory.getLogger(KafkaProducerCall.class);
+
+    final Producer<String, byte[]> kafkaProducer;
+    final String topic;
+    final String key;
+    final byte[] value;
+
+    KafkaProducerCall(Producer<String, byte[]> kafkaProducer,
+        String topic,
+        String key,
+        byte[] value) {
+      this.kafkaProducer = kafkaProducer;
+      this.topic = topic;
+      this.key = key;
+      this.value = value;
+    }
+
+    @Override
+    protected V doExecute() throws IOException {
+      try {
+        ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
+        RecordMetadata recordMetadata = kafkaProducer.send(producerRecord).get();
+        return convert(recordMetadata);
+      } catch (Exception e) {
+        LOG.error("Error sending span to Kafka", e);
+        throw new IOException(e);
+      }
+    }
+
+    abstract V convert(RecordMetadata recordMetadata);
+
+    @Override
+    @SuppressWarnings("FutureReturnValueIgnored")
+    protected void doEnqueue(Callback<V> callback) {
+      ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
+      kafkaProducer.send(producerRecord, (recordMetadata, e) -> {
+        if (e == null) {
+          callback.onSuccess(convert(recordMetadata));
+        } else {
+          LOG.error("Error sending span to Kafka", e);
+          callback.onError(e);
+        }
+      });
     }
   }
 }

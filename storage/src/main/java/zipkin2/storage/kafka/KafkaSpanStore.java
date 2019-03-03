@@ -24,19 +24,15 @@ import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.apache.lucene.document.LongPoint;
-import org.apache.lucene.index.DirectoryReader;
-import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.GroupingSearch;
 import org.apache.lucene.search.grouping.TopGroups;
-import org.apache.lucene.store.Directory;
 import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,9 +42,12 @@ import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
 import zipkin2.storage.SpanStore;
-import zipkin2.storage.kafka.internal.stores.IndexStateStore;
-import zipkin2.storage.kafka.internal.stores.IndexStoreType;
+import zipkin2.storage.kafka.streams.stores.IndexStateStore;
+import zipkin2.storage.kafka.streams.stores.IndexStoreType;
 
+/**
+ * Span Store based on Kafka Streams State Stores.
+ */
 public class KafkaSpanStore implements SpanStore {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
 
@@ -56,7 +55,8 @@ public class KafkaSpanStore implements SpanStore {
   final String serviceStoreName;
   final String dependenciesStoreName;
   final String indexStoreName;
-  final KafkaStreams processStreams;
+
+  final KafkaStreams storeStreams;
   final KafkaStreams indexStreams;
 
   KafkaSpanStore(KafkaStorage storage) {
@@ -64,14 +64,14 @@ public class KafkaSpanStore implements SpanStore {
     serviceStoreName = storage.servicesTopic.name;
     dependenciesStoreName = storage.dependenciesTopic.name;
     indexStoreName = storage.indexStoreName;
-    processStreams = storage.processStreams;
+    storeStreams = storage.storeStreams;
     indexStreams = storage.indexStreams;
   }
 
   @Override
   public Call<List<List<Span>>> getTraces(QueryRequest request) {
     ReadOnlyKeyValueStore<String, List<Span>> traceStore =
-        processStreams.store(tracesStoreName, QueryableStoreTypes.keyValueStore());
+        storeStreams.store(tracesStoreName, QueryableStoreTypes.keyValueStore());
     IndexStateStore indexStateStore = indexStreams.store(indexStoreName, new IndexStoreType());
     return new GetTracesCall(indexStateStore, request, traceStore);
   }
@@ -95,70 +95,67 @@ public class KafkaSpanStore implements SpanStore {
     }
 
     private List<List<Span>> query()  {
-      Directory directory = indexStateStore.directory();
-      try (IndexReader reader = DirectoryReader.open(directory)) {
-        IndexSearcher indexSearcher = new IndexSearcher(reader);
+      BooleanQuery.Builder builder = new BooleanQuery.Builder();
 
-        BooleanQuery.Builder builder = new BooleanQuery.Builder();
+      if (queryRequest.serviceName() != null) {
+        String serviceName = queryRequest.serviceName();
+        TermQuery serviceNameQuery = new TermQuery(new Term("local_service_name", serviceName));
+        builder.add(serviceNameQuery, BooleanClause.Occur.MUST);
+      }
 
-        if (queryRequest.serviceName() != null) {
-          String serviceName = queryRequest.serviceName();
-          TermQuery serviceNameQuery = new TermQuery(new Term("local_service_name", serviceName));
-          builder.add(serviceNameQuery, BooleanClause.Occur.MUST);
-        }
+      if (queryRequest.spanName() != null) {
+        String spanName = queryRequest.spanName();
+        TermQuery spanNameQuery = new TermQuery(new Term("name", spanName));
+        builder.add(spanNameQuery, BooleanClause.Occur.MUST);
+      }
 
-        if (queryRequest.spanName() != null) {
-          String spanName = queryRequest.spanName();
-          TermQuery spanNameQuery = new TermQuery(new Term("name", spanName));
-          builder.add(spanNameQuery, BooleanClause.Occur.MUST);
-        }
+      for (Map.Entry<String, String> entry : queryRequest.annotationQuery().entrySet()) {
+        TermQuery spanNameQuery = new TermQuery(new Term(entry.getKey(), entry.getValue()));
+        builder.add(spanNameQuery, BooleanClause.Occur.MUST);
+      }
 
-        for (Map.Entry<String, String> entry : queryRequest.annotationQuery().entrySet()) {
-          TermQuery spanNameQuery = new TermQuery(new Term(entry.getKey(), entry.getValue()));
-          builder.add(spanNameQuery, BooleanClause.Occur.MUST);
-        }
-
-        if (queryRequest.maxDuration() != null) {
-          builder.add(LongPoint.newRangeQuery(
-              "duration",
-              queryRequest.minDuration(),
-              queryRequest.maxDuration()),
-              BooleanClause.Occur.MUST);
-        }
-
-        long start = queryRequest.endTs() - queryRequest.lookback();
-        long end = queryRequest.endTs();
-        //TODO No timestamp field in Lucene. Find a way to query timestamp instead of longs.
-        long lowerValue = Long.parseLong(start + "000");
-        long upperValue = Long.parseLong(end + "000");
-        builder.add(LongPoint.newRangeQuery("ts", lowerValue, upperValue),
+      if (queryRequest.maxDuration() != null) {
+        builder.add(LongPoint.newRangeQuery(
+            "duration",
+            queryRequest.minDuration(),
+            queryRequest.maxDuration()),
             BooleanClause.Occur.MUST);
+      }
 
-        Sort sort = new Sort(new SortField("ts_sorted", SortField.Type.LONG, true));
+      long start = queryRequest.endTs() - queryRequest.lookback();
+      long end = queryRequest.endTs();
+      //TODO No timestamp field in Lucene. Find a way to query timestamp instead of longs.
+      long lowerValue = Long.parseLong(start + "000");
+      long upperValue = Long.parseLong(end + "000");
+      builder.add(LongPoint.newRangeQuery("ts", lowerValue, upperValue),
+          BooleanClause.Occur.MUST);
 
-        BooleanQuery query = builder.build();
+      Sort sort = new Sort(new SortField("ts_sorted", SortField.Type.LONG, true));
 
-        GroupingSearch groupingSearch = new GroupingSearch("trace_id");
-        groupingSearch.setGroupSort(sort);
-        TopGroups<BytesRef> docs =
-            groupingSearch.search(indexSearcher, query, 0, queryRequest.limit());
+      BooleanQuery query = builder.build();
 
-        LOG.info("Total results of query {}: {}", query, docs.groups.length);
+      GroupingSearch groupingSearch = new GroupingSearch("trace_id_sorted");
+      groupingSearch.setGroupSort(sort);
+      TopGroups<BytesRef> docs =
+          indexStateStore.groupSearch(groupingSearch, query, 0, queryRequest.limit());
+      if (docs == null) return new ArrayList<>();
 
-        Set<String> traceIds = new HashSet<>();
+      Set<String> traceIds = new HashSet<>();
 
-        for (GroupDocs<BytesRef> doc: docs.groups) {
+      for (GroupDocs<BytesRef> doc : docs.groups) {
+        if (doc.groupValue != null) {
           String traceId = doc.groupValue.utf8ToString();
           traceIds.add(traceId);
         }
-
-        return traceIds.stream()
-            .map(traceStore::get)
-            .collect(Collectors.toList());
-      } catch (Exception e) {
-        LOG.error("Querying traces: {}", queryRequest, e);
-        return new ArrayList<>(new ArrayList<>());
       }
+
+      List<List<Span>> result = traceIds.stream()
+          .map(traceStore::get)
+          .collect(Collectors.toList());
+
+      LOG.info("Total results of query {}: {}", query, result.size());
+
+      return result;
     }
 
     @Override
@@ -178,7 +175,7 @@ public class KafkaSpanStore implements SpanStore {
 
   @Override
   public Call<List<Span>> getTrace(String traceId) {
-    return new GetTraceCall(processStreams, tracesStoreName, traceId);
+    return new GetTraceCall(storeStreams, tracesStoreName, traceId);
   }
 
   static class GetTraceCall extends KafkaStreamsStoreCall<List<Span>> {
@@ -214,7 +211,7 @@ public class KafkaSpanStore implements SpanStore {
 
   @Override
   public Call<List<String>> getServiceNames() {
-    return new GetServiceNamesCall(processStreams, serviceStoreName);
+    return new GetServiceNamesCall(storeStreams, serviceStoreName);
   }
 
   static class GetServiceNamesCall extends KafkaStreamsStoreCall<List<String>> {
@@ -250,7 +247,7 @@ public class KafkaSpanStore implements SpanStore {
 
   @Override
   public Call<List<String>> getSpanNames(String serviceName) {
-    return new GetSpanNamesCall(processStreams, serviceStoreName, serviceName);
+    return new GetSpanNamesCall(storeStreams, serviceStoreName, serviceName);
   }
 
   static class GetSpanNamesCall extends KafkaStreamsStoreCall<List<String>> {
@@ -289,7 +286,7 @@ public class KafkaSpanStore implements SpanStore {
 
   @Override
   public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
-    return new GetDependenciesCall(processStreams, dependenciesStoreName);
+    return new GetDependenciesCall(storeStreams, dependenciesStoreName);
   }
 
   static class GetDependenciesCall

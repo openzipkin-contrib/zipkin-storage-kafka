@@ -43,21 +43,33 @@ import zipkin2.CheckResult;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
-import zipkin2.storage.kafka.internal.IndexTopologySupplier;
-import zipkin2.storage.kafka.internal.ProcessTopologySupplier;
+import zipkin2.storage.kafka.streams.IndexTopologySupplier;
+import zipkin2.storage.kafka.streams.AggregationTopologySupplier;
+import zipkin2.storage.kafka.streams.RetentionTopologySupplier;
+import zipkin2.storage.kafka.streams.StoreTopologySupplier;
 
+/**
+ * Kafka Storage entry-point.
+ *
+ * Storage implementation based on Kafka Streams State Stores, supporting aggregation of spans,
+ * indexing of traces and retention management.
+ */
 public class KafkaStorage extends StorageComponent {
-  private static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
+  static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
 
   final boolean ensureTopics;
   final String storeDirectory;
   final Properties adminConfigs;
   final Properties producerConfigs;
-  final Properties processStreamsConfig;
+  final Properties aggregationStreamsConfig;
+  final Properties storeStreamsConfig;
   final Properties indexStreamsConfig;
+  final Properties retentionStreamsConfig;
 
-  final Topology processTopology;
+  final Topology aggregationTopology;
+  final Topology storeTopology;
   final Topology indexTopology;
+  final Topology retentionTopology;
 
   final Topic spansTopic;
   final Topic tracesTopic;
@@ -69,8 +81,10 @@ public class KafkaStorage extends StorageComponent {
 
   volatile AdminClient adminClient;
   Producer<String, byte[]> producer;
-  KafkaStreams processStreams;
+  KafkaStreams aggregationsStreams;
+  KafkaStreams storeStreams;
   KafkaStreams indexStreams;
+  KafkaStreams retentionStreams;
 
   volatile boolean closeCalled, connected;
 
@@ -84,6 +98,7 @@ public class KafkaStorage extends StorageComponent {
     this.spansTopic = builder.spansTopic;
     this.indexPersistent = builder.indexPersistent;
 
+    // Kafka Clients configuration
     adminConfigs = new Properties();
     adminConfigs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
 
@@ -94,22 +109,41 @@ public class KafkaStorage extends StorageComponent {
     producerConfigs.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
     producerConfigs.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, builder.compressionType.name);
 
-    processStreamsConfig = new Properties();
-    processStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
-    processStreamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+    // Aggregation Stream Topology configuration
+    aggregationStreamsConfig = new Properties();
+    aggregationStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
+    aggregationStreamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
         Serdes.StringSerde.class);
-    processStreamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+    aggregationStreamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
         Serdes.ByteArraySerde.class);
-    processStreamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
-        builder.processStreamApplicationId);
-    processStreamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
-    processStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.processStreamStoreDirectory());
-    processStreamsConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, builder.compressionType.name);
+    aggregationStreamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
+        builder.aggregationStreamApplicationId);
+    aggregationStreamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
+    aggregationStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG,
+        builder.aggregationStreamStoreDirectory());
+    aggregationStreamsConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
+        builder.compressionType.name);
 
-    processTopology =
-        new ProcessTopologySupplier(spansTopic.name, tracesTopic.name, servicesTopic.name,
+    aggregationTopology =
+        new AggregationTopologySupplier(spansTopic.name, tracesTopic.name, servicesTopic.name,
             dependenciesTopic.name).get();
 
+    // Store Stream Topology configuration
+    storeStreamsConfig = new Properties();
+    storeStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
+    storeStreamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+        Serdes.StringSerde.class);
+    storeStreamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+        Serdes.ByteArraySerde.class);
+    storeStreamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
+        builder.storeStreamApplicationId);
+    storeStreamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
+    storeStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.storeStreamStoreDirectory());
+
+    storeTopology = new StoreTopologySupplier(tracesTopic.name, servicesTopic.name,
+        dependenciesTopic.name).get();
+
+    // Index Stream Topology configuration
     indexStreamsConfig = new Properties();
     indexStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
     indexStreamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
@@ -122,6 +156,23 @@ public class KafkaStorage extends StorageComponent {
     indexTopology =
         new IndexTopologySupplier(tracesTopic.name, indexStoreName, builder.indexPersistent,
             builder.indexStorageDirectory()).get();
+
+    // Retention Stream Topology configuration
+    retentionStreamsConfig = new Properties();
+    retentionStreamsConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
+    retentionStreamsConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+        Serdes.StringSerde.class);
+    retentionStreamsConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+        Serdes.ByteArraySerde.class);
+    retentionStreamsConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
+        builder.retentionStreamApplicationId);
+    retentionStreamsConfig.put(StreamsConfig.EXACTLY_ONCE, true);
+    retentionStreamsConfig.put(StreamsConfig.STATE_DIR_CONFIG,
+        builder.retentionStreamStoreDirectory());
+
+    retentionTopology =
+        new RetentionTopologySupplier(tracesTopic.name, builder.retentionScanFrequency,
+            builder.retentionMaxAge).get();
   }
 
   public static Builder newBuilder() {
@@ -162,8 +213,14 @@ public class KafkaStorage extends StorageComponent {
   }
 
   void connectStore() {
-    processStreams = new KafkaStreams(processTopology, processStreamsConfig);
-    processStreams.start();
+    aggregationsStreams = new KafkaStreams(aggregationTopology, aggregationStreamsConfig);
+    aggregationsStreams.start();
+
+    storeStreams = new KafkaStreams(storeTopology, storeStreamsConfig);
+    storeStreams.start();
+
+    retentionStreams = new KafkaStreams(retentionTopology, retentionStreamsConfig);
+    retentionStreams.start();
 
     indexStreams = new KafkaStreams(indexTopology, indexStreamsConfig);
     indexStreams.start();
@@ -244,7 +301,9 @@ public class KafkaStorage extends StorageComponent {
         producer.flush();
         producer.close(1, TimeUnit.SECONDS);
       }
-      if (processStreams != null) processStreams.close(Duration.ofSeconds(1));
+      if (aggregationsStreams != null) aggregationsStreams.close(Duration.ofSeconds(1));
+      if (storeStreams != null) storeStreams.close(Duration.ofSeconds(1));
+      if (retentionStreams != null) retentionStreams.close(Duration.ofSeconds(1));
       if (indexStreams != null) indexStreams.close(Duration.ofSeconds(1));
     } catch (Exception | Error e) {
       LOG.warn("error closing client {}", e.getMessage(), e);
@@ -252,12 +311,17 @@ public class KafkaStorage extends StorageComponent {
   }
 
   public static class Builder extends StorageComponent.Builder {
+    Duration retentionScanFrequency = Duration.ofMinutes(1);
+    Duration retentionMaxAge = Duration.ofMinutes(2);
     String bootstrapServers = "localhost:29092";
     CompressionType compressionType = CompressionType.NONE;
     String storeDirectory = "/tmp/zipkin";
 
-    String processStreamApplicationId = "zipkin-server-process_v1";
+    String aggregationStreamApplicationId = "zipkin-server-aggregation_v1";
+    String storeStreamApplicationId = "zipkin-server-store_v1";
     String indexStreamApplicationId = "zipkin-server-index_v1";
+    String retentionStreamApplicationId = "zipkin-server-retention_v1";
+
     String indexStoreName = "zipkin-index-store_v1";
 
     boolean indexPersistent = true;
@@ -347,13 +411,29 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * Store directory.
+     * Path to root directory when state is stored.
      */
     public Builder storeDirectory(String storeDirectory) {
       if (storeDirectory == null) {
         throw new NullPointerException("storeDirectory == null");
       }
       this.storeDirectory = storeDirectory;
+      return this;
+    }
+
+    /**
+     * Frequency to check retention policy.
+     */
+    public Builder retentionScanFrequency(Duration retentionScanFrequency) {
+      this.retentionScanFrequency = retentionScanFrequency;
+      return this;
+    }
+
+    /**
+     * Frequency to check retention policy.
+     */
+    public Builder retentionMaxAge(Duration retentionMaxAge) {
+      this.retentionMaxAge = retentionMaxAge;
       return this;
     }
 
@@ -379,12 +459,20 @@ public class KafkaStorage extends StorageComponent {
       return this;
     }
 
-    String processStreamStoreDirectory() {
-      return storeDirectory + "/kafka-streams/process";
+    String aggregationStreamStoreDirectory() {
+      return storeDirectory + "/streams/aggregation";
+    }
+
+    String storeStreamStoreDirectory() {
+      return storeDirectory + "/streams/store";
+    }
+
+    String retentionStreamStoreDirectory() {
+      return storeDirectory + "/streams/retention";
     }
 
     String indexStreamStoreDirectory() {
-      return storeDirectory + "/kafka-streams/index";
+      return storeDirectory + "/streams/index";
     }
 
     String indexStorageDirectory() {

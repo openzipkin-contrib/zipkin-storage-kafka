@@ -11,16 +11,24 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.internal.stores;
+package zipkin2.storage.kafka.streams.stores;
 
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
+import org.apache.lucene.index.DirectoryReader;
+import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.search.BooleanQuery;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.grouping.GroupingSearch;
+import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.store.*;
+import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,12 +38,16 @@ import java.util.List;
 import java.util.Map;
 
 public class IndexStateStore implements StateStore {
+
   private static final Logger LOG = LoggerFactory.getLogger(IndexStateStore.class);
+
   final String name;
   final boolean persistent;
   final IndexWriter indexWriter;
+
+  final Directory directory;
+
   IndexStateStore(Builder builder) throws IOException {
-    final Directory directory;
     if (builder.isPersistent()) {
       LOG.info("Storing index on path={}", builder.indexDirectory);
       directory = new MMapDirectory(Paths.get(builder.indexDirectory));
@@ -106,8 +118,26 @@ public class IndexStateStore implements StateStore {
     }
   }
 
-  public Directory directory() {
-    return indexWriter.getDirectory();
+  public void delete(Query query) {
+    try {
+      indexWriter.deleteDocuments(query);
+      indexWriter.commit();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  public TopGroups<BytesRef> groupSearch(GroupingSearch groupingSearch, BooleanQuery query,
+      int offset, int limit) {
+    try (IndexReader reader = DirectoryReader.open(directory)) {
+      IndexSearcher indexSearcher = new IndexSearcher(reader);
+
+      return
+          groupingSearch.search(indexSearcher, query, offset, limit);
+    } catch (IOException e) {
+      LOG.error("Error in group query", e);
+      return null;
+    }
   }
 
   public static class Builder implements StoreBuilder<IndexStateStore> {
