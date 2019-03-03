@@ -36,7 +36,6 @@ public class StoreTopologySupplier implements Supplier<Topology> {
   final String serviceStoreName;
   final String dependencyStoreName;
 
-
   final SpansSerde spansSerde;
   final DependencyLinkSerde dependencyLinkSerde;
   final SpanNamesSerde spanNamesSerde;
@@ -78,7 +77,6 @@ public class StoreTopologySupplier implements Supplier<Topology> {
         Materialized
             .<String, List<Span>, KeyValueStore<Bytes, byte[]>>as(traceStoreName)
             .withValueSerde(spansSerde));
-
 
     // Prepare local state from service names
     builder.globalTable(

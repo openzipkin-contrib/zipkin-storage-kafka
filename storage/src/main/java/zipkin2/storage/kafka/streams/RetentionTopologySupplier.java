@@ -68,16 +68,15 @@ public class RetentionTopologySupplier implements Supplier<Topology> {
               @Override public void init(ProcessorContext context) {
                 this.stateStore =
                     (KeyValueStore<String, Long>) context.getStateStore(traceTsStoreName);
+                // Schedule deletion of traces older than maxAge
                 context.schedule(
                     scanFrequency,
-                    PunctuationType.WALL_CLOCK_TIME,
+                    PunctuationType.WALL_CLOCK_TIME, // Run it independently of insertion
                     timestamp -> {
                       final long cutoff = timestamp - maxAge.toMillis();
                       final long ttl = Long.valueOf(cutoff + "000");
 
-                      // scan over all the keys in this partition's store
-                      // this can be optimized, but just keeping it simple.
-                      // this might take a while, so the Streams timeouts should take this into account
+                      // Scan all records indexed
                       try (final KeyValueIterator<String, Long> all = stateStore.all()) {
                         int deletions = 0;
                         while (all.hasNext()) {
@@ -97,18 +96,19 @@ public class RetentionTopologySupplier implements Supplier<Topology> {
 
               @Override
               public KeyValue<String, List<Span>> transform(String key, List<Span> value) {
-                if (value == null) {
+                if (value == null) { // clean state when tombstone
                   stateStore.delete(key);
-                } else {
+                } else { // update store when traces are available
                   if (value.size() > 1) {
                     Long timestamp = value.get(0).timestamp();
                     stateStore.put(key, timestamp);
                   }
                 }
-                return null;
+                return null; // no need to return anything here. the punctuator will emit the tombstones when necessary
               }
 
               @Override public void close() {
+                // no need to close anything; Streams already closes the state store.
               }
             }, traceTsStoreName)
         .to(tracesTopic);

@@ -78,7 +78,7 @@ public class IndexTopologySupplier implements Supplier<Topology> {
         Consumed.with(Serdes.String(), spansSerde),
         () -> new
             Processor() {
-              IndexStateStore index;
+              private IndexStateStore index;
 
               @Override
               public void init(ProcessorContext context) {
@@ -87,10 +87,10 @@ public class IndexTopologySupplier implements Supplier<Topology> {
 
               @Override
               public void process(Object key, Object value) {
-                if (value == null) {
+                if (value == null) { // clean index when trace removed
                   TermQuery query = new TermQuery(new Term("trace_id", (String) key));
                   index.delete(query);
-                } else {
+                } else { // index spans
                   List<Document> docs = new ArrayList<>();
                   List spans = (ArrayList) value;
                   for (Object s : spans) {
@@ -129,6 +129,7 @@ public class IndexTopologySupplier implements Supplier<Topology> {
                 index.close();
               }
             });
+
     return builder.build();
   }
 }

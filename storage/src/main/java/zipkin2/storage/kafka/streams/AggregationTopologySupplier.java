@@ -115,10 +115,12 @@ public class AggregationTopologySupplier implements Supplier<Topology> {
     aggregatedSpans
         .filterNot((traceId, spans) -> spans.isEmpty())
         .mapValues(spans -> new DependencyLinker().putTrace(spans).link())
+        .peek((key, value) -> System.out.printf("%s=>%s%n", key, value))
         .flatMapValues(dependencyLinks -> dependencyLinks)
-        .groupBy((traceId, dependencyLink) -> String.format(
-            DEPENDENCY_PAIR_PATTERN, dependencyLink.parent(),
-            dependencyLink.child()),
+        .groupBy((traceId, dependencyLink) ->
+                String.format(
+                    DEPENDENCY_PAIR_PATTERN, dependencyLink.parent(),
+                    dependencyLink.child()),
             Grouped.with(Serdes.String(), dependencyLinkSerde))
         .reduce((l, r) ->
                 DependencyLink.newBuilder()
