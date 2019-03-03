@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.internal.topology;
+package zipkin2.storage.kafka.streams;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,10 +33,15 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.util.BytesRef;
 import zipkin2.Span;
-import zipkin2.storage.kafka.internal.serdes.SpanNamesSerde;
-import zipkin2.storage.kafka.internal.serdes.SpansSerde;
-import zipkin2.storage.kafka.internal.stores.IndexStateStore;
+import zipkin2.storage.kafka.streams.serdes.SpanNamesSerde;
+import zipkin2.storage.kafka.streams.serdes.SpansSerde;
+import zipkin2.storage.kafka.streams.stores.IndexStateStore;
 
+/**
+ * Streams processing supplier for full-text indexing.
+ *
+ * This module enable search capabilities by storing traces into a Lucene index.
+ */
 public class IndexTopologySupplier implements Supplier<Topology> {
 
   final String traceStoreName;

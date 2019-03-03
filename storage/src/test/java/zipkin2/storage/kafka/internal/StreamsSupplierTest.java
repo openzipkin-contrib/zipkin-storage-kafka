@@ -31,7 +31,7 @@ import org.junit.Test;
 import zipkin2.Span;
 import zipkin2.TestObjects;
 import zipkin2.codec.SpanBytesEncoder;
-import zipkin2.storage.kafka.internal.topology.ProcessTopologySupplier;
+import zipkin2.storage.kafka.streams.AggregationTopologySupplier;
 
 import static org.junit.Assert.assertEquals;
 
@@ -48,11 +48,11 @@ public class StreamsSupplierTest {
     props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
 
     String topic = "topic";
-    ProcessTopologySupplier processTopologySupplier = new ProcessTopologySupplier(
+    AggregationTopologySupplier aggregationTopologySupplier = new AggregationTopologySupplier(
         topic, "traces",
         "services",
         "dependencies");
-    Topology topology = processTopologySupplier.get();
+    Topology topology = aggregationTopologySupplier.get();
     System.out.println(KafkaStreamsTopologyGraphvizPrinter.print(topology));
     TopologyTestDriver driver = new TopologyTestDriver(topology, props);
     ConsumerRecordFactory<String, byte[]> factory = new ConsumerRecordFactory<>(

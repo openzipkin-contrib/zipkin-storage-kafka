@@ -11,9 +11,10 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.internal.topology;
+package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
@@ -30,7 +31,7 @@ import org.apache.kafka.streams.state.Stores;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Span;
-import zipkin2.storage.kafka.internal.serdes.SpansSerde;
+import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 public class RetentionTopologySupplier implements Supplier<Topology> {
   static final Logger LOG = LoggerFactory.getLogger(RetentionTopologySupplier.class);
@@ -81,14 +82,14 @@ public class RetentionTopologySupplier implements Supplier<Topology> {
                         int deletions = 0;
                         while (all.hasNext()) {
                           final KeyValue<String, Long> record = all.next();
-                          LOG.info("Trace ts: {}", record.value);
                           if (record.value != null && record.value < ttl) {
                             deletions++;
                             // if a record's last update was older than our cutoff, emit a tombstone.
                             context.forward(record.key, null);
                           }
                         }
-                        LOG.info("Traces deletion emitted: {}, older than {}", deletions, ttl);
+                        LOG.info("Traces deletion emitted: {}, older than {}", deletions,
+                            Instant.ofEpochMilli(cutoff));
                       }
                     }
                 );
@@ -101,7 +102,6 @@ public class RetentionTopologySupplier implements Supplier<Topology> {
                 } else {
                   if (value.size() > 1) {
                     Long timestamp = value.get(0).timestamp();
-                    LOG.info("Indexing trace ts: {}", timestamp);
                     stateStore.put(key, timestamp);
                   }
                 }

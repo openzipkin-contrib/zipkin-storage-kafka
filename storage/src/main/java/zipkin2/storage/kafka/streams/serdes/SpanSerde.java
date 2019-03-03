@@ -11,73 +11,81 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.internal.serdes;
+package zipkin2.storage.kafka.streams.serdes;
 
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
+import zipkin2.Span;
+import zipkin2.codec.SpanBytesDecoder;
+import zipkin2.codec.SpanBytesEncoder;
 
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
+public class SpanSerde implements Serde<Span> {
 
-public class SpanNamesSerde implements Serde<Set<String>> {
+  private final SpanBytesDecoder spanBytesDecoder;
+
+  private final SpanBytesEncoder spanBytesEncoder;
+
+  public SpanSerde() {
+    spanBytesDecoder = SpanBytesDecoder.PROTO3;
+    spanBytesEncoder = SpanBytesEncoder.PROTO3;
+  }
+
   @Override
   public void configure(Map<String, ?> configs, boolean isKey) {
-    //Nothing to do.
+    // Nothing to configure
   }
 
   @Override
   public void close() {
+    // No resources to close
   }
 
   @Override
-  public Serializer<Set<String>> serializer() {
-    return new SpanNamesSerializer();
+  public Serializer<Span> serializer() {
+    return new SpanSerializer();
   }
 
   @Override
-  public Deserializer<Set<String>> deserializer() {
-    return new SpanNamesDeserializer();
+  public Deserializer<Span> deserializer() {
+    return new SpanDeserializer();
   }
 
-  public static class SpanNamesSerializer implements Serializer<Set<String>> {
+  private class SpanSerializer implements Serializer<Span> {
 
     @Override
     public void configure(Map<String, ?> configs, boolean isKey) {
-      //Nothing to do.
+      // Nothing to configure
     }
 
     @Override
-    public byte[] serialize(String topic, Set<String> data) {
-      String values = String.join("|", data);
-      return values.getBytes(UTF_8);
+    public byte[] serialize(String topic, Span data) {
+      return spanBytesEncoder.encode(data);
     }
 
     @Override
     public void close() {
+      // No resources to close
     }
   }
 
-  public static class SpanNamesDeserializer implements Deserializer<Set<String>> {
+  private class SpanDeserializer implements Deserializer<Span> {
 
     @Override
     public void configure(Map<String, ?> configs, boolean isKey) {
-      //Nothing to do.
+      // Nothing to configure
     }
 
     @Override
-    public Set<String> deserialize(String topic, byte[] data) {
-      String decoded = new String(data, UTF_8);
-      String[] values = decoded.split("\\|");
-      return new HashSet<>(Arrays.asList(values));
+    public Span deserialize(String topic, byte[] data) {
+      return spanBytesDecoder.decodeOne(data);
     }
 
     @Override
     public void close() {
+      // No resources to close
     }
   }
 }

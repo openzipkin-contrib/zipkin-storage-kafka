@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.internal.topology;
+package zipkin2.storage.kafka.streams;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -29,18 +29,19 @@ import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.state.StoreBuilder;
-import org.apache.kafka.streams.state.Stores;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.codec.SpanBytesDecoder;
 import zipkin2.internal.DependencyLinker;
-import zipkin2.storage.kafka.internal.serdes.DependencyLinkSerde;
-import zipkin2.storage.kafka.internal.serdes.SpanNamesSerde;
-import zipkin2.storage.kafka.internal.serdes.SpanSerde;
-import zipkin2.storage.kafka.internal.serdes.SpansSerde;
+import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
+import zipkin2.storage.kafka.streams.serdes.SpanNamesSerde;
+import zipkin2.storage.kafka.streams.serdes.SpanSerde;
+import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
-public class ProcessTopologySupplier implements Supplier<Topology> {
+/**
+ * Aggregation of spans into Traces, Services and Dependencies.
+ */
+public class AggregationTopologySupplier implements Supplier<Topology> {
   static final String DEPENDENCY_PAIR_PATTERN = "%s|%s";
 
   final String spansTopic;
@@ -53,7 +54,7 @@ public class ProcessTopologySupplier implements Supplier<Topology> {
   final DependencyLinkSerde dependencyLinkSerde;
   final SpanNamesSerde spanNamesSerde;
 
-  public ProcessTopologySupplier(String spansTopic,
+  public AggregationTopologySupplier(String spansTopic,
       String traceStoreName,
       String serviceStoreName,
       String dependencyStoreName) {
@@ -69,25 +70,9 @@ public class ProcessTopologySupplier implements Supplier<Topology> {
 
   @Override
   public Topology get() {
-    StoreBuilder<KeyValueStore<String, byte[]>> traceStoreBuilder = Stores.keyValueStoreBuilder(
-        Stores.persistentKeyValueStore(traceStoreName),
-        Serdes.String(),
-        Serdes.ByteArray());
-    traceStoreBuilder.build();
-    StoreBuilder<KeyValueStore<String, byte[]>> serviceStoreBuilder = Stores.keyValueStoreBuilder(
-        Stores.persistentKeyValueStore(serviceStoreName),
-        Serdes.String(),
-        Serdes.ByteArray());
-    serviceStoreBuilder.build();
-    StoreBuilder<KeyValueStore<String, byte[]>> dependencyStoreBuilder =
-        Stores.keyValueStoreBuilder(
-            Stores.persistentKeyValueStore(dependencyStoreName),
-            Serdes.String(),
-            Serdes.ByteArray());
-    dependencyStoreBuilder.build();
-
     StreamsBuilder builder = new StreamsBuilder();
 
+    // Mapping spans
     KStream<String, Span> spanStream = builder.stream(
         spansTopic,
         Consumed.<String, byte[]>with(Topology.AutoOffsetReset.EARLIEST)
@@ -95,6 +80,7 @@ public class ProcessTopologySupplier implements Supplier<Topology> {
             .withValueSerde(Serdes.ByteArray()))
         .mapValues(SpanBytesDecoder.PROTO3::decodeOne);
 
+    // Aggregating Spans by Trace Id
     KStream<String, List<Span>> aggregatedSpans = spanStream.groupByKey(
         Grouped.with(Serdes.String(), new SpanSerde()))
         .aggregate(ArrayList::new,
@@ -107,13 +93,11 @@ public class ProcessTopologySupplier implements Supplier<Topology> {
                 .withLoggingDisabled().withCachingDisabled())
         .toStream();
 
+    // Downstream Aggregated Spans to Topic
     aggregatedSpans.to(traceStoreName, Produced.valueSerde(spansSerde));
 
-    builder.globalTable(traceStoreName,
-        Materialized
-            .<String, List<Span>, KeyValueStore<Bytes, byte[]>>as(traceStoreName)
-            .withValueSerde(spansSerde));
 
+    // Aggregating Spans into Service -> Spans map
     spanStream.map((traceId, span) -> KeyValue.pair(span.localServiceName(), span.name()))
         .groupByKey(Grouped.with(Serdes.String(), Serdes.String()))
         .aggregate(HashSet::new,
@@ -127,11 +111,7 @@ public class ProcessTopologySupplier implements Supplier<Topology> {
                 .withLoggingDisabled().withCachingDisabled())
         .toStream().to(serviceStoreName, Produced.with(Serdes.String(), spanNamesSerde));
 
-    builder.globalTable(
-        serviceStoreName,
-        Materialized.<String, Set<String>, KeyValueStore<Bytes, byte[]>>as(serviceStoreName)
-            .withValueSerde(spanNamesSerde));
-
+    // Aggregating traces into dependencies
     aggregatedSpans
         .filterNot((traceId, spans) -> spans.isEmpty())
         .mapValues(spans -> new DependencyLinker().putTrace(spans).link())
@@ -151,11 +131,6 @@ public class ProcessTopologySupplier implements Supplier<Topology> {
                 dependencyLinkSerde)
                 .withLoggingDisabled().withCachingDisabled())
         .toStream().to(dependencyStoreName, Produced.valueSerde(dependencyLinkSerde));
-
-    builder.globalTable(dependencyStoreName,
-        Materialized
-            .<String, DependencyLink, KeyValueStore<Bytes, byte[]>>as(dependencyStoreName)
-            .withValueSerde(dependencyLinkSerde));
 
     return builder.build();
   }

@@ -11,29 +11,18 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.internal.serdes;
+package zipkin2.storage.kafka.streams.serdes;
 
-import java.util.ArrayList;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
-import zipkin2.Span;
-import zipkin2.codec.SpanBytesDecoder;
-import zipkin2.codec.SpanBytesEncoder;
+import zipkin2.DependencyLink;
+import zipkin2.codec.DependencyLinkBytesDecoder;
+import zipkin2.codec.DependencyLinkBytesEncoder;
 
-import java.util.List;
 import java.util.Map;
 
-public class SpansSerde implements Serde<List<Span>> {
-
-  private final SpanBytesDecoder spanBytesDecoder;
-
-  private final SpanBytesEncoder spanBytesEncoder;
-
-  public SpansSerde() {
-    this.spanBytesDecoder = SpanBytesDecoder.PROTO3;
-    this.spanBytesEncoder = SpanBytesEncoder.PROTO3;
-  }
+public class DependencyLinkSerde implements Serde<DependencyLink> {
 
   @Override
   public void configure(Map<String, ?> configs, boolean isKey) {
@@ -46,16 +35,17 @@ public class SpansSerde implements Serde<List<Span>> {
   }
 
   @Override
-  public Serializer<List<Span>> serializer() {
-    return new SpansSerializer();
+  public Serializer<DependencyLink> serializer() {
+    return new DependencyLinkSerializer();
   }
 
   @Override
-  public Deserializer<List<Span>> deserializer() {
-    return new SpansDeserializer();
+  public Deserializer<DependencyLink> deserializer() {
+    return new DependencyLinkDeserializer();
   }
 
-  private class SpansSerializer implements Serializer<List<Span>> {
+  public static class DependencyLinkDeserializer
+      implements Deserializer<DependencyLink> {
 
     @Override
     public void configure(Map<String, ?> configs, boolean isKey) {
@@ -63,9 +53,11 @@ public class SpansSerde implements Serde<List<Span>> {
     }
 
     @Override
-    public byte[] serialize(String topic, List<Span> data) {
-      if (data == null) return null;
-      return spanBytesEncoder.encodeList(data);
+    public DependencyLink deserialize(String topic, byte[] data) {
+      if (data == null) {
+        return null;
+      }
+      return DependencyLinkBytesDecoder.JSON_V1.decodeOne(data);
     }
 
     @Override
@@ -74,7 +66,7 @@ public class SpansSerde implements Serde<List<Span>> {
     }
   }
 
-  private class SpansDeserializer implements Deserializer<List<Span>> {
+  public static class DependencyLinkSerializer implements Serializer<DependencyLink> {
 
     @Override
     public void configure(Map<String, ?> configs, boolean isKey) {
@@ -82,9 +74,11 @@ public class SpansSerde implements Serde<List<Span>> {
     }
 
     @Override
-    public List<Span> deserialize(String topic, byte[] data) {
-      if (data == null) return new ArrayList<>();
-      return spanBytesDecoder.decodeList(data);
+    public byte[] serialize(String topic, DependencyLink data) {
+      if (data == null) {
+        return null;
+      }
+      return DependencyLinkBytesEncoder.JSON_V1.encode(data);
     }
 
     @Override
