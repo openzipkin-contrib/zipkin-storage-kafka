@@ -20,6 +20,7 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.search.Query;
 import org.apache.lucene.store.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,10 +31,13 @@ import java.util.List;
 import java.util.Map;
 
 public class IndexStateStore implements StateStore {
+
   private static final Logger LOG = LoggerFactory.getLogger(IndexStateStore.class);
+
   final String name;
   final boolean persistent;
   final IndexWriter indexWriter;
+
   IndexStateStore(Builder builder) throws IOException {
     final Directory directory;
     if (builder.isPersistent()) {
@@ -103,6 +107,15 @@ public class IndexStateStore implements StateStore {
       LOG.debug("{} indexed documents", value.size());
     } catch (IOException e) {
       LOG.error("Error indexing documents", e);
+    }
+  }
+
+  public void delete(Query query) {
+    try {
+      indexWriter.deleteDocuments(query);
+      indexWriter.commit();
+    } catch (IOException e) {
+      e.printStackTrace();
     }
   }
 

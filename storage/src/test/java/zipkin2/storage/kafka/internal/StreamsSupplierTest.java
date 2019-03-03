@@ -13,6 +13,10 @@
  */
 package zipkin2.storage.kafka.internal;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import no.sysco.middleware.kafka.util.KafkaStreamsTopologyGraphvizPrinter;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serdes;
@@ -27,11 +31,7 @@ import org.junit.Test;
 import zipkin2.Span;
 import zipkin2.TestObjects;
 import zipkin2.codec.SpanBytesEncoder;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import zipkin2.storage.kafka.internal.topology.ProcessTopologySupplier;
 
 import static org.junit.Assert.assertEquals;
 

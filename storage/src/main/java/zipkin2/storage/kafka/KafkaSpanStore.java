@@ -138,19 +138,21 @@ public class KafkaSpanStore implements SpanStore {
 
         BooleanQuery query = builder.build();
 
-        GroupingSearch groupingSearch = new GroupingSearch("trace_id");
+        GroupingSearch groupingSearch = new GroupingSearch("trace_id_sorted");
         groupingSearch.setGroupSort(sort);
         TopGroups<BytesRef> docs =
             groupingSearch.search(indexSearcher, query, 0, queryRequest.limit());
 
-        LOG.info("Total results of query {}: {}", query, docs.groups.length);
-
         Set<String> traceIds = new HashSet<>();
 
         for (GroupDocs<BytesRef> doc: docs.groups) {
-          String traceId = doc.groupValue.utf8ToString();
-          traceIds.add(traceId);
+          if (doc.groupValue != null) {
+            String traceId = doc.groupValue.utf8ToString();
+            traceIds.add(traceId);
+          }
         }
+
+        LOG.info("Total results of query {}: {}", query, traceIds.size());
 
         return traceIds.stream()
             .map(traceStore::get)

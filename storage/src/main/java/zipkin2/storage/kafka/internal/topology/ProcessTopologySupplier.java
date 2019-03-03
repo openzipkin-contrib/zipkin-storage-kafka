@@ -11,14 +11,23 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.internal;
+package zipkin2.storage.kafka.internal.topology;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.*;
+import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.Grouped;
+import org.apache.kafka.streams.kstream.KStream;
+import org.apache.kafka.streams.kstream.Materialized;
+import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
@@ -30,12 +39,6 @@ import zipkin2.storage.kafka.internal.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.internal.serdes.SpanNamesSerde;
 import zipkin2.storage.kafka.internal.serdes.SpanSerde;
 import zipkin2.storage.kafka.internal.serdes.SpansSerde;
-
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.function.Supplier;
 
 public class ProcessTopologySupplier implements Supplier<Topology> {
   static final String DEPENDENCY_PAIR_PATTERN = "%s|%s";

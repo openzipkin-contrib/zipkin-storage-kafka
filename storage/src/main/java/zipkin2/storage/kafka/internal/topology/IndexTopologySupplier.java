@@ -11,8 +11,12 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.internal;
+package zipkin2.storage.kafka.internal.topology;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
@@ -24,18 +28,14 @@ import org.apache.lucene.document.Field;
 import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.SortedDocValuesField;
-import org.apache.lucene.document.SortedNumericDocValuesField;
 import org.apache.lucene.document.StringField;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.util.BytesRef;
 import zipkin2.Span;
 import zipkin2.storage.kafka.internal.serdes.SpanNamesSerde;
 import zipkin2.storage.kafka.internal.serdes.SpansSerde;
 import zipkin2.storage.kafka.internal.stores.IndexStateStore;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.function.Supplier;
 
 public class IndexTopologySupplier implements Supplier<Topology> {
 
@@ -82,34 +82,41 @@ public class IndexTopologySupplier implements Supplier<Topology> {
 
               @Override
               public void process(Object key, Object value) {
-                List<Document> docs = new ArrayList<>();
-                List spans = (ArrayList) value;
-                for (Object s : spans) {
-                  Span span = (Span) s;
-                  String kind = span.kind() != null ? span.kind().name() : "";
-                  Document doc = new Document();
-                  doc.add(new SortedDocValuesField("trace_id", new BytesRef(span.traceId())));
-                  doc.add(new StringField("id", span.id(), Field.Store.YES));
-                  doc.add(new StringField("kind", kind, Field.Store.YES));
-                  String localServiceName =
-                      span.localServiceName() != null ? span.localServiceName() : "";
-                  doc.add(new StringField("local_service_name", localServiceName, Field.Store.YES));
-                  String remoteServiceName =
-                      span.remoteServiceName() != null ? span.remoteServiceName() : "";
-                  doc.add(
-                      new StringField("remote_service_name", remoteServiceName, Field.Store.YES));
-                  String name = span.name() != null ? span.name() : "";
-                  doc.add(new StringField("name", name, Field.Store.YES));
-                  long micros = span.timestampAsLong();
-                  doc.add(new LongPoint("ts", micros));
-                  doc.add(new NumericDocValuesField("ts_sorted", micros));
-                  doc.add(new LongPoint("duration", span.durationAsLong()));
-                  for (Map.Entry<String, String> tag : span.tags().entrySet()) {
-                    doc.add(new StringField(tag.getKey(), tag.getValue(), Field.Store.YES));
+                if (value == null) {
+                  TermQuery query = new TermQuery(new Term("trace_id", (String) key));
+                  index.delete(query);
+                } else {
+                  List<Document> docs = new ArrayList<>();
+                  List spans = (ArrayList) value;
+                  for (Object s : spans) {
+                    Span span = (Span) s;
+                    String kind = span.kind() != null ? span.kind().name() : "";
+                    Document doc = new Document();
+                    doc.add(new SortedDocValuesField("trace_id_sorted", new BytesRef(span.traceId())));
+                    doc.add(new StringField("trace_id", span.traceId(), Field.Store.YES));
+                    doc.add(new StringField("id", span.id(), Field.Store.YES));
+                    doc.add(new StringField("kind", kind, Field.Store.YES));
+                    String localServiceName =
+                        span.localServiceName() != null ? span.localServiceName() : "";
+                    doc.add(
+                        new StringField("local_service_name", localServiceName, Field.Store.YES));
+                    String remoteServiceName =
+                        span.remoteServiceName() != null ? span.remoteServiceName() : "";
+                    doc.add(
+                        new StringField("remote_service_name", remoteServiceName, Field.Store.YES));
+                    String name = span.name() != null ? span.name() : "";
+                    doc.add(new StringField("name", name, Field.Store.YES));
+                    long micros = span.timestampAsLong();
+                    doc.add(new LongPoint("ts", micros));
+                    doc.add(new NumericDocValuesField("ts_sorted", micros));
+                    doc.add(new LongPoint("duration", span.durationAsLong()));
+                    for (Map.Entry<String, String> tag : span.tags().entrySet()) {
+                      doc.add(new StringField(tag.getKey(), tag.getValue(), Field.Store.YES));
+                    }
+                    docs.add(doc);
                   }
-                  docs.add(doc);
+                  index.put(docs);
                 }
-                index.put(docs);
               }
 
               @Override
