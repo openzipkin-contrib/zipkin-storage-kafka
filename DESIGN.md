@@ -82,7 +82,7 @@ in-memory index that can handle these queries.
 
 ## Implementation
 
-This Zipkin storage implementation is based on Kafka Streams State.
+This Zipkin storage implementation is based on Kafka Streams State Store.
 
 ### Kafka Span Consumer
 
@@ -108,3 +108,25 @@ A custom Kafka Stream store was implemented to collect traces and index them usi
 **All Stores are using Global state, which consumes all partitions. This means that every instance
 stores all data on a defined directory.** All these with the trade-off of removing the need for an
 additional database.
+
+### Stream processors
+
+#### Aggregation Stream Processor
+
+This is the main processors that take incoming spans and aggregate them into:
+
+- Traces
+- Service Names
+- Dependencies
+
+#### Store Stream Processor
+
+Global tables for traces, service names and dependencies to be available on local state.
+
+#### Index Stream Processor
+
+Custom processor to full-text indexing of traces using Lucene as back-end.
+
+#### Retention Stream Processor
+
+This is the processor that keeps track of trace timestamps for cleanup.
