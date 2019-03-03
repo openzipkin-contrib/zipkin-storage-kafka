@@ -56,7 +56,7 @@ public class KafkaSpanStore implements SpanStore {
   final String dependenciesStoreName;
   final String indexStoreName;
 
-  final KafkaStreams aggregationStreams;
+  final KafkaStreams storeStreams;
   final KafkaStreams indexStreams;
 
   KafkaSpanStore(KafkaStorage storage) {
@@ -64,14 +64,14 @@ public class KafkaSpanStore implements SpanStore {
     serviceStoreName = storage.servicesTopic.name;
     dependenciesStoreName = storage.dependenciesTopic.name;
     indexStoreName = storage.indexStoreName;
-    aggregationStreams = storage.aggregationsStreams;
+    storeStreams = storage.storeStreams;
     indexStreams = storage.indexStreams;
   }
 
   @Override
   public Call<List<List<Span>>> getTraces(QueryRequest request) {
     ReadOnlyKeyValueStore<String, List<Span>> traceStore =
-        aggregationStreams.store(tracesStoreName, QueryableStoreTypes.keyValueStore());
+        storeStreams.store(tracesStoreName, QueryableStoreTypes.keyValueStore());
     IndexStateStore indexStateStore = indexStreams.store(indexStoreName, new IndexStoreType());
     return new GetTracesCall(indexStateStore, request, traceStore);
   }
@@ -175,7 +175,7 @@ public class KafkaSpanStore implements SpanStore {
 
   @Override
   public Call<List<Span>> getTrace(String traceId) {
-    return new GetTraceCall(aggregationStreams, tracesStoreName, traceId);
+    return new GetTraceCall(storeStreams, tracesStoreName, traceId);
   }
 
   static class GetTraceCall extends KafkaStreamsStoreCall<List<Span>> {
@@ -211,7 +211,7 @@ public class KafkaSpanStore implements SpanStore {
 
   @Override
   public Call<List<String>> getServiceNames() {
-    return new GetServiceNamesCall(aggregationStreams, serviceStoreName);
+    return new GetServiceNamesCall(storeStreams, serviceStoreName);
   }
 
   static class GetServiceNamesCall extends KafkaStreamsStoreCall<List<String>> {
@@ -247,7 +247,7 @@ public class KafkaSpanStore implements SpanStore {
 
   @Override
   public Call<List<String>> getSpanNames(String serviceName) {
-    return new GetSpanNamesCall(aggregationStreams, serviceStoreName, serviceName);
+    return new GetSpanNamesCall(storeStreams, serviceStoreName, serviceName);
   }
 
   static class GetSpanNamesCall extends KafkaStreamsStoreCall<List<String>> {
@@ -286,7 +286,7 @@ public class KafkaSpanStore implements SpanStore {
 
   @Override
   public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
-    return new GetDependenciesCall(aggregationStreams, dependenciesStoreName);
+    return new GetDependenciesCall(storeStreams, dependenciesStoreName);
   }
 
   static class GetDependenciesCall
