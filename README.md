@@ -25,11 +25,11 @@ Proof of concept of fully-featured Kafka-based storage for Zipkin.
 | `KAFKA_STORE_TRACES_TOPIC_PARTITIONS` | Traces topic number of partitions. | `1` |
 | `KAFKA_STORE_TRACES_TOPIC_REPLICATION_FACTOR` | Traces topic replication factor. | `1` |
 | `KAFKA_STORE_SERVICES_TOPIC` | Topic where aggregated service names are stored. | `zipkin-services` |
-| `KAFKA_STORE_SERVICES_PARTITIONS` | Services topic number of partitions. | `1` |
-| `KAFKA_STORE_SERVICES_REPLICATION_FACTOR` | Services topic replication factor. | `1` |
+| `KAFKA_STORE_SERVICES_TOPIC_PARTITIONS` | Services topic number of partitions. | `1` |
+| `KAFKA_STORE_SERVICES_TOPIC_REPLICATION_FACTOR` | Services topic replication factor. | `1` |
 | `KAFKA_STORE_DEPENDENCIES_TOPIC` | Topic where aggregated service dependencies names are stored. | `zipkin-dependencies` |
-| `KAFKA_STORE_DEPENDENCIES_PARTITIONS` | Services topic number of partitions. | `1` |
-| `KAFKA_STORE_DEPENDENCIES_REPLICATION_FACTOR` | Services topic replication factor. | `1` |
+| `KAFKA_STORE_DEPENDENCIES_TOPIC_PARTITIONS` | Services topic number of partitions. | `1` |
+| `KAFKA_STORE_DEPENDENCIES_TOPIC_REPLICATION_FACTOR` | Services topic replication factor. | `1` |
 
 ## Get started
 
