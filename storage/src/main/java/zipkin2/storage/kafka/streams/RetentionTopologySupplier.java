@@ -59,7 +59,9 @@ public class RetentionTopologySupplier implements Supplier<Topology> {
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(traceTsStoreName),
             Serdes.String(),
-            Serdes.Long()))
+            Serdes.Long())
+            .withCachingDisabled()
+            .withLoggingDisabled())
         .stream(tracesTopic, Consumed.with(Serdes.String(), spansSerde))
         .transform(
             () -> new Transformer<String, List<Span>, KeyValue<String, List<Span>>>() {
