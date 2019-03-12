@@ -82,10 +82,10 @@ public class DependencyStoreStream implements Supplier<Topology> {
                 List<DependencyLink> dependencyLinks =
                     new DependencyLinker().putTrace(spans).link();
                 for (DependencyLink dependencyLink : dependencyLinks) {
-                  String dependencyKey =
-                      String.format(
-                          DEPENDENCY_PAIR_PATTERN, dependencyLink.parent(),
-                          dependencyLink.child());
+                  String dependencyKey = String.format(
+                      DEPENDENCY_PAIR_PATTERN,
+                      dependencyLink.parent(),
+                      dependencyLink.child());
                   DependencyLink currentDependencyLink = dependenciesStore.get(dependencyKey);
                   if (currentDependencyLink == null) {
                     dependenciesStore.put(dependencyKey, dependencyLink);

@@ -47,6 +47,7 @@ import zipkin2.storage.QueryRequest;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
+import zipkin2.storage.kafka.streams.DependencyStoreStream;
 import zipkin2.storage.kafka.streams.ServiceStoreStream;
 import zipkin2.storage.kafka.streams.SpanConsumerStream;
 import zipkin2.storage.kafka.streams.SpanIndexStream;
@@ -125,7 +126,6 @@ public class KafkaStorage extends StorageComponent {
         Serdes.ByteArraySerde.class);
     spanConsumerStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
         builder.spanConsumerStreamApplicationId);
-    spanConsumerStreamConfig.put(StreamsConfig.EXACTLY_ONCE, true);
     spanConsumerStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.spanConsumerStreamStoreDirectory());
     spanConsumerStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
@@ -143,9 +143,10 @@ public class KafkaStorage extends StorageComponent {
         Serdes.ByteArraySerde.class);
     traceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
         builder.traceStoreStreamApplicationId);
-    traceStoreStreamConfig.put(StreamsConfig.EXACTLY_ONCE, true);
     traceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.traceStoreStreamStoreDirectory());
+    traceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
+        builder.compressionType.name);
 
     traceStoreTopology = new TraceStoreStream(traceSpansTopic.name, tracesTopic.name).get();
 
@@ -159,10 +160,10 @@ public class KafkaStorage extends StorageComponent {
         Serdes.ByteArraySerde.class);
     traceAggregationStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
         builder.traceAggregationStreamApplicationId);
-    traceAggregationStreamConfig.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
-        StreamsConfig.EXACTLY_ONCE);
     traceAggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.traceAggregationStreamStoreDirectory());
+    traceAggregationStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
+        builder.compressionType.name);
 
     traceAggregationTopology = new TraceAggregationStream(
         traceSpansTopic.name, tracesTopic.name, tracesTopic.name).get();
@@ -176,9 +177,10 @@ public class KafkaStorage extends StorageComponent {
         Serdes.ByteArraySerde.class);
     spanIndexStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
         builder.spanIndexStreamApplicationId);
-    spanIndexStreamConfig.put(StreamsConfig.EXACTLY_ONCE, true);
     spanIndexStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.spanIndexStreamStoreDirectory());
+    spanIndexStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
+        builder.compressionType.name);
 
     spanIndexTopology =
         new SpanIndexStream(spansTopic.name, spansTopic.name, builder.indexStorageDirectory())
@@ -192,10 +194,10 @@ public class KafkaStorage extends StorageComponent {
         Serdes.ByteArraySerde.class);
     serviceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
         builder.serviceStoreStreamApplicationId);
-    serviceStoreStreamConfig.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
-        StreamsConfig.EXACTLY_ONCE);
     serviceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.serviceStoreStreamStoreDirectory());
+    serviceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
+        builder.compressionType.name);
 
     serviceStoreTopology = new ServiceStoreStream(servicesTopic.name, servicesTopic.name).get();
 
@@ -208,13 +210,13 @@ public class KafkaStorage extends StorageComponent {
         Serdes.ByteArraySerde.class);
     dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
         builder.dependencyStoreStreamApplicationId);
-    dependencyStoreStreamConfig.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
-        StreamsConfig.EXACTLY_ONCE);
     dependencyStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.serviceStoreStreamStoreDirectory());
+    dependencyStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
+        builder.compressionType.name);
 
     dependencyStoreTopology =
-        new ServiceStoreStream(dependenciesTopic.name, dependenciesTopic.name).get();
+        new DependencyStoreStream(tracesTopic.name, dependenciesTopic.name).get();
 
     // Retention Stream Topology configuration
     //retentionStreamsConfig = new Properties();

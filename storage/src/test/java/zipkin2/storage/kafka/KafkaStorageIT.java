@@ -137,7 +137,7 @@ public class KafkaStorageIT {
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.traceSpansTopic.name, 2, 10000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopic.name, 2, 60000);
+        testConsumerConfig, storage.tracesTopic.name, 1, 30000);
 
     await().atMost(60, TimeUnit.SECONDS)
         .until(() -> {

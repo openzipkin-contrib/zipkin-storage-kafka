@@ -15,11 +15,8 @@ package zipkin2.storage.kafka;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
@@ -35,10 +32,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.Sort;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.GroupingSearch;
-import org.apache.lucene.search.grouping.TopGroups;
-import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
@@ -230,19 +224,17 @@ public class KafkaSpanStore implements SpanStore {
       if (queryRequest.annotationQueryString() != null) {
         try {
           QueryParser queryParser = new QueryParser("annotation", new StandardAnalyzer());
-          builder.add(queryParser.parse(queryRequest.annotationQueryString()),
-              BooleanClause.Occur.MUST);
+          Query annotationQuery = queryParser.parse(queryRequest.annotationQueryString());
+          builder.add(annotationQuery, BooleanClause.Occur.MUST);
         } catch (ParseException e) {
           e.printStackTrace();
         }
       }
 
       if (queryRequest.maxDuration() != null) {
-        builder.add(LongPoint.newRangeQuery(
-            "duration",
-            queryRequest.minDuration(),
-            queryRequest.maxDuration()),
-            BooleanClause.Occur.MUST);
+        Query durationRangeQuery = LongPoint.newRangeQuery(
+            "duration", queryRequest.minDuration(), queryRequest.maxDuration());
+        builder.add(durationRangeQuery, BooleanClause.Occur.MUST);
       }
 
       long start = queryRequest.endTs() - queryRequest.lookback();
@@ -250,35 +242,27 @@ public class KafkaSpanStore implements SpanStore {
       //TODO No timestamp field in Lucene. Find a way to query timestamp instead of longs.
       long lowerValue = Long.parseLong(start + "000");
       long upperValue = Long.parseLong(end + "000");
-      builder.add(LongPoint.newRangeQuery("ts", lowerValue, upperValue),
-          BooleanClause.Occur.MUST);
-
-      Sort sort = new Sort(new SortField("ts_sorted", SortField.Type.LONG, true));
+      Query tsRangeQuery = LongPoint.newRangeQuery("ts", lowerValue, upperValue);
+      builder.add(tsRangeQuery, BooleanClause.Occur.MUST);
 
       BooleanQuery query = builder.build();
 
       GroupingSearch groupingSearch = new GroupingSearch("trace_id_sorted");
+
+      Sort sort = new Sort(new SortField("ts_sorted", SortField.Type.LONG, true));
+      groupingSearch.setGroupDocsLimit(1);
       groupingSearch.setGroupSort(sort);
 
-      TopGroups<BytesRef> docs =
+      List<Document> docs =
           spanIndexStore.groupSearch(groupingSearch, query, 0, queryRequest.limit());
 
-      if (docs == null) return new ArrayList<>();
+      List<List<Span>> result = new ArrayList<>();
 
-      Set<String> traceIds = new HashSet<>();
-
-      for (GroupDocs<BytesRef> doc : docs.groups) {
-        if (doc.groupValue != null) {
-          String traceId = doc.groupValue.utf8ToString();
-          traceIds.add(traceId);
-        }
+      for (Document doc : docs) {
+        String traceId = doc.get("trace_id");
+        List<Span> spans = traceStore.get(traceId);
+        result.add(hydrateSpans(spans, spanIndexStore));
       }
-
-      List<List<Span>> result = traceIds.stream()
-          .map(traceStore::get)
-          .filter(Objects::nonNull)
-          .map(spans -> hydrateSpans(spans, spanIndexStore))
-          .collect(Collectors.toList());
 
       LOG.info("Total results of query {}: {}", query, result.size());
 
@@ -336,8 +320,7 @@ public class KafkaSpanStore implements SpanStore {
     return hydratedSpans;
   }
 
-  static class GetDependenciesCall
-      extends KafkaStreamsStoreCall<List<DependencyLink>> {
+  static class GetDependenciesCall extends KafkaStreamsStoreCall<List<DependencyLink>> {
     final ReadOnlyKeyValueStore<String, DependencyLink> dependenciesStore;
 
     GetDependenciesCall(ReadOnlyKeyValueStore<String, DependencyLink> dependenciesStore) {

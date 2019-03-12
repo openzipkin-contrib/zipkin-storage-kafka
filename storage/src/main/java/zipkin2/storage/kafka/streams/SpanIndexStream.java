@@ -92,41 +92,51 @@ public class SpanIndexStream implements Supplier<Topology> {
                 } else { // index spans
                   List<Document> docs = new ArrayList<>();
                   for (Span span : spans) {
-                    String kind = span.kind() != null ? span.kind().name() : "";
                     Document doc = new Document();
+
                     doc.add(
                         new SortedDocValuesField("trace_id_sorted", new BytesRef(span.traceId())));
+                    doc.add(new NumericDocValuesField("ts_sorted", span.timestampAsLong()));
+
                     doc.add(new StringField("trace_id", span.traceId(), Field.Store.YES));
                     doc.add(new StringField("id", span.id(), Field.Store.YES));
+
+                    String kind = span.kind() != null ? span.kind().name() : "";
                     doc.add(new StringField("kind", kind, Field.Store.YES));
+
                     String localServiceName =
                         span.localServiceName() != null ? span.localServiceName() : "";
                     doc.add(
                         new StringField("local_service_name", localServiceName, Field.Store.YES));
+
                     String remoteServiceName =
                         span.remoteServiceName() != null ? span.remoteServiceName() : "";
                     doc.add(
                         new StringField("remote_service_name", remoteServiceName, Field.Store.YES));
+
                     String name = span.name() != null ? span.name() : "";
                     doc.add(new StringField("name", name, Field.Store.YES));
-                    long micros = span.timestampAsLong();
-                    doc.add(new LongPoint("ts", micros));
-                    doc.add(new NumericDocValuesField("ts_sorted", micros));
+
+                    doc.add(new LongPoint("ts", span.timestampAsLong()));
                     doc.add(new LongPoint("duration", span.durationAsLong()));
+
                     for (Map.Entry<String, String> tag : span.tags().entrySet()) {
                       doc.add(new StringField("tag", tag.getKey() + "=" + tag.getValue(),
                           Field.Store.YES));
                       doc.add(new TextField("annotation", tag.getKey() + "=" + tag.getValue(),
                           Field.Store.YES));
                     }
+
                     for (Annotation annotation : span.annotations()) {
                       doc.add(new TextField("annotation", annotation.value(), Field.Store.YES));
                       doc.add(new StringField("annotation_value", annotation.value(), Field.Store.YES));
                     }
+
                     for (Annotation annotation : span.annotations()) {
                       doc.add(new StringField("annotation_ts", annotation.timestamp() + "",
                           Field.Store.YES));
                     }
+
                     docs.add(doc);
                   }
                   index.put(docs);
