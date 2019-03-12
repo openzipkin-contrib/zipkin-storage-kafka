@@ -58,10 +58,7 @@ public class KafkaSpanStore implements SpanStore {
   final String dependenciesStoreName;
   final String spanIndexStoreName;
 
-  final KafkaStreams storeStreams;
-  final KafkaStreams indexStreams;
-
-  final KafkaStreams spanIndexStoreStream;
+  final KafkaStreams spanIndexStream;
   final KafkaStreams traceStoreStream;
   final KafkaStreams serviceStoreStream;
   final KafkaStreams dependencyStoreStream;
@@ -71,13 +68,11 @@ public class KafkaSpanStore implements SpanStore {
     servicesStoreName = storage.servicesTopic.name;
     dependenciesStoreName = storage.dependenciesTopic.name;
     spanIndexStoreName = storage.indexStoreName;
-    storeStreams = storage.storeStreams;
-    indexStreams = storage.indexStreams;
-    // TODO: initialize
-    spanIndexStoreStream = null;
-    traceStoreStream = null;
-    serviceStoreStream = null;
-    dependencyStoreStream = null;
+
+    spanIndexStream = storage.getSpanIndexStream();
+    traceStoreStream = storage.getTraceStoreStream();
+    serviceStoreStream = storage.getServiceStoreStream();
+    dependencyStoreStream = storage.getDependencyStoreStream();
   }
 
   static Span hydrateSpan(Span lightSpan, Document document) {
@@ -108,7 +103,7 @@ public class KafkaSpanStore implements SpanStore {
     return new GetTracesCall(
         traceStoreStream,
         tracesStoreName,
-        spanIndexStoreStream,
+        spanIndexStream,
         spanIndexStoreName,
         request);
   }
@@ -118,7 +113,7 @@ public class KafkaSpanStore implements SpanStore {
     return new GetTraceCall(
         traceStoreStream,
         tracesStoreName,
-        spanIndexStoreStream,
+        spanIndexStream,
         spanIndexStoreName,
         traceId);
   }

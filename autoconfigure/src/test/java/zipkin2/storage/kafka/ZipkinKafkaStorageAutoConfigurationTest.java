@@ -73,7 +73,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).producerConfigs.get(
+    assertThat(context.getBean(KafkaStorage.class).producerConfig.get(
         ProducerConfig.BOOTSTRAP_SERVERS_CONFIG)).isEqualTo("host1:19092");
   }
 
@@ -100,7 +100,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).producerConfigs.get(
+    assertThat(context.getBean(KafkaStorage.class).producerConfig.get(
         ProducerConfig.COMPRESSION_TYPE_CONFIG)).isEqualTo(CompressionType.SNAPPY.name);
   }
 
