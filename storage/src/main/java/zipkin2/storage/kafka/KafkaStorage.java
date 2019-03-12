@@ -50,6 +50,7 @@ import zipkin2.storage.StorageComponent;
 import zipkin2.storage.kafka.streams.ServiceStoreStream;
 import zipkin2.storage.kafka.streams.SpanConsumerStream;
 import zipkin2.storage.kafka.streams.SpanIndexStream;
+import zipkin2.storage.kafka.streams.TraceAggregationStream;
 import zipkin2.storage.kafka.streams.TraceStoreStream;
 
 /**
@@ -76,17 +77,19 @@ public class KafkaStorage extends StorageComponent {
   final Properties producerConfig;
 
   // Kafka Streams topology configs
-  final Properties spanConsumerStreamConfig, traceStoreStreamConfig, spanIndexStreamConfig,
+  final Properties spanConsumerStreamConfig, traceStoreStreamConfig, traceAggregationStreamConfig,
+      spanIndexStreamConfig,
       serviceStoreStreamConfig, dependencyStoreStreamConfig;
-  final Topology spanConsumerTopology, traceStoreTopology, spanIndexTopology, serviceStoreTopology,
+  final Topology spanConsumerTopology, traceStoreTopology, traceAggregationTopology,
+      spanIndexTopology, serviceStoreTopology,
       dependencyStoreTopology;
   final String indexStoreName;
 
   // Resources
   volatile AdminClient adminClient;
   volatile Producer<String, byte[]> producer;
-  volatile KafkaStreams spanConsumerStream, traceStoreStream, spanIndexStream, serviceStoreStream,
-      dependencyStoreStream;
+  volatile KafkaStreams spanConsumerStream, traceStoreStream, traceAggregationStream,
+      spanIndexStream, serviceStoreStream, dependencyStoreStream;
   volatile boolean closeCalled;
 
   KafkaStorage(Builder builder) {
@@ -129,7 +132,7 @@ public class KafkaStorage extends StorageComponent {
         builder.compressionType.name);
 
     spanConsumerTopology =
-        new SpanConsumerStream(spansTopic.name, servicesTopic.name, tracesTopic.name).get();
+        new SpanConsumerStream(spansTopic.name, servicesTopic.name, traceSpansTopic.name).get();
 
     // Store Stream Topology configuration
     traceStoreStreamConfig = new Properties();
@@ -144,9 +147,25 @@ public class KafkaStorage extends StorageComponent {
     traceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.traceStoreStreamStoreDirectory());
 
-    traceStoreTopology =
-        new TraceStoreStream(spansTopic.name, traceSpansTopic.name, tracesTopic.name,
-            tracesTopic.name, tracesTopic.name + "_global").get();
+    traceStoreTopology = new TraceStoreStream(traceSpansTopic.name, tracesTopic.name).get();
+
+    // Store Stream Topology configuration
+    traceAggregationStreamConfig = new Properties();
+    traceAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
+        builder.bootstrapServers);
+    traceAggregationStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+        Serdes.StringSerde.class);
+    traceAggregationStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+        Serdes.ByteArraySerde.class);
+    traceAggregationStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
+        builder.traceAggregationStreamApplicationId);
+    traceAggregationStreamConfig.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
+        StreamsConfig.EXACTLY_ONCE);
+    traceAggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
+        builder.traceAggregationStreamStoreDirectory());
+
+    traceAggregationTopology = new TraceAggregationStream(
+        traceSpansTopic.name, tracesTopic.name, tracesTopic.name).get();
 
     // Index Stream Topology configuration
     spanIndexStreamConfig = new Properties();
@@ -162,8 +181,8 @@ public class KafkaStorage extends StorageComponent {
         builder.spanIndexStreamStoreDirectory());
 
     spanIndexTopology =
-        new SpanIndexStream(spansTopic.name, tracesTopic.name,
-            builder.indexStorageDirectory()).get();
+        new SpanIndexStream(spansTopic.name, spansTopic.name, builder.indexStorageDirectory())
+            .get();
 
     serviceStoreStreamConfig = new Properties();
     serviceStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -173,7 +192,8 @@ public class KafkaStorage extends StorageComponent {
         Serdes.ByteArraySerde.class);
     serviceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
         builder.serviceStoreStreamApplicationId);
-    serviceStoreStreamConfig.put(StreamsConfig.EXACTLY_ONCE, true);
+    serviceStoreStreamConfig.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
+        StreamsConfig.EXACTLY_ONCE);
     serviceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.serviceStoreStreamStoreDirectory());
 
@@ -188,7 +208,8 @@ public class KafkaStorage extends StorageComponent {
         Serdes.ByteArraySerde.class);
     dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
         builder.dependencyStoreStreamApplicationId);
-    dependencyStoreStreamConfig.put(StreamsConfig.EXACTLY_ONCE, true);
+    dependencyStoreStreamConfig.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
+        StreamsConfig.EXACTLY_ONCE);
     dependencyStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.serviceStoreStreamStoreDirectory());
 
@@ -259,7 +280,7 @@ public class KafkaStorage extends StorageComponent {
     try {
       Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
       List<Topic> requiredTopics =
-          Arrays.asList(spansTopic, tracesTopic, servicesTopic, dependenciesTopic);
+          Arrays.asList(spansTopic, traceSpansTopic, tracesTopic, servicesTopic, dependenciesTopic);
       Set<NewTopic> newTopics = new HashSet<>();
 
       for (Topic requiredTopic : requiredTopics) {
@@ -311,6 +332,9 @@ public class KafkaStorage extends StorageComponent {
       }
       if (traceStoreStream != null) {
         traceStoreStream.close(Duration.ofSeconds(1));
+      }
+      if (traceAggregationStream != null) {
+        traceAggregationStream.close(Duration.ofSeconds(1));
       }
       if (serviceStoreStream != null) {
         serviceStoreStream.close(Duration.ofSeconds(1));
@@ -389,6 +413,19 @@ public class KafkaStorage extends StorageComponent {
     return traceStoreStream;
   }
 
+  KafkaStreams getTraceAggregationStream() {
+    if (traceAggregationStream == null) {
+      synchronized (this) {
+        if (traceAggregationStream == null) {
+          traceAggregationStream =
+              new KafkaStreams(traceAggregationTopology, traceAggregationStreamConfig);
+          traceAggregationStream.start();
+        }
+      }
+    }
+    return traceAggregationStream;
+  }
+
   KafkaStreams getServiceStoreStream() {
     if (serviceStoreStream == null) {
       synchronized (this) {
@@ -425,6 +462,7 @@ public class KafkaStorage extends StorageComponent {
 
     String spanConsumerStreamApplicationId = "zipkin-server-span-consumer_v1";
     String traceStoreStreamApplicationId = "zipkin-server-trace-store_v1";
+    String traceAggregationStreamApplicationId = "zipkin-server-trace-aggregation_v1";
     String serviceStoreStreamApplicationId = "zipkin-server-service-store_v1";
     String dependencyStoreStreamApplicationId = "zipkin-server-dependency-store_v1";
     String spanIndexStreamApplicationId = "zipkin-server-span-index_v1";
@@ -563,6 +601,10 @@ public class KafkaStorage extends StorageComponent {
 
     String traceStoreStreamStoreDirectory() {
       return storeDirectory + "/streams/traces";
+    }
+
+    String traceAggregationStreamStoreDirectory() {
+      return storeDirectory + "/streams/trace-aggregation";
     }
 
     String serviceStoreStreamStoreDirectory() {

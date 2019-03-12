@@ -13,7 +13,6 @@
  */
 package zipkin2.storage.kafka;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
@@ -99,15 +98,12 @@ public class KafkaStorageIT {
     List<Span> spans0 = Arrays.asList(root, child);
 
     final SpanConsumer spanConsumer = storage.spanConsumer();
-    storage.spanStore();
     spanConsumer.accept(spans0).execute();
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopic.name, 2, 10000);
+        testConsumerConfig, storage.traceSpansTopic.name, 2, 10000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.servicesTopic.name, 2, 10000);
-    IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopic.name, 1, 10000);
   }
 
   @Test
@@ -139,9 +135,11 @@ public class KafkaStorageIT {
     spanConsumer.accept(spans).execute();
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopic.name, 1, 10000);
+        testConsumerConfig, storage.traceSpansTopic.name, 2, 10000);
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.tracesTopic.name, 2, 60000);
 
-    await().atMost(5, TimeUnit.SECONDS)
+    await().atMost(60, TimeUnit.SECONDS)
         .until(() -> {
           List<DependencyLink> dependencyLinks = spanStore.getDependencies(0L, 0L).execute();
           return dependencyLinks.size() == 1;
@@ -178,7 +176,7 @@ public class KafkaStorageIT {
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopic.name, 2, 10000);
-    await().atMost(5, TimeUnit.SECONDS)
+    await().atMost(30, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
               spanStore.getTraces(QueryRequest.newBuilder()
@@ -192,7 +190,7 @@ public class KafkaStorageIT {
   }
 
   @Test
-  public void shouldFindTracesByAnnotation() throws IOException, InterruptedException {
+  public void shouldFindTracesByTags() throws Exception {
     Map<String, String> annotationQuery =
         new HashMap<String, String>() {
           {
@@ -236,7 +234,7 @@ public class KafkaStorageIT {
 
     // query by annotation {"key_tag_a":"value_tag_a"} = 1 trace
     await()
-        .atMost(5, TimeUnit.SECONDS)
+        .atMost(30, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
               spanStore.getTraces(QueryRequest.newBuilder()
@@ -269,7 +267,60 @@ public class KafkaStorageIT {
   }
 
   @Test
-  public void shouldFindTracesBySpanName() throws IOException, InterruptedException {
+  public void shouldFindTracesByAnnotations() throws Exception {
+    Span span1 =
+        Span.newBuilder()
+            .traceId("a")
+            .id("a")
+            .putTag("key_tag_a", "value_tag_a")
+            .addAnnotation(TODAY, "log value")
+            .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+            .name("op_a")
+            .kind(Span.Kind.CLIENT)
+            .timestamp(Long.valueOf(TODAY + "000"))
+            .duration(10)
+            .build();
+
+    Span span2 =
+        Span.newBuilder()
+            .traceId("b")
+            .id("b")
+            .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+            .putTag("key_tag_c", "value_tag_d")
+            .addAnnotation(Long.valueOf(TODAY + "000"), "annotation_b")
+            .name("op_b")
+            .kind(Span.Kind.CLIENT)
+            .timestamp(Long.valueOf(TODAY + "000"))
+            .duration(10)
+            .build();
+
+    final SpanConsumer spanConsumer = storage.spanConsumer();
+    final SpanStore spanStore = storage.spanStore();
+
+    List<Span> spans = Arrays.asList(span1, span2);
+    spanConsumer.accept(spans).execute();
+
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.spansTopic.name, 2, 10000);
+
+    // query by annotation {"key_tag_a":"value_tag_a"} = 1 trace
+    await()
+        .atMost(30, TimeUnit.SECONDS)
+        .until(() -> {
+          List<List<Span>> traces =
+              spanStore.getTraces(QueryRequest.newBuilder()
+                  .parseAnnotationQuery("log*")
+                  .endTs(TODAY + 1)
+                  .limit(10)
+                  .lookback(Duration.ofMinutes(1).toMillis())
+                  .build())
+                  .execute();
+          return traces.size() == 1;
+        });
+  }
+
+  @Test
+  public void shouldFindTracesBySpanName() throws Exception {
     Span span1 =
         Span.newBuilder()
             .traceId("a")

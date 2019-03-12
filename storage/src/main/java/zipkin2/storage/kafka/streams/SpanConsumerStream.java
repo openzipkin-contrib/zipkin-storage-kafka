@@ -52,20 +52,22 @@ public class SpanConsumerStream implements Supplier<Topology> {
         builder.stream(spansTopic, Consumed.with(Serdes.String(), spanSerde));
 
     // Repartition of Light Spans by Trace Id
-    spanStream.map((s, span) -> {
-      zipkin2.Span.Builder spanBuilder = zipkin2.Span.newBuilder()
-          .traceId(span.traceId())
-          .parentId(span.parentId())
-          .id(span.id())
-          .kind(span.kind())
-          .shared(span.shared())
-          .name(span.name())
-          .timestamp(span.timestamp())
-          .duration(span.duration())
-          .localEndpoint(span.localEndpoint())
-          .remoteEndpoint(span.remoteEndpoint());
-      return KeyValue.pair(span.traceId(), spanBuilder.build());
-    }).to(traceSpansTopic, Produced.with(Serdes.String(), spanSerde));
+    spanStream
+        .map((s, span) -> {
+          Span.Builder spanBuilder = Span.newBuilder()
+              .traceId(span.traceId())
+              .parentId(span.parentId())
+              .id(span.id())
+              .kind(span.kind())
+              .shared(span.shared())
+              .name(span.name())
+              .timestamp(span.timestamp())
+              .duration(span.duration())
+              .localEndpoint(span.localEndpoint())
+              .remoteEndpoint(span.remoteEndpoint());
+          return KeyValue.pair(span.traceId(), spanBuilder.build());
+        })
+        .to(traceSpansTopic, Produced.with(Serdes.String(), spanSerde));
 
     // Stream of serviceName:spanName
     spanStream

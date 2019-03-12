@@ -17,11 +17,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.KeyValueStore;
@@ -33,27 +31,15 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 public class TraceStoreStream implements Supplier<Topology> {
 
-  final String spansTopic;
   final String traceSpansTopic;
-  final String tracesTopic;
-
   final String tracesStoreName;
-  final String globalTracesStoreName;
 
   final SpanSerde spanSerde;
   final SpansSerde spansSerde;
 
-  public TraceStoreStream(
-      String spansTopic,
-      String traceSpansTopic,
-      String tracesTopic,
-      String tracesStoreName,
-      String globalTracesStoreName) {
-    this.spansTopic = spansTopic;
+  public TraceStoreStream(String traceSpansTopic, String tracesStoreName) {
     this.traceSpansTopic = traceSpansTopic;
-    this.tracesTopic = tracesTopic;
     this.tracesStoreName = tracesStoreName;
-    this.globalTracesStoreName = globalTracesStoreName;
 
     // Initialize SerDes
     spanSerde = new SpanSerde();
@@ -64,7 +50,7 @@ public class TraceStoreStream implements Supplier<Topology> {
     // Preparing state stores
     StoreBuilder<KeyValueStore<String, List<Span>>> globalTracesStoreBuilder =
         Stores.keyValueStoreBuilder(
-            Stores.persistentKeyValueStore(globalTracesStoreName),
+            Stores.persistentKeyValueStore(tracesStoreName),
             Serdes.String(),
             spansSerde)
             .withCachingEnabled()
@@ -72,20 +58,6 @@ public class TraceStoreStream implements Supplier<Topology> {
 
     StreamsBuilder builder = new StreamsBuilder();
 
-    // Aggregate Spans to Traces
-    builder.stream(traceSpansTopic, Consumed.with(Serdes.String(), spanSerde))
-        .groupByKey()
-        .aggregate(ArrayList::new, (s, span, spans) -> {
-              spans.add(span);
-              return spans;
-            },
-            Materialized.<String, List<Span>, KeyValueStore<Bytes, byte[]>>as(tracesStoreName)
-                .withKeySerde(Serdes.String())
-                .withValueSerde(spansSerde)
-                .withCachingEnabled()
-                .withLoggingDisabled())
-        .toStream()
-        .to(tracesTopic);
 
     // Aggregate TraceId:Spans
     // This store could be removed once an RPC is used to find Traces per instance based on prior
@@ -100,8 +72,7 @@ public class TraceStoreStream implements Supplier<Topology> {
 
               @Override public void init(ProcessorContext context) {
                 tracesStore =
-                    (KeyValueStore<String, List<Span>>) context.getStateStore(
-                        globalTracesStoreName);
+                    (KeyValueStore<String, List<Span>>) context.getStateStore(tracesStoreName);
               }
 
               @Override public void process(String traceId, Span span) {

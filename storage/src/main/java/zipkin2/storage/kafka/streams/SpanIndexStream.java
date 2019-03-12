@@ -87,7 +87,7 @@ public class SpanIndexStream implements Supplier<Topology> {
               @Override
               public void process(String spanId, List<Span> spans) {
                 if (spans == null) { // clean index when trace removed
-                  TermQuery query = new TermQuery(new Term("trace_id", spanId));
+                  TermQuery query = new TermQuery(new Term("id", spanId));
                   index.delete(query);
                 } else { // index spans
                   List<Document> docs = new ArrayList<>();
@@ -114,13 +114,17 @@ public class SpanIndexStream implements Supplier<Topology> {
                     doc.add(new NumericDocValuesField("ts_sorted", micros));
                     doc.add(new LongPoint("duration", span.durationAsLong()));
                     for (Map.Entry<String, String> tag : span.tags().entrySet()) {
-                      doc.add(new TextField("tag", tag.getKey()+ ":" + tag.getValue(), Field.Store.YES));
+                      doc.add(new StringField("tag", tag.getKey() + "=" + tag.getValue(),
+                          Field.Store.YES));
+                      doc.add(new TextField("annotation", tag.getKey() + "=" + tag.getValue(),
+                          Field.Store.YES));
                     }
                     for (Annotation annotation : span.annotations()) {
                       doc.add(new TextField("annotation", annotation.value(), Field.Store.YES));
+                      doc.add(new StringField("annotation_value", annotation.value(), Field.Store.YES));
                     }
                     for (Annotation annotation : span.annotations()) {
-                      doc.add(new TextField("annotation_ts", annotation.timestamp() + "",
+                      doc.add(new StringField("annotation_ts", annotation.timestamp() + "",
                           Field.Store.YES));
                     }
                     docs.add(doc);
