@@ -60,7 +60,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
 
     static Call<Void> create(Producer<String, byte[]> producer, String spansTopic, Span span) {
       byte[] encodedSpan = SpanBytesEncoder.PROTO3.encode(span);
-      StoreSpanCall call = new StoreSpanCall(producer, spansTopic, span.traceId(), encodedSpan);
+      StoreSpanCall call = new StoreSpanCall(producer, spansTopic, span.id(), encodedSpan);
       return call.handleError(call);
     }
 

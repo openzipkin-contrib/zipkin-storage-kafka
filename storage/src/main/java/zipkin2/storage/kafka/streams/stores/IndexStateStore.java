@@ -25,6 +25,8 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.TermQuery;
+import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.grouping.GroupingSearch;
 import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.store.*;
@@ -124,6 +126,20 @@ public class IndexStateStore implements StateStore {
       indexWriter.commit();
     } catch (IOException e) {
       e.printStackTrace();
+    }
+  }
+
+  public Document get(Query query) {
+    try (IndexReader reader = DirectoryReader.open(directory)) {
+      IndexSearcher indexSearcher = new IndexSearcher(reader);
+      TopDocs docs = indexSearcher.search(query, 1);
+      if (docs.totalHits > 0) {
+        return indexSearcher.doc(docs.scoreDocs[0].doc);
+      }
+      return null;
+    } catch (IOException e) {
+      LOG.error("Error in group query", e);
+      return null;
     }
   }
 
