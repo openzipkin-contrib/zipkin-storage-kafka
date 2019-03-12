@@ -33,9 +33,12 @@ import org.testcontainers.containers.KafkaContainer;
 import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.CheckResult;
+import zipkin2.DependencyLink;
 import zipkin2.Endpoint;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
+import zipkin2.storage.SpanConsumer;
+import zipkin2.storage.SpanStore;
 
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
@@ -65,7 +68,7 @@ public class KafkaStorageIT {
     storage = (KafkaStorage) new KafkaStorage.Builder().ensureTopics(true)
         .bootstrapServers(kafka.getBootstrapServers())
         .storeDirectory("target/zipkin_" + epochMilli)
-        .spansTopic(KafkaStorage.Topic.builder("topic").build())
+        .spansTopic(KafkaStorage.Topic.builder("zipkin").build())
         .build();
   }
 
@@ -95,13 +98,16 @@ public class KafkaStorageIT {
         .build();
     List<Span> spans0 = Arrays.asList(root, child);
 
-    storage.spanConsumer().accept(spans0).execute();
+    final SpanConsumer spanConsumer = storage.spanConsumer();
+    storage.spanStore();
+    spanConsumer.accept(spans0).execute();
 
-    IntegrationTestUtils.waitUntilMinRecordsReceived(testConsumerConfig, storage.spansTopic.name, 2,
-        10000);
-    IntegrationTestUtils.waitUntilMinRecordsReceived(testConsumerConfig,
-        storage.servicesTopic.name,
-        2, 10000);
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.spansTopic.name, 2, 10000);
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.servicesTopic.name, 2, 10000);
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.tracesTopic.name, 1, 10000);
   }
 
   @Test
@@ -125,11 +131,21 @@ public class KafkaStorageIT {
         .timestamp(TODAY)
         .duration(2)
         .build();
+
+    final SpanConsumer spanConsumer = storage.spanConsumer();
+    final SpanStore spanStore = storage.spanStore();
+
     List<Span> spans = Arrays.asList(root, child);
-    storage.spanConsumer().accept(spans).execute();
+    spanConsumer.accept(spans).execute();
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.dependenciesTopic.name, 1, 10000);
+        testConsumerConfig, storage.tracesTopic.name, 1, 10000);
+
+    await().atMost(5, TimeUnit.SECONDS)
+        .until(() -> {
+          List<DependencyLink> dependencyLinks = spanStore.getDependencies(0L, 0L).execute();
+          return dependencyLinks.size() == 1;
+        });
   }
 
   @Test
@@ -155,19 +171,21 @@ public class KafkaStorageIT {
         .duration(2)
         .build();
     List<Span> spans = Arrays.asList(root, child);
-    storage.spanConsumer().accept(spans).execute();
+    final SpanConsumer spanConsumer = storage.spanConsumer();
+    final SpanStore spanStore = storage.spanStore();
 
-    IntegrationTestUtils.waitUntilMinRecordsReceived(testConsumerConfig, storage.spansTopic.name, 2,
-        10000);
+    spanConsumer.accept(spans).execute();
+
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.spansTopic.name, 2, 10000);
     await().atMost(5, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
-              storage.spanStore()
-                  .getTraces(QueryRequest.newBuilder()
-                      .endTs(TODAY + 1)
-                      .limit(10)
-                      .lookback(Duration.ofMinutes(1).toMillis())
-                      .build())
+              spanStore.getTraces(QueryRequest.newBuilder()
+                  .endTs(TODAY + 1)
+                  .limit(10)
+                  .lookback(Duration.ofMinutes(1).toMillis())
+                  .build())
                   .execute();
           return traces.size() == 1 && traces.get(0).size() == 2;
         });
@@ -175,8 +193,6 @@ public class KafkaStorageIT {
 
   @Test
   public void shouldFindTracesByAnnotation() throws IOException, InterruptedException {
-
-    // todo: it is not explicit that annotations applied for tags
     Map<String, String> annotationQuery =
         new HashMap<String, String>() {
           {
@@ -209,8 +225,11 @@ public class KafkaStorageIT {
             .duration(10)
             .build();
 
+    final SpanConsumer spanConsumer = storage.spanConsumer();
+    final SpanStore spanStore = storage.spanStore();
+
     List<Span> spans = Arrays.asList(span1, span2);
-    storage.spanConsumer().accept(spans).execute();
+    spanConsumer.accept(spans).execute();
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopic.name, 2, 10000);
@@ -220,13 +239,12 @@ public class KafkaStorageIT {
         .atMost(5, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
-              storage.spanStore()
-                  .getTraces(QueryRequest.newBuilder()
-                      .annotationQuery(annotationQuery)
-                      .endTs(TODAY + 1)
-                      .limit(10)
-                      .lookback(Duration.ofMinutes(1).toMillis())
-                      .build())
+              spanStore.getTraces(QueryRequest.newBuilder()
+                  .annotationQuery(annotationQuery)
+                  .endTs(TODAY + 1)
+                  .limit(10)
+                  .lookback(Duration.ofMinutes(1).toMillis())
+                  .build())
                   .execute();
           return traces.size() == 1;
         });
@@ -236,14 +254,15 @@ public class KafkaStorageIT {
         .pollDelay(5, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
-              storage.spanStore()
-                  .getTraces(QueryRequest.newBuilder()
-                      .annotationQuery(
-                          new HashMap<String, String>() {{ put("key_tag_non_exist_a", "value_tag_non_exist_a"); }})
-                      .endTs(TODAY + 1)
-                      .limit(10)
-                      .lookback(Duration.ofMinutes(1).toMillis())
-                      .build())
+              spanStore.getTraces(QueryRequest.newBuilder()
+                  .annotationQuery(
+                      new HashMap<String, String>() {{
+                        put("key_tag_non_exist_a", "value_tag_non_exist_a");
+                      }})
+                  .endTs(TODAY + 1)
+                  .limit(10)
+                  .lookback(Duration.ofMinutes(1).toMillis())
+                  .build())
                   .execute();
           return traces.size() == 0;
         });
@@ -273,8 +292,11 @@ public class KafkaStorageIT {
             .duration(10)
             .build();
 
+    final SpanConsumer spanConsumer = storage.spanConsumer();
+    final SpanStore spanStore = storage.spanStore();
+
     List<Span> spans = Arrays.asList(span1, span2);
-    storage.spanConsumer().accept(spans).execute();
+    spanConsumer.accept(spans).execute();
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopic.name, 2, 10000);
@@ -284,14 +306,13 @@ public class KafkaStorageIT {
         .atMost(5, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
-              storage.spanStore()
-                  .getTraces(
-                      QueryRequest.newBuilder()
-                          .spanName("op_a")
-                          .endTs(TODAY + 1)
-                          .limit(10)
-                          .lookback(Duration.ofMinutes(1).toMillis())
-                          .build())
+              spanStore.getTraces(
+                  QueryRequest.newBuilder()
+                      .spanName("op_a")
+                      .endTs(TODAY + 1)
+                      .limit(10)
+                      .lookback(Duration.ofMinutes(1).toMillis())
+                      .build())
                   .execute();
           return traces.size() == 1;
         });
@@ -301,14 +322,13 @@ public class KafkaStorageIT {
         .atMost(5, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
-              storage.spanStore()
-                  .getTraces(
-                      QueryRequest.newBuilder()
-                          .spanName("op_b")
-                          .endTs(TODAY + 1)
-                          .limit(10)
-                          .lookback(Duration.ofMinutes(1).toMillis())
-                          .build())
+              spanStore.getTraces(
+                  QueryRequest.newBuilder()
+                      .spanName("op_b")
+                      .endTs(TODAY + 1)
+                      .limit(10)
+                      .lookback(Duration.ofMinutes(1).toMillis())
+                      .build())
                   .execute();
           return traces.size() == 1;
         });
@@ -318,14 +338,13 @@ public class KafkaStorageIT {
         .pollDelay(5, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
-              storage.spanStore()
-                  .getTraces(
-                      QueryRequest.newBuilder()
-                          .spanName("non_existing_span_name")
-                          .endTs(TODAY + 1)
-                          .limit(10)
-                          .lookback(Duration.ofMinutes(1).toMillis())
-                          .build())
+              spanStore.getTraces(
+                  QueryRequest.newBuilder()
+                      .spanName("non_existing_span_name")
+                      .endTs(TODAY + 1)
+                      .limit(10)
+                      .lookback(Duration.ofMinutes(1).toMillis())
+                      .build())
                   .execute();
           return traces.size() == 0;
         });
@@ -355,8 +374,11 @@ public class KafkaStorageIT {
             .duration(10)
             .build();
 
+    final SpanConsumer spanConsumer = storage.spanConsumer();
+    final SpanStore spanStore = storage.spanStore();
+
     List<Span> spans = Arrays.asList(span1, span2);
-    storage.spanConsumer().accept(spans).execute();
+    spanConsumer.accept(spans).execute();
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopic.name, 2, 10000);
@@ -366,14 +388,13 @@ public class KafkaStorageIT {
         .atMost(5, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
-              storage.spanStore()
-                  .getTraces(
-                      QueryRequest.newBuilder()
-                          .serviceName("svc_a")
-                          .endTs(TODAY + 1)
-                          .limit(10)
-                          .lookback(Duration.ofMinutes(1).toMillis())
-                          .build())
+              spanStore.getTraces(
+                  QueryRequest.newBuilder()
+                      .serviceName("svc_a")
+                      .endTs(TODAY + 1)
+                      .limit(10)
+                      .lookback(Duration.ofMinutes(1).toMillis())
+                      .build())
                   .execute();
           return traces.size() == 2;
         });
@@ -383,14 +404,13 @@ public class KafkaStorageIT {
         .pollDelay(5, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
-              storage.spanStore()
-                  .getTraces(
-                      QueryRequest.newBuilder()
-                          .serviceName("non_existing_span_name")
-                          .endTs(TODAY + 1)
-                          .limit(10)
-                          .lookback(Duration.ofMinutes(1).toMillis())
-                          .build())
+              spanStore.getTraces(
+                  QueryRequest.newBuilder()
+                      .serviceName("non_existing_span_name")
+                      .endTs(TODAY + 1)
+                      .limit(10)
+                      .lookback(Duration.ofMinutes(1).toMillis())
+                      .build())
                   .execute();
           return traces.size() == 0;
         });
@@ -398,15 +418,15 @@ public class KafkaStorageIT {
 
   @Test
   public void traceQueryEnqueue() {
+    final SpanStore spanStore = storage.spanStore();
     Call<List<List<Span>>> callTraces =
-        storage.spanStore()
-            .getTraces(
-                QueryRequest.newBuilder()
-                    .serviceName("non_existing_span_name")
-                    .endTs(TODAY + 1)
-                    .limit(10)
-                    .lookback(Duration.ofMinutes(1).toMillis())
-                    .build());
+        spanStore.getTraces(
+            QueryRequest.newBuilder()
+                .serviceName("non_existing_span_name")
+                .endTs(TODAY + 1)
+                .limit(10)
+                .lookback(Duration.ofMinutes(1).toMillis())
+                .build());
 
     Callback<List<List<Span>>> callback = new Callback<List<List<Span>>>() {
       @Override
@@ -435,7 +455,6 @@ public class KafkaStorageIT {
 
   @Test
   public void checkShouldErrorWhenKafkaNotAvailable() {
-
     CheckResult checked = storage.check();
     assertEquals(CheckResult.OK, checked);
 
