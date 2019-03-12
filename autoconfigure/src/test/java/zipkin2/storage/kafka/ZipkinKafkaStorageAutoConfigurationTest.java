@@ -114,7 +114,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).storeDirectory).isEqualTo("/zipkin");
+    assertThat(context.getBean(KafkaStorage.class).storageDirectory).isEqualTo("/zipkin");
   }
 
   @Test
@@ -239,44 +239,44 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   }
 
   @Test
-  public void canOverridesProperty_dependenciesTopicName() {
+  public void canOverridesProperty_traceSpansTopicName() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.dependencies-topic:zipkin-dependencies-1"
+        "zipkin.storage.kafka.traceSpans-topic:zipkin-traceSpans-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.name).isEqualTo(
-        "zipkin-dependencies-1");
+    assertThat(context.getBean(KafkaStorage.class).traceSpansTopic.name).isEqualTo(
+        "zipkin-traceSpans-1");
   }
 
 
   @Test
-  public void canOverridesProperty_dependenciesTopicPartitions() {
+  public void canOverridesProperty_traceSpansTopicPartitions() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.dependencies-topic-partitions:2"
+        "zipkin.storage.kafka.traceSpans-topic-partitions:2"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.partitions).isEqualTo(2);
+    assertThat(context.getBean(KafkaStorage.class).traceSpansTopic.partitions).isEqualTo(2);
   }
 
   @Test
-  public void canOverridesProperty_dependenciesTopicReplicationFactor() {
+  public void canOverridesProperty_traceSpansTopicReplicationFactor() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.dependencies-topic-replication-factor:2"
+        "zipkin.storage.kafka.traceSpans-topic-replication-factor:2"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.replicationFactor).isEqualTo(
+    assertThat(context.getBean(KafkaStorage.class).traceSpansTopic.replicationFactor).isEqualTo(
         (short) 2);
   }
 }

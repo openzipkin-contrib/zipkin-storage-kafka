@@ -76,14 +76,18 @@ public class TraceStoreStream implements Supplier<Topology> {
               }
 
               @Override public void process(String traceId, Span span) {
-                List<Span> currentSpans = tracesStore.get(traceId);
-                if (currentSpans == null) {
-                  List<Span> spans = new ArrayList<>();
-                  spans.add(span);
-                  tracesStore.put(traceId, spans);
+                if (span == null) {
+                  tracesStore.delete(traceId);
                 } else {
-                  currentSpans.add(span);
-                  tracesStore.put(traceId, currentSpans);
+                  List<Span> currentSpans = tracesStore.get(traceId);
+                  if (currentSpans == null) {
+                    List<Span> spans = new ArrayList<>();
+                    spans.add(span);
+                    tracesStore.put(traceId, spans);
+                  } else {
+                    currentSpans.add(span);
+                    tracesStore.put(traceId, currentSpans);
+                  }
                 }
               }
 

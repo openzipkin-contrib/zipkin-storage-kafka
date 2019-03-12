@@ -60,18 +60,20 @@ public class KafkaSpanStore implements SpanStore {
   final KafkaStreams traceAggregationStream;
   final KafkaStreams serviceStoreStream;
   final KafkaStreams dependencyStoreStream;
+  final KafkaStreams traceRetentionStoreStream;
 
   KafkaSpanStore(KafkaStorage storage) {
-    tracesStoreName = storage.tracesTopic.name;
-    servicesStoreName = storage.servicesTopic.name;
-    dependenciesStoreName = storage.dependenciesTopic.name;
-    spanIndexStoreName = storage.spansTopic.name;
+    tracesStoreName = storage.traceStoreName;
+    servicesStoreName = storage.serviceStoreName;
+    dependenciesStoreName = storage.dependencyStoreName;
+    spanIndexStoreName = storage.spanIndexStoreName;
 
     spanIndexStream = storage.getSpanIndexStream();
     traceStoreStream = storage.getTraceStoreStream();
     serviceStoreStream = storage.getServiceStoreStream();
     dependencyStoreStream = storage.getDependencyStoreStream();
     traceAggregationStream = storage.getTraceAggregationStream();
+    traceRetentionStoreStream = storage.getTraceRetentionStream();
   }
 
   static Span hydrateSpan(Span lightSpan, Document document) {

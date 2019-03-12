@@ -14,7 +14,9 @@
 package zipkin2.storage.kafka.streams;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.utils.Bytes;
@@ -57,14 +59,23 @@ public class TraceAggregationStream implements Supplier<Topology> {
     builder.stream(traceSpansTopic, Consumed.with(Serdes.String(), spanSerde))
         .groupByKey()
         .aggregate(ArrayList::new, (traceId, span, spans) -> {
-              spans.add(span);
-              return spans;
+              if (span == null) {
+                return null;
+              } else {
+                if (spans == null) {
+                  return Collections.singletonList(span);
+                } else {
+                  spans.add(span);
+                  return spans;
+                }
+              }
             },
             Materialized.<String, List<Span>, KeyValueStore<Bytes, byte[]>>as(tracesStoreName)
                 .withKeySerde(Serdes.String())
                 .withValueSerde(spansSerde)
                 .withCachingEnabled()
                 .withLoggingDisabled())
+        .filter((key, value) -> Objects.nonNull(value))
         .toStream()
         .to(tracesTopic, Produced.with(Serdes.String(), spansSerde));
     return builder.build();

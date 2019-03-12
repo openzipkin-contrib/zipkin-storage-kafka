@@ -23,6 +23,9 @@ import zipkin2.storage.kafka.KafkaStorage;
 public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
 
+  private boolean spanConsumerEnabled = true;
+  private boolean spanStoreEnabled = true;
+
   private boolean ensureTopics = true;
   private String bootstrapServers = "localhost:9092";
   private String compressionType = CompressionType.NONE.name();
@@ -39,14 +42,16 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String servicesTopic = "zipkin-services_v1";
   private Integer servicesTopicPartitions = 1;
   private Short servicesTopicReplicationFactor = 1;
-  private String dependenciesTopic = "zipkin-dependencies_v1";
-  private Integer dependenciesTopicPartitions = 1;
-  private Short dependenciesTopicReplicationFactor = 1;
+  private String traceSpansTopic = "zipkin-dependencies_v1";
+  private Integer traceSpansTopicPartitions = 1;
+  private Short traceSpansTopicReplicationFactor = 1;
 
   private String storeDirectory = "/tmp/zipkin";
 
   KafkaStorage.Builder toBuilder() {
     return KafkaStorage.newBuilder()
+        .spanConsumerEnabled(spanConsumerEnabled)
+        .spanStoreEnabled(spanStoreEnabled)
         .ensureTopics(ensureTopics)
         .bootstrapServers(bootstrapServers)
         .compressionType(compressionType)
@@ -64,9 +69,9 @@ public class ZipkinKafkaStorageProperties implements Serializable {
             .partitions(servicesTopicPartitions)
             .replicationFactor(servicesTopicReplicationFactor)
             .build())
-        .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic)
-            .partitions(dependenciesTopicPartitions)
-            .replicationFactor(dependenciesTopicReplicationFactor)
+        .traceSpansTopic(KafkaStorage.Topic.builder(traceSpansTopic)
+            .partitions(traceSpansTopicPartitions)
+            .replicationFactor(traceSpansTopicReplicationFactor)
             .build())
         .storeDirectory(storeDirectory);
   }
@@ -127,12 +132,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.servicesTopic = servicesTopic;
   }
 
-  public String getDependenciesTopic() {
-    return dependenciesTopic;
+  public String getTraceSpansTopic() {
+    return traceSpansTopic;
   }
 
-  public void setDependenciesTopic(String dependenciesTopic) {
-    this.dependenciesTopic = dependenciesTopic;
+  public void setTraceSpansTopic(String traceSpansTopic) {
+    this.traceSpansTopic = traceSpansTopic;
   }
 
   public String getStoreDirectory() {
@@ -199,19 +204,19 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.servicesTopicReplicationFactor = servicesTopicReplicationFactor;
   }
 
-  public Integer getDependenciesTopicPartitions() {
-    return dependenciesTopicPartitions;
+  public Integer getTraceSpansTopicPartitions() {
+    return traceSpansTopicPartitions;
   }
 
-  public void setDependenciesTopicPartitions(Integer dependenciesTopicPartitions) {
-    this.dependenciesTopicPartitions = dependenciesTopicPartitions;
+  public void setTraceSpansTopicPartitions(Integer traceSpansTopicPartitions) {
+    this.traceSpansTopicPartitions = traceSpansTopicPartitions;
   }
 
-  public Short getDependenciesTopicReplicationFactor() {
-    return dependenciesTopicReplicationFactor;
+  public Short getTraceSpansTopicReplicationFactor() {
+    return traceSpansTopicReplicationFactor;
   }
 
-  public void setDependenciesTopicReplicationFactor(Short dependenciesTopicReplicationFactor) {
-    this.dependenciesTopicReplicationFactor = dependenciesTopicReplicationFactor;
+  public void setTraceSpansTopicReplicationFactor(Short traceSpansTopicReplicationFactor) {
+    this.traceSpansTopicReplicationFactor = traceSpansTopicReplicationFactor;
   }
 }
