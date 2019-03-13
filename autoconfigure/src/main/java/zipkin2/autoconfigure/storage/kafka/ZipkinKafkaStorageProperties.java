@@ -30,8 +30,9 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String bootstrapServers = "localhost:9092";
   private String compressionType = CompressionType.NONE.name();
 
-  private Long retentionScanFrequencyMs = Duration.ofDays(1).toMillis();
-  private Long retentionMaxAgeMs = Duration.ofDays(7).toMillis();
+  private Long retentionScanFrequency = Duration.ofDays(1).toMillis();
+  private Long retentionMaxAge = Duration.ofDays(7).toMillis();
+  private Long traceInactivityGap = Duration.ofMinutes(5).toMillis();
 
   private String spansTopic = "zipkin-spans_v1";
   private Integer spansTopicPartitions = 1;
@@ -58,8 +59,9 @@ public class ZipkinKafkaStorageProperties implements Serializable {
         .ensureTopics(ensureTopics)
         .bootstrapServers(bootstrapServers)
         .compressionType(compressionType)
-        .retentionMaxAge(Duration.ofMillis(retentionMaxAgeMs))
-        .retentionScanFrequency(Duration.ofMillis(retentionScanFrequencyMs))
+        .retentionMaxAge(Duration.ofMillis(retentionMaxAge))
+        .retentionScanFrequency(Duration.ofMillis(retentionScanFrequency))
+        .traceInactivityGap(Duration.ofMillis(traceInactivityGap))
         .spansTopic(KafkaStorage.Topic.builder(spansTopic)
             .partitions(spansTopicPartitions)
             .replicationFactor(spansTopicReplicationFactor)
@@ -71,6 +73,10 @@ public class ZipkinKafkaStorageProperties implements Serializable {
         .servicesTopic(KafkaStorage.Topic.builder(servicesTopic)
             .partitions(servicesTopicPartitions)
             .replicationFactor(servicesTopicReplicationFactor)
+            .build())
+        .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic)
+            .partitions(dependenciesTopicPartitions)
+            .replicationFactor(dependenciesTopicReplicationFactor)
             .build())
         .traceSpansTopic(KafkaStorage.Topic.builder(traceSpansTopic)
             .partitions(traceSpansTopicPartitions)
@@ -111,20 +117,20 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.bootstrapServers = bootstrapServers;
   }
 
-  public Long getRetentionScanFrequencyMs() {
-    return retentionScanFrequencyMs;
+  public Long getRetentionScanFrequency() {
+    return retentionScanFrequency;
   }
 
-  public void setRetentionScanFrequencyMs(Long retentionScanFrequencyMs) {
-    this.retentionScanFrequencyMs = retentionScanFrequencyMs;
+  public void setRetentionScanFrequency(Long retentionScanFrequency) {
+    this.retentionScanFrequency = retentionScanFrequency;
   }
 
-  public Long getRetentionMaxAgeMs() {
-    return retentionMaxAgeMs;
+  public Long getRetentionMaxAge() {
+    return retentionMaxAge;
   }
 
-  public void setRetentionMaxAgeMs(Long retentionMaxAgeMs) {
-    this.retentionMaxAgeMs = retentionMaxAgeMs;
+  public void setRetentionMaxAge(Long retentionMaxAge) {
+    this.retentionMaxAge = retentionMaxAge;
   }
 
   public String getSpansTopic() {

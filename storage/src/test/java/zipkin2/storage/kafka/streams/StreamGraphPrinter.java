@@ -61,7 +61,7 @@ public class StreamGraphPrinter {
     System.out.println("# TRACE AGGREGATION TOPOLOGY");
     Topology traceAggregationTopology =
         new TraceAggregationStream(traceSpansTopic, traceStoreName, tracesTopic,
-            dependenciesTopic).get();
+            dependenciesTopic, Duration.ofMinutes(5)).get();
     System.out.println(StreamsTopologyGraphviz.print(traceAggregationTopology));
 
     System.out.println();

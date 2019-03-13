@@ -25,7 +25,6 @@ import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 import zipkin2.DependencyLink;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
-import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 /**
  * Stream topology supplier for Dependency aggregation.
@@ -34,7 +33,6 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
  * Store: Dependencies store (global state store)
  */
 public class DependencyStoreStream implements Supplier<Topology> {
-  static final String DEPENDENCY_PAIR_PATTERN = "%s|%s";
 
   // Kafka Topics
   final String dependenciesTopic;
@@ -43,14 +41,12 @@ public class DependencyStoreStream implements Supplier<Topology> {
   final String globalDependenciesStoreName;
 
   // SerDes
-  final SpansSerde spansSerde;
   final DependencyLinkSerde dependencyLinkSerde;
 
   public DependencyStoreStream(String dependenciesTopic, String globalDependenciesStoreName) {
     this.dependenciesTopic = dependenciesTopic;
     this.globalDependenciesStoreName = globalDependenciesStoreName;
 
-    spansSerde = new SpansSerde();
     dependencyLinkSerde = new DependencyLinkSerde();
   }
 
@@ -71,7 +67,7 @@ public class DependencyStoreStream implements Supplier<Topology> {
         .addGlobalStore(
             globalDependenciesStoreBuilder,
             dependenciesTopic,
-            Consumed.with(Serdes.String(), spansSerde),
+            Consumed.with(Serdes.String(), dependencyLinkSerde),
             () -> new Processor<String, DependencyLink>() {
               KeyValueStore<String, DependencyLink> dependenciesStore;
 

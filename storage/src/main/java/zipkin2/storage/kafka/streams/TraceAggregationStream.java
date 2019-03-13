@@ -41,6 +41,8 @@ import static java.util.stream.Collectors.toList;
  * Aggregation of Spans partitioned by TraceId into a Trace ChangeLog
  */
 public class TraceAggregationStream implements Supplier<Topology> {
+  static final String LINK_PATTERN = "%s|%s";
+
   // Kafka topics
   final String traceSpansTopic;
   final String tracesTopic;
@@ -54,17 +56,21 @@ public class TraceAggregationStream implements Supplier<Topology> {
   final SpansSerde spansSerde;
   final DependencyLinkSerde dependencyLinkSerde;
 
+  final Duration traceInactivityGap;
+
   final DependencyLinker dependencyLinker;
 
   public TraceAggregationStream(
       String traceSpansTopic,
       String tracesStoreName,
       String tracesTopic,
-      String dependenciesTopic) {
+      String dependenciesTopic,
+      Duration traceInactivityGap) {
     this.traceSpansTopic = traceSpansTopic;
     this.tracesStoreName = tracesStoreName;
     this.tracesTopic = tracesTopic;
     this.dependenciesTopic = dependenciesTopic;
+    this.traceInactivityGap = traceInactivityGap;
 
     spanSerde = new SpanSerde();
     spansSerde = new SpansSerde();
@@ -79,7 +85,7 @@ public class TraceAggregationStream implements Supplier<Topology> {
     final KStream<String, List<Span>> traceStream =
         builder.stream(traceSpansTopic, Consumed.with(Serdes.String(), spanSerde))
             .groupByKey()
-            .windowedBy(SessionWindows.with(Duration.ofMinutes(5)))
+            .windowedBy(SessionWindows.with(traceInactivityGap))
             .aggregate(ArrayList::new,
                 (traceId, span, spans) -> {
                   if (span == null) { // Cleaning state
@@ -108,16 +114,13 @@ public class TraceAggregationStream implements Supplier<Topology> {
             .through(tracesTopic, Produced.with(Serdes.String(), spansSerde));
 
     traceStream
-        //.map((stringWindowed, spans) -> KeyValue.pair(stringWindowed.key(), spans))
-        //.through(tracesTopic, Produced.with(Serdes.String(), spansSerde))
         .flatMap((windowTraceId, spans) ->
             dependencyLinker.putTrace(spans).link()
                 .stream()
                 .map(dependencyLink -> {
                   String linkPair =
-                      String.format("%s|%s", dependencyLink.parent(), dependencyLink.child());
-                  final String key = String.format("%s=%s", windowTraceId, linkPair);
-                  return KeyValue.pair(key, dependencyLink);
+                      String.format(LINK_PATTERN, dependencyLink.parent(), dependencyLink.child());
+                  return KeyValue.pair(linkPair, dependencyLink);
                 }).collect(toList()))
         .to(dependenciesTopic, Produced.with(Serdes.String(), dependencyLinkSerde));
 

@@ -89,6 +89,8 @@ public class KafkaStorage extends StorageComponent {
       spanIndexTopology, serviceStoreTopology, dependencyStoreTopology,
       traceRetentionStoreTopology;
 
+  final Duration traceInactivityGap;
+
   // Resources
   volatile AdminClient adminClient;
   volatile Producer<String, byte[]> producer;
@@ -175,8 +177,11 @@ public class KafkaStorage extends StorageComponent {
     traceAggregationStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
 
+    traceInactivityGap = builder.traceInactivityGap;
+
     traceAggregationTopology = new TraceAggregationStream(
-        traceSpansTopic.name, traceStoreName, tracesTopic.name, dependenciesTopic.name).get();
+        traceSpansTopic.name, traceStoreName, tracesTopic.name, dependenciesTopic.name,
+        traceInactivityGap).get();
 
     // Index Stream Topology configuration
     spanIndexStreamConfig = new Properties();
@@ -487,6 +492,8 @@ public class KafkaStorage extends StorageComponent {
     String bootstrapServers = "localhost:29092";
     CompressionType compressionType = CompressionType.NONE;
 
+    Duration traceInactivityGap = Duration.ofMinutes(5);
+
     String spanConsumerStreamApplicationId = "zipkin-server-span-consumer_v1";
     String traceStoreStreamApplicationId = "zipkin-server-trace-store_v1";
     String traceAggregationStreamApplicationId = "zipkin-server-trace-aggregation_v1";
@@ -558,6 +565,12 @@ public class KafkaStorage extends StorageComponent {
       return this;
     }
 
+    public Builder traceInactivityGap(Duration traceInactivityGap) {
+      if (traceInactivityGap == null) throw new NullPointerException("traceInactivityGap == null");
+      this.traceInactivityGap = traceInactivityGap;
+      return this;
+    }
+
     /**
      * Kafka Bootstrap Servers list to establish connection with a Cluster.
      */
@@ -601,6 +614,17 @@ public class KafkaStorage extends StorageComponent {
     public Builder tracesTopic(Topic tracesTopic) {
       if (tracesTopic == null) throw new NullPointerException("tracesTopic == null");
       this.tracesTopic = tracesTopic;
+      return this;
+    }
+
+    /**
+     * Kafka topic name where dependencies changelog are stored.
+     */
+    public Builder dependenciesTopic(Topic dependenciesTopic) {
+      if (dependenciesTopic == null) {
+        throw new NullPointerException("dependenciesTopic == null");
+      }
+      this.dependenciesTopic = dependenciesTopic;
       return this;
     }
 
