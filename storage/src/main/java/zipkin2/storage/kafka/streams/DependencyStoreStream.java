@@ -13,7 +13,6 @@
  */
 package zipkin2.storage.kafka.streams;
 
-import java.util.List;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -25,8 +24,6 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 import zipkin2.DependencyLink;
-import zipkin2.Span;
-import zipkin2.internal.DependencyLinker;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
@@ -40,7 +37,7 @@ public class DependencyStoreStream implements Supplier<Topology> {
   static final String DEPENDENCY_PAIR_PATTERN = "%s|%s";
 
   // Kafka Topics
-  final String tracesTopic;
+  final String dependenciesTopic;
 
   // Store names
   final String globalDependenciesStoreName;
@@ -49,8 +46,8 @@ public class DependencyStoreStream implements Supplier<Topology> {
   final SpansSerde spansSerde;
   final DependencyLinkSerde dependencyLinkSerde;
 
-  public DependencyStoreStream(String tracesTopic, String globalDependenciesStoreName) {
-    this.tracesTopic = tracesTopic;
+  public DependencyStoreStream(String dependenciesTopic, String globalDependenciesStoreName) {
+    this.dependenciesTopic = dependenciesTopic;
     this.globalDependenciesStoreName = globalDependenciesStoreName;
 
     spansSerde = new SpansSerde();
@@ -73,9 +70,9 @@ public class DependencyStoreStream implements Supplier<Topology> {
     builder
         .addGlobalStore(
             globalDependenciesStoreBuilder,
-            tracesTopic,
+            dependenciesTopic,
             Consumed.with(Serdes.String(), spansSerde),
-            () -> new Processor<String, List<Span>>() {
+            () -> new Processor<String, DependencyLink>() {
               KeyValueStore<String, DependencyLink> dependenciesStore;
 
               @Override public void init(ProcessorContext context) {
@@ -84,29 +81,9 @@ public class DependencyStoreStream implements Supplier<Topology> {
                         globalDependenciesStoreName);
               }
 
-              @Override public void process(String traceId, List<Span> spans) {
-                List<DependencyLink> dependencyLinks =
-                    new DependencyLinker().putTrace(spans).link();
-                for (DependencyLink dependencyLink : dependencyLinks) {
-                  String dependencyKey = String.format(
-                      DEPENDENCY_PAIR_PATTERN,
-                      dependencyLink.parent(),
-                      dependencyLink.child());
-                  DependencyLink currentDependencyLink = dependenciesStore.get(dependencyKey);
-                  if (currentDependencyLink == null) {
-                    dependenciesStore.put(dependencyKey, dependencyLink);
-                  } else {
-                    // TODO: validate counters
-                    DependencyLink aggDependencyLink =
-                        DependencyLink.newBuilder()
-                            .parent(currentDependencyLink.parent())
-                            .child(currentDependencyLink.child())
-                            .callCount(currentDependencyLink.callCount() + dependencyLink.callCount())
-                            .errorCount(currentDependencyLink.errorCount() + dependencyLink.errorCount())
-                            .build();
-                    dependenciesStore.put(dependencyKey, aggDependencyLink);
-                  }
-                }
+              @Override
+              public void process(String windowTraceIdLinkPair, DependencyLink dependencyLink) {
+                dependenciesStore.put(windowTraceIdLinkPair, dependencyLink);
               }
 
               @Override public void close() { // Nothing to close

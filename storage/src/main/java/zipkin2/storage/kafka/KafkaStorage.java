@@ -75,7 +75,7 @@ public class KafkaStorage extends StorageComponent {
 
 
   // Kafka Topics
-  final Topic spansTopic, traceSpansTopic, tracesTopic, servicesTopic;
+  final Topic spansTopic, traceSpansTopic, tracesTopic, servicesTopic, dependenciesTopic;
 
   // Kafka Clients config
   final Properties adminConfig;
@@ -107,6 +107,7 @@ public class KafkaStorage extends StorageComponent {
     this.traceSpansTopic = builder.traceSpansTopic;
     this.servicesTopic = builder.servicesTopic;
     this.spansTopic = builder.spansTopic;
+    this.dependenciesTopic = builder.dependenciesTopic;
 
     // State store directories
     this.storageDirectory = builder.storeDirectory;
@@ -175,7 +176,7 @@ public class KafkaStorage extends StorageComponent {
         builder.compressionType.name);
 
     traceAggregationTopology = new TraceAggregationStream(
-        traceSpansTopic.name, traceStoreName, tracesTopic.name).get();
+        traceSpansTopic.name, traceStoreName, tracesTopic.name, dependenciesTopic.name).get();
 
     // Index Stream Topology configuration
     spanIndexStreamConfig = new Properties();
@@ -226,7 +227,7 @@ public class KafkaStorage extends StorageComponent {
         builder.compressionType.name);
 
     dependencyStoreTopology =
-        new DependencyStoreStream(tracesTopic.name, dependencyStoreName).get();
+        new DependencyStoreStream(dependenciesTopic.name, dependencyStoreName).get();
 
     // Retention Stream Topology configuration
     traceRetentionStoreStreamConfig = new Properties();
@@ -292,7 +293,7 @@ public class KafkaStorage extends StorageComponent {
     try {
       Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
       List<Topic> requiredTopics =
-          Arrays.asList(spansTopic, traceSpansTopic, tracesTopic, servicesTopic);
+          Arrays.asList(spansTopic, traceSpansTopic, tracesTopic, servicesTopic, dependenciesTopic);
       Set<NewTopic> newTopics = new HashSet<>();
 
       for (Topic requiredTopic : requiredTopics) {
@@ -486,7 +487,6 @@ public class KafkaStorage extends StorageComponent {
     String bootstrapServers = "localhost:29092";
     CompressionType compressionType = CompressionType.NONE;
 
-
     String spanConsumerStreamApplicationId = "zipkin-server-span-consumer_v1";
     String traceStoreStreamApplicationId = "zipkin-server-trace-store_v1";
     String traceAggregationStreamApplicationId = "zipkin-server-trace-aggregation_v1";
@@ -506,6 +506,9 @@ public class KafkaStorage extends StorageComponent {
     Topic traceSpansTopic = Topic.builder("zipkin-trace-spans_v1")
         .build();
     Topic tracesTopic = Topic.builder("zipkin-traces_v1")
+        .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
+        .build();
+    Topic dependenciesTopic = Topic.builder("zipkin-dependencies_v1")
         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
         .build();
     Topic servicesTopic = Topic.builder("zipkin-services_v1")

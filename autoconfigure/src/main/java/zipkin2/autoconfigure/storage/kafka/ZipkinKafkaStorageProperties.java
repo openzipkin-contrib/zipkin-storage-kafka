@@ -42,7 +42,10 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String servicesTopic = "zipkin-services_v1";
   private Integer servicesTopicPartitions = 1;
   private Short servicesTopicReplicationFactor = 1;
-  private String traceSpansTopic = "zipkin-dependencies_v1";
+  private String dependenciesTopic = "zipkin-dependencies_v1";
+  private Integer dependenciesTopicPartitions = 1;
+  private Short dependenciesTopicReplicationFactor = 1;
+  private String traceSpansTopic = "zipkin-trace-spans_v1";
   private Integer traceSpansTopicPartitions = 1;
   private Short traceSpansTopicReplicationFactor = 1;
 
@@ -74,6 +77,22 @@ public class ZipkinKafkaStorageProperties implements Serializable {
             .replicationFactor(traceSpansTopicReplicationFactor)
             .build())
         .storeDirectory(storeDirectory);
+  }
+
+  public boolean isSpanConsumerEnabled() {
+    return spanConsumerEnabled;
+  }
+
+  public void setSpanConsumerEnabled(boolean spanConsumerEnabled) {
+    this.spanConsumerEnabled = spanConsumerEnabled;
+  }
+
+  public boolean isSpanStoreEnabled() {
+    return spanStoreEnabled;
+  }
+
+  public void setSpanStoreEnabled(boolean spanStoreEnabled) {
+    this.spanStoreEnabled = spanStoreEnabled;
   }
 
   public boolean isEnsureTopics() {
@@ -218,5 +237,29 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setTraceSpansTopicReplicationFactor(Short traceSpansTopicReplicationFactor) {
     this.traceSpansTopicReplicationFactor = traceSpansTopicReplicationFactor;
+  }
+
+  public String getDependenciesTopic() {
+    return dependenciesTopic;
+  }
+
+  public void setDependenciesTopic(String dependenciesTopic) {
+    this.dependenciesTopic = dependenciesTopic;
+  }
+
+  public Integer getDependenciesTopicPartitions() {
+    return dependenciesTopicPartitions;
+  }
+
+  public void setDependenciesTopicPartitions(Integer dependenciesTopicPartitions) {
+    this.dependenciesTopicPartitions = dependenciesTopicPartitions;
+  }
+
+  public Short getDependenciesTopicReplicationFactor() {
+    return dependenciesTopicReplicationFactor;
+  }
+
+  public void setDependenciesTopicReplicationFactor(Short dependenciesTopicReplicationFactor) {
+    this.dependenciesTopicReplicationFactor = dependenciesTopicReplicationFactor;
   }
 }

@@ -14,24 +14,11 @@
 package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
-import java.time.Instant;
-import java.util.Properties;
 import no.sysco.middleware.kafka.util.StreamsTopologyGraphviz;
-import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
 
 public class StreamGraphPrinter {
   public static void main(String[] args) {
-    // given
-    Properties props = new Properties();
-    props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
-    props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
-    props.put(StreamsConfig.STATE_DIR_CONFIG,
-        "target/kafka-streams-test/" + Instant.now().getEpochSecond());
-    props.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
-    props.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.ByteArraySerde.class);
-
     String spansTopic = "topic";
     String tracesTopic = "traces";
     String traceSpansTopic = "trace-spans";
@@ -40,32 +27,47 @@ public class StreamGraphPrinter {
     String serviceStoreName = "service-store";
     String dependencyStoreName = "dependencies";
     String spanIndexStoreName = "span-index";
+    String dependenciesTopic = "dependencies";
 
+    System.out.println();
+    System.out.println("# SPAN CONSUMER TOPOLOGY");
     Topology spanConsumerTopology =
         new SpanConsumerStream(spansTopic, servicesTopic, tracesTopic).get();
     System.out.println(StreamsTopologyGraphviz.print(spanConsumerTopology));
 
-    Topology traceAggregationTopology =
-        new TraceAggregationStream(traceSpansTopic, traceStoreName, tracesTopic).get();
-    System.out.println(StreamsTopologyGraphviz.print(traceAggregationTopology));
-
+    System.out.println();
+    System.out.println("# SERVICE STORE TOPOLOGY");
     Topology serviceStoreTopology = new ServiceStoreStream(servicesTopic, serviceStoreName).get();
     System.out.println(StreamsTopologyGraphviz.print(serviceStoreTopology));
 
-    Topology dependencyStoreTopology =
-        new DependencyStoreStream(tracesTopic, dependencyStoreName).get();
-    System.out.println(StreamsTopologyGraphviz.print(dependencyStoreTopology));
-
+    System.out.println();
+    System.out.println("# SPAN INDEX TOPOLOGY");
     Topology spanIndexTopology = new SpanIndexStream(spansTopic, spanIndexStoreName, "").get();
     System.out.println(StreamsTopologyGraphviz.print(spanIndexTopology));
 
+    System.out.println();
+    System.out.println("# TRACE STORE TOPOLOGY");
     Topology traceStoreTopology = new TraceStoreStream(traceSpansTopic, traceStoreName).get();
     System.out.println(StreamsTopologyGraphviz.print(traceStoreTopology));
 
+    System.out.println();
+    System.out.println("# RETENTION TOPOLOGY");
     Topology traceRetentionTopology =
         new TraceRetentionStoreStream(traceSpansTopic, traceStoreName, Duration
             .ofMinutes(1), Duration.ofMinutes(1)).get();
     System.out.println(StreamsTopologyGraphviz.print(traceRetentionTopology));
 
+    System.out.println();
+    System.out.println("# TRACE AGGREGATION TOPOLOGY");
+    Topology traceAggregationTopology =
+        new TraceAggregationStream(traceSpansTopic, traceStoreName, tracesTopic,
+            dependenciesTopic).get();
+    System.out.println(StreamsTopologyGraphviz.print(traceAggregationTopology));
+
+    System.out.println();
+    System.out.println("# DEPENDENCY TOPOLOGY");
+    Topology dependencyStoreTopology =
+        new DependencyStoreStream(dependenciesTopic, dependencyStoreName).get();
+    System.out.println(StreamsTopologyGraphviz.print(dependencyStoreTopology));
   }
 }
