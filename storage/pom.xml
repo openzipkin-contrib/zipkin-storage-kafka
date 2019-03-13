@@ -82,7 +82,7 @@
         <dependency>
             <groupId>no.sysco.middleware.kafka</groupId>
             <artifactId>kafka-util-streams-graphviz</artifactId>
-            <version>0.1.3-SNAPSHOT</version>
+            <version>0.1.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>
