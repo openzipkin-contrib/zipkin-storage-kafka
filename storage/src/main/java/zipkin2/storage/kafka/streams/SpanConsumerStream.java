@@ -22,9 +22,13 @@ import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
 import org.apache.kafka.streams.kstream.Produced;
 import zipkin2.Span;
-import zipkin2.storage.kafka.streams.serdes.SpanNamesSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 
+/**
+ * Topology to process incoming spans.
+ *
+ * Raw spans are turned into Light Spans and Service:SpanName pair is collected.
+ */
 public class SpanConsumerStream implements Supplier<Topology> {
   final String spansTopic;
   final String serviceSpanNamesTopic;

@@ -45,12 +45,16 @@ import zipkin2.storage.kafka.streams.stores.IndexStateStore;
  */
 public class SpanIndexStream implements Supplier<Topology> {
 
+  // Kafka Topics
   final String spansTopic;
+
+  // Store name
   final String globalTracesIndexStoreName;
 
-  final String indexDirectory;
-
+  // SerDes
   final SpansSerde spansSerde;
+
+  final String indexDirectory;
 
   public SpanIndexStream(
       String spansTopic,

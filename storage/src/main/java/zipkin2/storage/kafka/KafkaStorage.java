@@ -48,11 +48,11 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 import zipkin2.storage.kafka.streams.DependencyStoreStream;
-import zipkin2.storage.kafka.streams.TraceRetentionStoreStream;
 import zipkin2.storage.kafka.streams.ServiceStoreStream;
 import zipkin2.storage.kafka.streams.SpanConsumerStream;
 import zipkin2.storage.kafka.streams.SpanIndexStream;
 import zipkin2.storage.kafka.streams.TraceAggregationStream;
+import zipkin2.storage.kafka.streams.TraceRetentionStoreStream;
 import zipkin2.storage.kafka.streams.TraceStoreStream;
 
 /**
@@ -97,15 +97,18 @@ public class KafkaStorage extends StorageComponent {
   volatile boolean closeCalled;
 
   KafkaStorage(Builder builder) {
+    // Kafka Storage modes
     this.spanConsumerEnabled = builder.spanConsumerEnabled;
     this.spanStoreEnabled = builder.spanStoreEnabled;
 
+    // Kafka Topics config
     this.ensureTopics = builder.ensureTopics;
     this.tracesTopic = builder.tracesTopic;
     this.traceSpansTopic = builder.traceSpansTopic;
     this.servicesTopic = builder.servicesTopic;
     this.spansTopic = builder.spansTopic;
 
+    // State store directories
     this.storageDirectory = builder.storeDirectory;
     this.spanIndexStoreName = builder.spanIndexStoreName;
     this.traceStoreName = builder.traceStoreName;
@@ -191,6 +194,7 @@ public class KafkaStorage extends StorageComponent {
     spanIndexTopology = new SpanIndexStream(
         spansTopic.name, spanIndexStoreName, builder.indexStorageDirectory()).get();
 
+    // Service stream configuration
     serviceStoreStreamConfig = new Properties();
     serviceStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
     serviceStoreStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
@@ -250,7 +254,7 @@ public class KafkaStorage extends StorageComponent {
   public SpanConsumer spanConsumer() {
     if (spanConsumerEnabled) {
       return new KafkaSpanConsumer(this);
-    } else {
+    } else { // NoopSpanConsumer
       return list -> Call.create(null);
     }
   }
@@ -259,7 +263,7 @@ public class KafkaStorage extends StorageComponent {
   public SpanStore spanStore() {
     if (spanStoreEnabled) {
       return new KafkaSpanStore(this);
-    } else {
+    } else { // NoopSpanStore
       return new SpanStore() {
         @Override public Call<List<List<Span>>> getTraces(QueryRequest queryRequest) {
           return Call.emptyList();
@@ -497,7 +501,8 @@ public class KafkaStorage extends StorageComponent {
     String dependencyStoreName = "zipkin-dependency_v1";
     String serviceStoreName = "zipkin-service_v1";
 
-    Topic spansTopic = Topic.builder("zipkin-spans_v1").build();
+    Topic spansTopic = Topic.builder("zipkin-spans_v1")
+        .build();
     Topic traceSpansTopic = Topic.builder("zipkin-trace-spans_v1")
         .build();
     Topic tracesTopic = Topic.builder("zipkin-traces_v1")
@@ -531,7 +536,9 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * Enable consuming spans from collector to be stored in Kafka topics.
+     * Enable consuming spans from collectors and store them in Kafka topics.
+     *
+     * When disabled, a NoopSpanConsumer is instantiated to do nothing with incoming spans.
      */
     public Builder spanConsumerEnabled(boolean spanConsumerEnabled) {
       this.spanConsumerEnabled = spanConsumerEnabled;
@@ -540,6 +547,8 @@ public class KafkaStorage extends StorageComponent {
 
     /**
      * Enable storing spans to aggregate and index spans, traces, and dependencies.
+     *
+     * When disabled, a NoopSpanStore is instantiated to return empty lists for all searches.
      */
     public Builder spanStoreEnabled(boolean spanStoreEnabled) {
       this.spanConsumerEnabled = spanStoreEnabled;
@@ -556,7 +565,10 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * Kafka topic name where incoming list of Spans are stored.
+     * Kafka topic name where incoming raw spans are stored.
+     *
+     * A Raw span is a span received from Collectors that contains all metadata and is partitioned
+     * by Span Id.
      */
     public Builder spansTopic(Topic spansTopic) {
       if (spansTopic == null) throw new NullPointerException("spansTopic == null");
@@ -565,27 +577,9 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * Kafka topic name where traces are stored.
-     */
-    public Builder tracesTopic(Topic tracesTopic) {
-      if (tracesTopic == null) throw new NullPointerException("tracesTopic == null");
-      this.tracesTopic = tracesTopic;
-      return this;
-    }
-
-    /**
-     * Kafka topic name where Service names are stored.
-     */
-    public Builder servicesTopic(Topic servicesTopic) {
-      if (servicesTopic == null) {
-        throw new NullPointerException("servicesTopic == null");
-      }
-      this.servicesTopic = servicesTopic;
-      return this;
-    }
-
-    /**
-     * Kafka topic name where Dependencies are stored.
+     * Kafka topic name where "light" Spans, partitioned by Trace Id are stored.
+     *
+     * A Light Spans is a span without annotations and tags.
      */
     public Builder traceSpansTopic(Topic traceSpansTopic) {
       if (traceSpansTopic == null) {
@@ -596,7 +590,30 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * Path to root directory when state is stored.
+     * Kafka topic name where aggregated traces changelog are stored. This topic is meant to be
+     * compacted.
+     *
+     * This Trace changelog represents how traces grow on time.
+     */
+    public Builder tracesTopic(Topic tracesTopic) {
+      if (tracesTopic == null) throw new NullPointerException("tracesTopic == null");
+      this.tracesTopic = tracesTopic;
+      return this;
+    }
+
+    /**
+     * Kafka topic name where ServiceName:SpanName are stored.
+     */
+    public Builder servicesTopic(Topic servicesTopic) {
+      if (servicesTopic == null) {
+        throw new NullPointerException("servicesTopic == null");
+      }
+      this.servicesTopic = servicesTopic;
+      return this;
+    }
+
+    /**
+     * Path to root directory when aggregated and indexed data is stored.
      */
     public Builder storeDirectory(String storeDirectory) {
       if (storeDirectory == null) {
@@ -615,7 +632,7 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * Frequency to check retention policy.
+     * Maximum age for traces and spans to be retained on State Stores.
      */
     public Builder retentionMaxAge(Duration retentionMaxAge) {
       this.retentionMaxAge = retentionMaxAge;

@@ -29,11 +29,18 @@ import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
+/**
+ * Aggregation and storage of Light spans into traces.
+ */
 public class TraceStoreStream implements Supplier<Topology> {
 
+  // Kafka topics
   final String traceSpansTopic;
+
+  // Store names
   final String tracesStoreName;
 
+  // SerDes
   final SpanSerde spanSerde;
   final SpansSerde spansSerde;
 
@@ -41,7 +48,6 @@ public class TraceStoreStream implements Supplier<Topology> {
     this.traceSpansTopic = traceSpansTopic;
     this.tracesStoreName = tracesStoreName;
 
-    // Initialize SerDes
     spanSerde = new SpanSerde();
     spansSerde = new SpansSerde();
   }
@@ -57,7 +63,6 @@ public class TraceStoreStream implements Supplier<Topology> {
             .withLoggingDisabled();
 
     StreamsBuilder builder = new StreamsBuilder();
-
 
     // Aggregate TraceId:Spans
     // This store could be removed once an RPC is used to find Traces per instance based on prior

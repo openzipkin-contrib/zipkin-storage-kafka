@@ -18,8 +18,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.StreamsBuilder;
+import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.processor.ProcessorSupplier;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
+import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.LongPoint;
@@ -46,6 +50,12 @@ import zipkin2.storage.kafka.streams.stores.IndexStoreType;
 
 /**
  * Span Store based on Kafka Streams State Stores.
+ *
+ * This store supports all searches (e.g. findTraces, getTrace, getServiceNames, getSpanNames, and
+ * getDependencies).
+ *
+ * NOTE: Currently State Stores are based on global state stores (i.e., all data is replicated on
+ * every Zipkin instance with spanStoreEnabled=true.
  */
 public class KafkaSpanStore implements SpanStore {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);

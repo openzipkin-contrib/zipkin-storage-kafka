@@ -32,15 +32,26 @@ import org.slf4j.LoggerFactory;
 import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 
+/**
+ * Retention topology to validate every defined period of time (e.g. 1 day) old spans and mark them
+ * for deletion.
+ *
+ * Deletion is handled in the other streams.
+ */
 public class TraceRetentionStoreStream implements Supplier<Topology> {
   static final Logger LOG = LoggerFactory.getLogger(TraceRetentionStoreStream.class);
 
+  // Kafka topics
   final String traceSpansTopic;
+
+  // Store names
   final String traceTsStoreName;
 
+  // Retention attributes
   final Duration scanFrequency;
   final Duration maxAge;
 
+  // SerDe
   final SpanSerde spanSerde;
 
   public TraceRetentionStoreStream(

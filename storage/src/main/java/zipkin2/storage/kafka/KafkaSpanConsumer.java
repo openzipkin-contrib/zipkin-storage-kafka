@@ -30,9 +30,10 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.kafka.internal.AggregateCall;
 
 /**
- * Processing of Spans consumed.
+ * Collected Spans processor.
  *
- * Supported by a Kafka Producer, spans are stored in a Kafka Topic.
+ * Spans are processed by turning "raw spans" into "light spans" for aggregation, and collecting
+ * serviceName:spanName pairs.
  */
 public class KafkaSpanConsumer implements SpanConsumer {
 

@@ -30,23 +30,29 @@ import zipkin2.internal.DependencyLinker;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
+/**
+ * Stream topology supplier for Dependency aggregation.
+ *
+ * Source: Traces topic (aggregated Traces aggregation)
+ * Store: Dependencies store (global state store)
+ */
 public class DependencyStoreStream implements Supplier<Topology> {
   static final String DEPENDENCY_PAIR_PATTERN = "%s|%s";
 
+  // Kafka Topics
   final String tracesTopic;
 
+  // Store names
   final String globalDependenciesStoreName;
 
+  // SerDes
   final SpansSerde spansSerde;
   final DependencyLinkSerde dependencyLinkSerde;
 
-  public DependencyStoreStream(
-      String tracesTopic,
-      String globalDependenciesStoreName) {
+  public DependencyStoreStream(String tracesTopic, String globalDependenciesStoreName) {
     this.tracesTopic = tracesTopic;
     this.globalDependenciesStoreName = globalDependenciesStoreName;
 
-    // Initialize SerDes
     spansSerde = new SpansSerde();
     dependencyLinkSerde = new DependencyLinkSerde();
   }
@@ -90,6 +96,7 @@ public class DependencyStoreStream implements Supplier<Topology> {
                   if (currentDependencyLink == null) {
                     dependenciesStore.put(dependencyKey, dependencyLink);
                   } else {
+                    // TODO: validate counters
                     DependencyLink aggDependencyLink =
                         DependencyLink.newBuilder()
                             .parent(currentDependencyLink.parent())
@@ -102,7 +109,7 @@ public class DependencyStoreStream implements Supplier<Topology> {
                 }
               }
 
-              @Override public void close() {
+              @Override public void close() { // Nothing to close
               }
             }
         );

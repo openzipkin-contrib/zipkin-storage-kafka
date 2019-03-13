@@ -30,12 +30,18 @@ import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
+/**
+ * Aggregation of Spans partitioned by TraceId into a Trace ChangeLog
+ */
 public class TraceAggregationStream implements Supplier<Topology> {
-
+  // Kafka topics
   final String traceSpansTopic;
-  final String tracesStoreName;
   final String tracesTopic;
 
+  // Store names
+  final String tracesStoreName;
+
+  // SerDes
   final SpanSerde spanSerde;
   final SpansSerde spansSerde;
 
@@ -47,7 +53,6 @@ public class TraceAggregationStream implements Supplier<Topology> {
     this.tracesStoreName = tracesStoreName;
     this.tracesTopic = tracesTopic;
 
-    // initialize SerDes
     spanSerde = new SpanSerde();
     spansSerde = new SpansSerde();
   }
@@ -59,7 +64,7 @@ public class TraceAggregationStream implements Supplier<Topology> {
     builder.stream(traceSpansTopic, Consumed.with(Serdes.String(), spanSerde))
         .groupByKey()
         .aggregate(ArrayList::new, (traceId, span, spans) -> {
-              if (span == null) {
+              if (span == null) { // Cleaning state
                 return null;
               } else {
                 if (spans == null) {
