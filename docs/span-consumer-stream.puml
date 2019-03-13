@@ -1,0 +1,33 @@
+@startuml
+digraph G {
+	graph [labelloc=top,label="kafka-streams topology",fontname="Verdana",fontsize=12];
+	edge [fontname="Verdana",fontsize=9,labelfontname="Verdana",labelfontsize=9];
+	node [fontname="Verdana",fontsize=9,shape=record];
+subgraph cluster_c3 {
+label = "Sub-Topology: 0";
+	c0 [label="Topic: topic"]
+	// null
+	c0 -> c4 [];
+	c4 [label="Source: KSTREAM-SOURCE-0000000000"]
+	c5 [label="Processor: KSTREAM-MAP-0000000001"]
+	// null
+	c4 -> c5 [];
+	c6 [label="Processor: KSTREAM-MAP-0000000003"]
+	// null
+	c4 -> c6 [];
+	c7 [label="Sink: KSTREAM-SINK-0000000002"]
+	// null
+	c5 -> c7 [];
+	// null
+	c7 -> c1 [];
+	c8 [label="Sink: KSTREAM-SINK-0000000004"]
+	// null
+	c6 -> c8 [];
+	// null
+	c8 -> c2 [];
+}
+	c0 [label="Topic: topic", shape=cds]
+	c1 [label="Topic: traces", shape=cds]
+	c2 [label="Topic: services", shape=cds]
+}
+@enduml
