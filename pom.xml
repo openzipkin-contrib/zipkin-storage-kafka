@@ -19,7 +19,7 @@
 
     <groupId>io.github.jeqo.zipkin</groupId>
     <artifactId>zipkin-storage-kafka-parent</artifactId>
-    <version>0.2.2-SNAPSHOT</version>
+    <version>0.3.0</version>
     <packaging>pom</packaging>
 
     <modules>
@@ -81,7 +81,7 @@
         <developerConnection>scm:git:ssh://git@github.com/jeqo/zipkin-storage-kafka.git
         </developerConnection>
         <url>http://github.com/jeqo/zipkin-storage-kafka/tree/master</url>
-        <tag>HEAD</tag>
+        <tag>0.3.0</tag>
     </scm>
 
     <dependencyManagement>
