@@ -23,7 +23,6 @@ public class StreamGraphPrinter {
     String tracesTopic = "traces";
     String traceSpansTopic = "trace-spans";
     String traceStoreName = "trace-store";
-    String servicesTopic = "services";
     String serviceStoreName = "service-store";
     String dependencyStoreName = "dependencies";
     String spanIndexStoreName = "span-index";
@@ -32,12 +31,12 @@ public class StreamGraphPrinter {
     System.out.println();
     System.out.println("# SPAN CONSUMER TOPOLOGY");
     Topology spanConsumerTopology =
-        new SpanConsumerStream(spansTopic, servicesTopic, tracesTopic).get();
+        new SpanConsumerStream(spansTopic, tracesTopic).get();
     System.out.println(StreamsTopologyGraphviz.print(spanConsumerTopology));
 
     System.out.println();
     System.out.println("# SERVICE STORE TOPOLOGY");
-    Topology serviceStoreTopology = new ServiceStoreStream(servicesTopic, serviceStoreName).get();
+    Topology serviceStoreTopology = new ServiceStoreStream(traceSpansTopic, serviceStoreName).get();
     System.out.println(StreamsTopologyGraphviz.print(serviceStoreTopology));
 
     System.out.println();

@@ -75,7 +75,7 @@ public class KafkaStorage extends StorageComponent {
 
 
   // Kafka Topics
-  final Topic spansTopic, traceSpansTopic, tracesTopic, servicesTopic, dependenciesTopic;
+  final Topic spansTopic, traceSpansTopic, tracesTopic, dependenciesTopic;
 
   // Kafka Clients config
   final Properties adminConfig;
@@ -86,8 +86,7 @@ public class KafkaStorage extends StorageComponent {
       spanIndexStreamConfig, serviceStoreStreamConfig, dependencyStoreStreamConfig,
       traceRetentionStoreStreamConfig;
   final Topology spanConsumerTopology, traceStoreTopology, traceAggregationTopology,
-      spanIndexTopology, serviceStoreTopology, dependencyStoreTopology,
-      traceRetentionStoreTopology;
+      spanIndexTopology, serviceStoreTopology, dependencyStoreTopology, traceRetentionStoreTopology;
 
   final Duration traceInactivityGap;
 
@@ -107,7 +106,6 @@ public class KafkaStorage extends StorageComponent {
     this.ensureTopics = builder.ensureTopics;
     this.tracesTopic = builder.tracesTopic;
     this.traceSpansTopic = builder.traceSpansTopic;
-    this.servicesTopic = builder.servicesTopic;
     this.spansTopic = builder.spansTopic;
     this.dependenciesTopic = builder.dependenciesTopic;
 
@@ -144,7 +142,7 @@ public class KafkaStorage extends StorageComponent {
         builder.compressionType.name);
 
     spanConsumerTopology =
-        new SpanConsumerStream(spansTopic.name, servicesTopic.name, traceSpansTopic.name).get();
+        new SpanConsumerStream(spansTopic.name, traceSpansTopic.name).get();
 
     // Store Stream Topology configuration
     traceStoreStreamConfig = new Properties();
@@ -214,7 +212,7 @@ public class KafkaStorage extends StorageComponent {
     serviceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
 
-    serviceStoreTopology = new ServiceStoreStream(servicesTopic.name, serviceStoreName).get();
+    serviceStoreTopology = new ServiceStoreStream(traceSpansTopic.name, serviceStoreName).get();
 
     // Dependency aggregation topology configuration
     dependencyStoreStreamConfig = new Properties();
@@ -298,7 +296,7 @@ public class KafkaStorage extends StorageComponent {
     try {
       Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
       List<Topic> requiredTopics =
-          Arrays.asList(spansTopic, traceSpansTopic, tracesTopic, servicesTopic, dependenciesTopic);
+          Arrays.asList(spansTopic, traceSpansTopic, tracesTopic, dependenciesTopic);
       Set<NewTopic> newTopics = new HashSet<>();
 
       for (Topic requiredTopic : requiredTopics) {
@@ -316,8 +314,7 @@ public class KafkaStorage extends StorageComponent {
     }
   }
 
-  @Override
-  public CheckResult check() {
+  @Override public CheckResult check() {
     try {
       KafkaFuture<String> maybeClusterId = getAdminClient().describeCluster().clusterId();
       maybeClusterId.get(1, TimeUnit.SECONDS);
@@ -327,8 +324,7 @@ public class KafkaStorage extends StorageComponent {
     }
   }
 
-  @Override
-  public void close() {
+  @Override public void close() {
     if (closeCalled) return;
     synchronized (this) {
       if (!closeCalled) {
@@ -518,8 +514,6 @@ public class KafkaStorage extends StorageComponent {
     Topic dependenciesTopic = Topic.builder("zipkin-dependencies_v1")
         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
         .build();
-    Topic servicesTopic = Topic.builder("zipkin-services_v1")
-        .build();
 
     boolean ensureTopics = true;
 
@@ -625,17 +619,6 @@ public class KafkaStorage extends StorageComponent {
         throw new NullPointerException("dependenciesTopic == null");
       }
       this.dependenciesTopic = dependenciesTopic;
-      return this;
-    }
-
-    /**
-     * Kafka topic name where ServiceName:SpanName are stored.
-     */
-    public Builder servicesTopic(Topic servicesTopic) {
-      if (servicesTopic == null) {
-        throw new NullPointerException("servicesTopic == null");
-      }
-      this.servicesTopic = servicesTopic;
       return this;
     }
 

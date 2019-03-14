@@ -198,43 +198,43 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   }
 
   @Test
-  public void canOverridesProperty_servicesTopicName() {
+  public void canOverridesProperty_dependenciesTopicName() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.services-topic:zipkin-services-1"
+        "zipkin.storage.kafka.dependencies-topic:zipkin-dependencies-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).servicesTopic.name).isEqualTo(
-        "zipkin-services-1");
+    assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.name).isEqualTo(
+        "zipkin-dependencies-1");
   }
 
   @Test
-  public void canOverridesProperty_servicesTopicPartitions() {
+  public void canOverridesProperty_dependenciesTopicPartitions() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.services-topic-partitions:2"
+        "zipkin.storage.kafka.dependencies-topic-partitions:2"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).servicesTopic.partitions).isEqualTo(2);
+    assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.partitions).isEqualTo(2);
   }
 
   @Test
-  public void canOverridesProperty_servicesTopicReplicationFactor() {
+  public void canOverridesProperty_dependenciesTopicReplicationFactor() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.services-topic-replication-factor:2"
+        "zipkin.storage.kafka.dependencies-topic-replication-factor:2"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).servicesTopic.replicationFactor).isEqualTo(
+    assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.replicationFactor).isEqualTo(
         (short) 2);
   }
 

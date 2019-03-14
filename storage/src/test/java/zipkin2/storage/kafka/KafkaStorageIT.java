@@ -98,12 +98,24 @@ public class KafkaStorageIT {
     List<Span> spans0 = Arrays.asList(root, child);
 
     final SpanConsumer spanConsumer = storage.spanConsumer();
+    final SpanStore spanStore = storage.spanStore();
+
     spanConsumer.accept(spans0).execute();
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.traceSpansTopic.name, 2, 10000);
-    IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.servicesTopic.name, 2, 10000);
+
+    await().atMost(10, TimeUnit.SECONDS)
+        .until(() -> {
+          List<String> serviceNames = spanStore.getServiceNames().execute();
+          return serviceNames.size() == 1;
+        });
+
+    await().atMost(10, TimeUnit.SECONDS)
+        .until(() -> {
+          List<String> spanNames = spanStore.getSpanNames("svc_a").execute();
+          return spanNames.size() == 2;
+        });
   }
 
   @Test
@@ -137,9 +149,9 @@ public class KafkaStorageIT {
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.traceSpansTopic.name, 2, 10000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopic.name, 1, 30000);
+        testConsumerConfig, storage.tracesTopic.name, 1, 10000);
 
-    await().atMost(60, TimeUnit.SECONDS)
+    await().atMost(10, TimeUnit.SECONDS)
         .until(() -> {
           List<DependencyLink> dependencyLinks = spanStore.getDependencies(0L, 0L).execute();
           return dependencyLinks.size() == 1;
@@ -176,7 +188,7 @@ public class KafkaStorageIT {
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopic.name, 2, 10000);
-    await().atMost(30, TimeUnit.SECONDS)
+    await().atMost(10, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
               spanStore.getTraces(QueryRequest.newBuilder()
@@ -234,7 +246,7 @@ public class KafkaStorageIT {
 
     // query by annotation {"key_tag_a":"value_tag_a"} = 1 trace
     await()
-        .atMost(30, TimeUnit.SECONDS)
+        .atMost(10, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
               spanStore.getTraces(QueryRequest.newBuilder()
@@ -305,7 +317,7 @@ public class KafkaStorageIT {
 
     // query by annotation {"key_tag_a":"value_tag_a"} = 1 trace
     await()
-        .atMost(30, TimeUnit.SECONDS)
+        .atMost(10, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
               spanStore.getTraces(QueryRequest.newBuilder()
@@ -436,7 +448,7 @@ public class KafkaStorageIT {
 
     // query by service name `srv_a` = 2 trace
     await()
-        .atMost(5, TimeUnit.SECONDS)
+        .atMost(10, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
               spanStore.getTraces(
@@ -452,7 +464,7 @@ public class KafkaStorageIT {
 
     // query by service name `non_existing_span_name` = 0 trace
     await()
-        .pollDelay(5, TimeUnit.SECONDS)
+        .pollDelay(10, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
               spanStore.getTraces(

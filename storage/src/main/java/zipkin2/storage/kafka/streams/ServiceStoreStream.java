@@ -25,25 +25,29 @@ import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
+import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.SpanNamesSerde;
+import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 
 public class ServiceStoreStream implements Supplier<Topology> {
 
   // Topic names
-  final String serviceSpanNamesTopic;
+  final String traceSpansTopic;
 
   // Store names
   final String globalServicesStoreName;
 
   // SerDes
+  final SpanSerde spanSerde;
   final SpanNamesSerde spanNamesSerde;
 
   public ServiceStoreStream(
-      String serviceSpanNamesTopic,
+      String traceSpansTopic,
       String globalServicesStoreName) {
-    this.serviceSpanNamesTopic = serviceSpanNamesTopic;
+    this.traceSpansTopic = traceSpansTopic;
     this.globalServicesStoreName = globalServicesStoreName;
 
+    spanSerde = new SpanSerde();
     spanNamesSerde = new SpanNamesSerde();
   }
 
@@ -63,9 +67,9 @@ public class ServiceStoreStream implements Supplier<Topology> {
     builder
         .addGlobalStore(
             globalServiceStoreBuilder,
-            serviceSpanNamesTopic,
-            Consumed.with(Serdes.String(), Serdes.String()),
-            () -> new Processor<String, String>() {
+            traceSpansTopic,
+            Consumed.with(Serdes.String(), spanSerde),
+            () -> new Processor<String, Span>() {
               KeyValueStore<String, Set<String>> servicesStore;
 
               @Override public void init(ProcessorContext context) {
@@ -74,15 +78,15 @@ public class ServiceStoreStream implements Supplier<Topology> {
                         globalServicesStoreName);
               }
 
-              @Override public void process(String serviceName, String spanName) {
-                Set<String> currentSpanNames = servicesStore.get(serviceName);
+              @Override public void process(String traceId, Span span) {
+                Set<String> currentSpanNames = servicesStore.get(span.localServiceName());
                 if (currentSpanNames == null) {
-                  final HashSet<String> spanNames = new HashSet<>();
-                  spanNames.add(spanName);
-                  servicesStore.put(serviceName, spanNames);
+                  final Set<String> spanNames = new HashSet<>();
+                  spanNames.add(span.name());
+                  servicesStore.put(span.localServiceName(), spanNames);
                 } else {
-                  currentSpanNames.add(spanName);
-                  servicesStore.put(serviceName, currentSpanNames);
+                  currentSpanNames.add(span.name());
+                  servicesStore.put(span.localServiceName(), currentSpanNames);
                 }
               }
 

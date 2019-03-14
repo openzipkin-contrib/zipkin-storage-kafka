@@ -26,22 +26,15 @@ import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 
 /**
  * Topology to process incoming spans.
- *
- * Raw spans are turned into Light Spans and Service:SpanName pair is collected.
  */
 public class SpanConsumerStream implements Supplier<Topology> {
   final String spansTopic;
-  final String serviceSpanNamesTopic;
   final String traceSpansTopic;
 
   final SpanSerde spanSerde;
 
-  public SpanConsumerStream(
-      String spansTopic,
-      String serviceSpanNamesTopic,
-      String traceSpansTopic) {
+  public SpanConsumerStream(String spansTopic, String traceSpansTopic) {
     this.spansTopic = spansTopic;
-    this.serviceSpanNamesTopic = serviceSpanNamesTopic;
     this.traceSpansTopic = traceSpansTopic;
 
     // Initialize SerDes
@@ -72,11 +65,6 @@ public class SpanConsumerStream implements Supplier<Topology> {
           return KeyValue.pair(span.traceId(), spanBuilder.build());
         })
         .to(traceSpansTopic, Produced.with(Serdes.String(), spanSerde));
-
-    // Stream of serviceName:spanName
-    spanStream
-        .map((traceId, span) -> KeyValue.pair(span.localServiceName(), span.name()))
-        .to(serviceSpanNamesTopic, Produced.with(Serdes.String(), Serdes.String()));
 
     return builder.build();
   }

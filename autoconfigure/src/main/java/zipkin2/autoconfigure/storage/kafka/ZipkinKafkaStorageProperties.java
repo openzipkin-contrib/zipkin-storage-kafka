@@ -40,9 +40,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String tracesTopic = "zipkin-traces_v1";
   private Integer tracesTopicPartitions = 1;
   private Short tracesTopicReplicationFactor = 1;
-  private String servicesTopic = "zipkin-services_v1";
-  private Integer servicesTopicPartitions = 1;
-  private Short servicesTopicReplicationFactor = 1;
   private String dependenciesTopic = "zipkin-dependencies_v1";
   private Integer dependenciesTopicPartitions = 1;
   private Short dependenciesTopicReplicationFactor = 1;
@@ -69,10 +66,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
         .tracesTopic(KafkaStorage.Topic.builder(tracesTopic)
             .partitions(tracesTopicPartitions)
             .replicationFactor(tracesTopicReplicationFactor)
-            .build())
-        .servicesTopic(KafkaStorage.Topic.builder(servicesTopic)
-            .partitions(servicesTopicPartitions)
-            .replicationFactor(servicesTopicReplicationFactor)
             .build())
         .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic)
             .partitions(dependenciesTopicPartitions)
@@ -149,14 +142,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.tracesTopic = tracesTopic;
   }
 
-  public String getServicesTopic() {
-    return servicesTopic;
-  }
-
-  public void setServicesTopic(String servicesTopic) {
-    this.servicesTopic = servicesTopic;
-  }
-
   public String getTraceSpansTopic() {
     return traceSpansTopic;
   }
@@ -211,22 +196,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setTracesTopicReplicationFactor(Short tracesTopicReplicationFactor) {
     this.tracesTopicReplicationFactor = tracesTopicReplicationFactor;
-  }
-
-  public Integer getServicesTopicPartitions() {
-    return servicesTopicPartitions;
-  }
-
-  public void setServicesTopicPartitions(Integer servicesTopicPartitions) {
-    this.servicesTopicPartitions = servicesTopicPartitions;
-  }
-
-  public Short getServicesTopicReplicationFactor() {
-    return servicesTopicReplicationFactor;
-  }
-
-  public void setServicesTopicReplicationFactor(Short servicesTopicReplicationFactor) {
-    this.servicesTopicReplicationFactor = servicesTopicReplicationFactor;
   }
 
   public Integer getTraceSpansTopicPartitions() {

@@ -15,9 +15,6 @@ zipkin:
       traces-topic: ${KAFKA_STORE_TRACES_TOPIC:zipkin-traces}
       traces-topic-partitions: ${KAFKA_STORE_TRACES_TOPIC_PARTITIONS:1}
       traces-topic-replication-factor: ${KAFKA_STORE_TRACES_TOPIC_REPLICATION_FACTOR:1}
-      services-topic: ${KAFKA_STORE_SERVICES_TOPIC:zipkin-services}
-      services-topic-partitions: ${KAFKA_STORE_SERVICES_TOPIC_PARTITIONS:1}
-      services-topic-replication-factor: ${KAFKA_STORE_SERVICES_TOPIC_REPLICATION_FACTOR:1}
       dependencies-topic: ${KAFKA_STORE_DEPENDENCIES_TOPIC:zipkin-dependencies}
       dependencies-topic-partitions: ${KAFKA_STORE_DEPENDENCIES_TOPIC_PARTITIONS:1}
       dependencies-topic-replication-factor: ${KAFKA_STORE_DEPENDENCIES_TOPIC_REPLICATION_FACTOR:1}
