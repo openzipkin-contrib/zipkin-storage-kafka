@@ -2,9 +2,20 @@
 
 [![Build Status](https://www.travis-ci.org/jeqo/zipkin-storage-kafka.svg?branch=master)](https://www.travis-ci.org/jeqo/zipkin-storage-kafka)
 
-Proof of concept of fully-featured Kafka-based storage for Zipkin.
+Kafka-based storage for Zipkin.
 
-*This is in experimentation phase at the moment. Don't use in production!*
+> This is in experimentation phase at the moment.
+
+```
+
+( collected-spans )-->[ span-consumer ]
+                              |                                                   +-->( traces )
+                              +-->(  raw-spans  )-.potential.-+                   |
+                              |                               +-->[ span-store ]--+
+                              +-->( light-spans )-.enriching.-+                   |
+                                                                                  +-->( dependencies )
+
+```
 
 - [Design notes](DESIGN.md)
 
