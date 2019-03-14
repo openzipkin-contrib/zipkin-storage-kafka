@@ -23,12 +23,16 @@ import zipkin2.storage.kafka.KafkaStorage;
 public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
 
+  private boolean spanConsumerEnabled = true;
+  private boolean spanStoreEnabled = true;
+
   private boolean ensureTopics = true;
   private String bootstrapServers = "localhost:9092";
   private String compressionType = CompressionType.NONE.name();
 
-  private Long retentionScanFrequencyMs = Duration.ofDays(1).toMillis();
-  private Long retentionMaxAgeMs = Duration.ofDays(7).toMillis();
+  private Long retentionScanFrequency = Duration.ofDays(1).toMillis();
+  private Long retentionMaxAge = Duration.ofDays(7).toMillis();
+  private Long traceInactivityGap = Duration.ofMinutes(5).toMillis();
 
   private String spansTopic = "zipkin-spans_v1";
   private Integer spansTopicPartitions = 1;
@@ -36,22 +40,25 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String tracesTopic = "zipkin-traces_v1";
   private Integer tracesTopicPartitions = 1;
   private Short tracesTopicReplicationFactor = 1;
-  private String servicesTopic = "zipkin-services_v1";
-  private Integer servicesTopicPartitions = 1;
-  private Short servicesTopicReplicationFactor = 1;
   private String dependenciesTopic = "zipkin-dependencies_v1";
   private Integer dependenciesTopicPartitions = 1;
   private Short dependenciesTopicReplicationFactor = 1;
+  private String traceSpansTopic = "zipkin-trace-spans_v1";
+  private Integer traceSpansTopicPartitions = 1;
+  private Short traceSpansTopicReplicationFactor = 1;
 
   private String storeDirectory = "/tmp/zipkin";
 
   KafkaStorage.Builder toBuilder() {
     return KafkaStorage.newBuilder()
+        .spanConsumerEnabled(spanConsumerEnabled)
+        .spanStoreEnabled(spanStoreEnabled)
         .ensureTopics(ensureTopics)
         .bootstrapServers(bootstrapServers)
         .compressionType(compressionType)
-        .retentionMaxAge(Duration.ofMillis(retentionMaxAgeMs))
-        .retentionScanFrequency(Duration.ofMillis(retentionScanFrequencyMs))
+        .retentionMaxAge(Duration.ofMillis(retentionMaxAge))
+        .retentionScanFrequency(Duration.ofMillis(retentionScanFrequency))
+        .traceInactivityGap(Duration.ofMillis(traceInactivityGap))
         .spansTopic(KafkaStorage.Topic.builder(spansTopic)
             .partitions(spansTopicPartitions)
             .replicationFactor(spansTopicReplicationFactor)
@@ -60,15 +67,31 @@ public class ZipkinKafkaStorageProperties implements Serializable {
             .partitions(tracesTopicPartitions)
             .replicationFactor(tracesTopicReplicationFactor)
             .build())
-        .servicesTopic(KafkaStorage.Topic.builder(servicesTopic)
-            .partitions(servicesTopicPartitions)
-            .replicationFactor(servicesTopicReplicationFactor)
-            .build())
         .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic)
             .partitions(dependenciesTopicPartitions)
             .replicationFactor(dependenciesTopicReplicationFactor)
             .build())
+        .traceSpansTopic(KafkaStorage.Topic.builder(traceSpansTopic)
+            .partitions(traceSpansTopicPartitions)
+            .replicationFactor(traceSpansTopicReplicationFactor)
+            .build())
         .storeDirectory(storeDirectory);
+  }
+
+  public boolean isSpanConsumerEnabled() {
+    return spanConsumerEnabled;
+  }
+
+  public void setSpanConsumerEnabled(boolean spanConsumerEnabled) {
+    this.spanConsumerEnabled = spanConsumerEnabled;
+  }
+
+  public boolean isSpanStoreEnabled() {
+    return spanStoreEnabled;
+  }
+
+  public void setSpanStoreEnabled(boolean spanStoreEnabled) {
+    this.spanStoreEnabled = spanStoreEnabled;
   }
 
   public boolean isEnsureTopics() {
@@ -87,20 +110,20 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.bootstrapServers = bootstrapServers;
   }
 
-  public Long getRetentionScanFrequencyMs() {
-    return retentionScanFrequencyMs;
+  public Long getRetentionScanFrequency() {
+    return retentionScanFrequency;
   }
 
-  public void setRetentionScanFrequencyMs(Long retentionScanFrequencyMs) {
-    this.retentionScanFrequencyMs = retentionScanFrequencyMs;
+  public void setRetentionScanFrequency(Long retentionScanFrequency) {
+    this.retentionScanFrequency = retentionScanFrequency;
   }
 
-  public Long getRetentionMaxAgeMs() {
-    return retentionMaxAgeMs;
+  public Long getRetentionMaxAge() {
+    return retentionMaxAge;
   }
 
-  public void setRetentionMaxAgeMs(Long retentionMaxAgeMs) {
-    this.retentionMaxAgeMs = retentionMaxAgeMs;
+  public void setRetentionMaxAge(Long retentionMaxAge) {
+    this.retentionMaxAge = retentionMaxAge;
   }
 
   public String getSpansTopic() {
@@ -119,20 +142,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.tracesTopic = tracesTopic;
   }
 
-  public String getServicesTopic() {
-    return servicesTopic;
+  public String getTraceSpansTopic() {
+    return traceSpansTopic;
   }
 
-  public void setServicesTopic(String servicesTopic) {
-    this.servicesTopic = servicesTopic;
-  }
-
-  public String getDependenciesTopic() {
-    return dependenciesTopic;
-  }
-
-  public void setDependenciesTopic(String dependenciesTopic) {
-    this.dependenciesTopic = dependenciesTopic;
+  public void setTraceSpansTopic(String traceSpansTopic) {
+    this.traceSpansTopic = traceSpansTopic;
   }
 
   public String getStoreDirectory() {
@@ -183,20 +198,28 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.tracesTopicReplicationFactor = tracesTopicReplicationFactor;
   }
 
-  public Integer getServicesTopicPartitions() {
-    return servicesTopicPartitions;
+  public Integer getTraceSpansTopicPartitions() {
+    return traceSpansTopicPartitions;
   }
 
-  public void setServicesTopicPartitions(Integer servicesTopicPartitions) {
-    this.servicesTopicPartitions = servicesTopicPartitions;
+  public void setTraceSpansTopicPartitions(Integer traceSpansTopicPartitions) {
+    this.traceSpansTopicPartitions = traceSpansTopicPartitions;
   }
 
-  public Short getServicesTopicReplicationFactor() {
-    return servicesTopicReplicationFactor;
+  public Short getTraceSpansTopicReplicationFactor() {
+    return traceSpansTopicReplicationFactor;
   }
 
-  public void setServicesTopicReplicationFactor(Short servicesTopicReplicationFactor) {
-    this.servicesTopicReplicationFactor = servicesTopicReplicationFactor;
+  public void setTraceSpansTopicReplicationFactor(Short traceSpansTopicReplicationFactor) {
+    this.traceSpansTopicReplicationFactor = traceSpansTopicReplicationFactor;
+  }
+
+  public String getDependenciesTopic() {
+    return dependenciesTopic;
+  }
+
+  public void setDependenciesTopic(String dependenciesTopic) {
+    this.dependenciesTopic = dependenciesTopic;
   }
 
   public Integer getDependenciesTopicPartitions() {

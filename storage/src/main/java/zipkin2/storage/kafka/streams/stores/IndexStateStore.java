@@ -13,6 +13,11 @@
  */
 package zipkin2.storage.kafka.streams.stores;
 
+import java.io.IOException;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.StateStore;
 import org.apache.kafka.streams.state.StoreBuilder;
@@ -25,17 +30,17 @@ import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.GroupingSearch;
 import org.apache.lucene.search.grouping.TopGroups;
-import org.apache.lucene.store.*;
+import org.apache.lucene.store.ByteBuffersDirectory;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
-import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
 
 public class IndexStateStore implements StateStore {
 
@@ -127,16 +132,43 @@ public class IndexStateStore implements StateStore {
     }
   }
 
-  public TopGroups<BytesRef> groupSearch(GroupingSearch groupingSearch, BooleanQuery query,
-      int offset, int limit) {
+  public Document get(Query query) {
     try (IndexReader reader = DirectoryReader.open(directory)) {
       IndexSearcher indexSearcher = new IndexSearcher(reader);
-
-      return
-          groupingSearch.search(indexSearcher, query, offset, limit);
+      TopDocs docs = indexSearcher.search(query, 1);
+      if (docs.totalHits > 0) {
+        return indexSearcher.doc(docs.scoreDocs[0].doc);
+      }
+      return null;
     } catch (IOException e) {
       LOG.error("Error in group query", e);
       return null;
+    }
+  }
+
+  public List<Document> groupSearch(
+      GroupingSearch groupingSearch,
+      BooleanQuery query,
+      int offset,
+      int limit) {
+    try (IndexReader reader = DirectoryReader.open(directory)) {
+      IndexSearcher indexSearcher = new IndexSearcher(reader);
+
+      TopGroups<BytesRef> search = groupingSearch.search(indexSearcher, query, offset, limit);
+
+      List<Document> documents = new ArrayList<>();
+
+      for (GroupDocs<BytesRef> doc : search.groups) {
+        for (ScoreDoc scoreDoc : doc.scoreDocs) {
+          Document document = indexSearcher.doc(scoreDoc.doc);
+          documents.add(document);
+        }
+      }
+
+      return documents;
+    } catch (IOException e) {
+      LOG.error("Error in group query", e);
+      return new ArrayList<>();
     }
   }
 

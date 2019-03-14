@@ -19,6 +19,7 @@ import java.util.List;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.streams.KafkaStreams;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
@@ -29,18 +30,21 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.kafka.internal.AggregateCall;
 
 /**
- * Processing of Spans consumed.
+ * Collected Spans processor.
  *
- * Supported by a Kafka Producer, spans are stored in a Kafka Topic.
+ * Spans are processed by turning "raw spans" into "light spans" for aggregation, and collecting
+ * serviceName:spanName pairs.
  */
 public class KafkaSpanConsumer implements SpanConsumer {
 
   final String spansTopic;
   final Producer<String, byte[]> kafkaProducer;
+  final KafkaStreams spanConsumerStream;
 
   KafkaSpanConsumer(KafkaStorage storage) {
     spansTopic = storage.spansTopic.name;
-    kafkaProducer = storage.producer;
+    kafkaProducer = storage.getProducer();
+    spanConsumerStream = storage.getSpanConsumerStream();
   }
 
   @Override
@@ -60,7 +64,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
 
     static Call<Void> create(Producer<String, byte[]> producer, String spansTopic, Span span) {
       byte[] encodedSpan = SpanBytesEncoder.PROTO3.encode(span);
-      StoreSpanCall call = new StoreSpanCall(producer, spansTopic, span.traceId(), encodedSpan);
+      StoreSpanCall call = new StoreSpanCall(producer, spansTopic, span.id(), encodedSpan);
       return call.handleError(call);
     }
 

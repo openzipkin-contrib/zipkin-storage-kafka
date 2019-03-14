@@ -15,7 +15,6 @@ package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
@@ -31,26 +30,41 @@ import org.apache.kafka.streams.state.Stores;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Span;
-import zipkin2.storage.kafka.streams.serdes.SpansSerde;
+import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 
-public class RetentionTopologySupplier implements Supplier<Topology> {
-  static final Logger LOG = LoggerFactory.getLogger(RetentionTopologySupplier.class);
+/**
+ * Retention topology to validate every defined period of time (e.g. 1 day) old spans and mark them
+ * for deletion.
+ *
+ * Deletion is handled in the other streams.
+ */
+public class TraceRetentionStoreStream implements Supplier<Topology> {
+  static final Logger LOG = LoggerFactory.getLogger(TraceRetentionStoreStream.class);
 
-  final String tracesTopic;
+  // Kafka topics
+  final String traceSpansTopic;
+
+  // Store names
   final String traceTsStoreName;
 
+  // Retention attributes
   final Duration scanFrequency;
   final Duration maxAge;
 
-  final SpansSerde spansSerde;
+  // SerDe
+  final SpanSerde spanSerde;
 
-  public RetentionTopologySupplier(String tracesTopic, Duration scanFrequency,
+  public TraceRetentionStoreStream(
+      String traceSpansTopic,
+      String traceTsStoreName,
+      Duration scanFrequency,
       Duration maxAge) {
-    this.tracesTopic = tracesTopic;
+    this.traceSpansTopic = traceSpansTopic;
+    this.traceTsStoreName = traceTsStoreName;
     this.scanFrequency = scanFrequency;
     this.maxAge = maxAge;
-    traceTsStoreName = tracesTopic + "-ts";
-    spansSerde = new SpansSerde();
+
+    spanSerde = new SpanSerde();
   }
 
   @Override public Topology get() {
@@ -60,16 +74,15 @@ public class RetentionTopologySupplier implements Supplier<Topology> {
             Stores.persistentKeyValueStore(traceTsStoreName),
             Serdes.String(),
             Serdes.Long())
-            .withCachingDisabled()
+            .withCachingEnabled()
             .withLoggingDisabled())
-        .stream(tracesTopic, Consumed.with(Serdes.String(), spansSerde))
+        .stream(traceSpansTopic, Consumed.with(Serdes.String(), spanSerde))
         .transform(
-            () -> new Transformer<String, List<Span>, KeyValue<String, List<Span>>>() {
-              private KeyValueStore<String, Long> stateStore;
+            () -> new Transformer<String, Span, KeyValue<String, Span>>() {
+              KeyValueStore<String, Long> stateStore;
 
               @Override public void init(ProcessorContext context) {
-                this.stateStore =
-                    (KeyValueStore<String, Long>) context.getStateStore(traceTsStoreName);
+                stateStore = (KeyValueStore<String, Long>) context.getStateStore(traceTsStoreName);
                 // Schedule deletion of traces older than maxAge
                 context.schedule(
                     scanFrequency,
@@ -89,22 +102,20 @@ public class RetentionTopologySupplier implements Supplier<Topology> {
                             context.forward(record.key, null);
                           }
                         }
-                        LOG.info("Traces deletion emitted: {}, older than {}", deletions,
-                            Instant.ofEpochMilli(cutoff));
+                        LOG.info("Traces deletion emitted: {}, older than {}",
+                            deletions, Instant.ofEpochMilli(cutoff));
                       }
                     }
                 );
               }
 
               @Override
-              public KeyValue<String, List<Span>> transform(String key, List<Span> value) {
+              public KeyValue<String, Span> transform(String key, Span value) {
                 if (value == null) { // clean state when tombstone
                   stateStore.delete(key);
                 } else { // update store when traces are available
-                  if (value.size() > 1) {
-                    Long timestamp = value.get(0).timestamp();
+                    Long timestamp = value.timestamp();
                     stateStore.put(key, timestamp);
-                  }
                 }
                 return null; // no need to return anything here. the punctuator will emit the tombstones when necessary
               }
@@ -113,7 +124,7 @@ public class RetentionTopologySupplier implements Supplier<Topology> {
                 // no need to close anything; Streams already closes the state store.
               }
             }, traceTsStoreName)
-        .to(tracesTopic);
+        .to(traceSpansTopic);
     return builder.build();
   }
 }

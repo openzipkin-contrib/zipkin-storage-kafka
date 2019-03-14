@@ -2,9 +2,27 @@
 
 [![Build Status](https://www.travis-ci.org/jeqo/zipkin-storage-kafka.svg?branch=master)](https://www.travis-ci.org/jeqo/zipkin-storage-kafka)
 
-Proof of concept of fully-featured Kafka-based storage for Zipkin.
+Kafka-based storage for Zipkin.
 
-*This is in experimentation phase at the moment. Don't use in production!*
+> This is in experimentation phase at the moment.
+
+```
+                    +-----------------------------zipkin------------------------------------------
+                    |                                                         +-->( service:span )
+                    |                                                         +-->( span-index   )
+( collected-spans )-|->[ span-consumer ]                      [ span-store ]--+-->( traces       )
+                    |         |                                   ^    |      +-->( dependencies )
+                    +---------|-----------------------------------|----|--------------------------
+                              |                                   |    |
+------------------------------|-----------------------------------|----|--------------------
+                              |                                   |    |
+kafka                         +-->(  raw-spans  )--//potential//--+    +-->( traces )
+                              |                                   |    |
+                              +-->( light-spans )--//enriching//--+    +-->( dependencies )
+
+--------------------------------------------------------------------------------------------
+
+```
 
 - [Design notes](DESIGN.md)
 
@@ -12,6 +30,8 @@ Proof of concept of fully-featured Kafka-based storage for Zipkin.
 
 | Configuration | Description | Default |
 |---------------|-------------|---------|
+| `KAFKA_STORE_SPAN_CONSUMER_ENABLED` | Process spans collected by Zipkin server | `true` |
+| `KAFKA_STORE_SPAN_STORE_ENABLED` | Aggregate and store Zipkin data | `true` |
 | `KAFKA_BOOTSTRAP_SERVERS` | Kafka bootstrap servers, format: `host:port` | `localhost:9092` |
 | `KAFKA_STORE_ENSURE_TOPICS` | Ensure topics are created if don't exist | `true` |
 | `KAFKA_STORE_DIRECTORY` | Root path where Zipkin stores tracing data | `/tmp/zipkin` |
@@ -24,9 +44,9 @@ Proof of concept of fully-featured Kafka-based storage for Zipkin.
 | `KAFKA_STORE_TRACES_TOPIC` | Topic where aggregated traces are stored. | `zipkin-traces` |
 | `KAFKA_STORE_TRACES_TOPIC_PARTITIONS` | Traces topic number of partitions. | `1` |
 | `KAFKA_STORE_TRACES_TOPIC_REPLICATION_FACTOR` | Traces topic replication factor. | `1` |
-| `KAFKA_STORE_SERVICES_TOPIC` | Topic where aggregated service names are stored. | `zipkin-services` |
-| `KAFKA_STORE_SERVICES_TOPIC_PARTITIONS` | Services topic number of partitions. | `1` |
-| `KAFKA_STORE_SERVICES_TOPIC_REPLICATION_FACTOR` | Services topic replication factor. | `1` |
+| `KAFKA_STORE_TRACE_SPANS_TOPIC` | Topic where aggregated service names are stored. | `zipkin-services` |
+| `KAFKA_STORE_TRACE_SPANS_TOPIC_PARTITIONS` | Services topic number of partitions. | `1` |
+| `KAFKA_STORE_TRACE_SPANS_TOPIC_REPLICATION_FACTOR` | Services topic replication factor. | `1` |
 | `KAFKA_STORE_DEPENDENCIES_TOPIC` | Topic where aggregated service dependencies names are stored. | `zipkin-dependencies` |
 | `KAFKA_STORE_DEPENDENCIES_TOPIC_PARTITIONS` | Services topic number of partitions. | `1` |
 | `KAFKA_STORE_DEPENDENCIES_TOPIC_REPLICATION_FACTOR` | Services topic replication factor. | `1` |
@@ -34,6 +54,11 @@ Proof of concept of fully-featured Kafka-based storage for Zipkin.
 ## Get started
 
 To build the project you will need Java 8+.
+
+```bash
+make build
+make test
+```
 
 ### Run locally
 

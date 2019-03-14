@@ -17,7 +17,7 @@ FROM openjdk:8
 ARG KAFKA_STORAGE_VERSION=0.1.1
 
 ENV ZIPKIN_REPO https://jcenter.bintray.com
-ENV ZIPKIN_VERSION 2.12.1
+ENV ZIPKIN_VERSION 2.12.5
 
 # Use to set heap, trust store or other system properties.
 ENV JAVA_OPTS -Djava.security.egd=file:/dev/./urandom

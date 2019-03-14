@@ -29,11 +29,12 @@ import org.apache.lucene.document.LongPoint;
 import org.apache.lucene.document.NumericDocValuesField;
 import org.apache.lucene.document.SortedDocValuesField;
 import org.apache.lucene.document.StringField;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.util.BytesRef;
+import zipkin2.Annotation;
 import zipkin2.Span;
-import zipkin2.storage.kafka.streams.serdes.SpanNamesSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 import zipkin2.storage.kafka.streams.stores.IndexStateStore;
 
@@ -42,82 +43,104 @@ import zipkin2.storage.kafka.streams.stores.IndexStateStore;
  *
  * This module enable search capabilities by storing traces into a Lucene index.
  */
-public class IndexTopologySupplier implements Supplier<Topology> {
+public class SpanIndexStream implements Supplier<Topology> {
 
-  final String traceStoreName;
-  final boolean indexPersistent;
-  final String indexDirectory;
-  final String indexStoreName;
+  // Kafka Topics
+  final String spansTopic;
 
+  // Store name
+  final String globalTracesIndexStoreName;
+
+  // SerDes
   final SpansSerde spansSerde;
-  final SpanNamesSerde spanNamesSerde;
 
-  public IndexTopologySupplier(String traceStoreName, String indexStoreName,
-      boolean indexPersistent, String indexDirectory) {
-    this.traceStoreName = traceStoreName;
-    this.indexStoreName = indexStoreName;
-    this.indexPersistent = indexPersistent;
+  final String indexDirectory;
+
+  public SpanIndexStream(
+      String spansTopic,
+      String globalTracesIndexStoreName,
+      String indexDirectory) {
+    this.spansTopic = spansTopic;
+    this.globalTracesIndexStoreName = globalTracesIndexStoreName;
     this.indexDirectory = indexDirectory;
 
     spansSerde = new SpansSerde();
-    spanNamesSerde = new SpanNamesSerde();
   }
 
   @Override
   public Topology get() {
-    IndexStateStore.Builder indexStoreBuilder = IndexStateStore.builder(indexStoreName);
-    if (indexPersistent) {
-      indexStoreBuilder.persistent(indexDirectory);
-    }
+    IndexStateStore.Builder indexStoreBuilder =
+        IndexStateStore.builder(globalTracesIndexStoreName);
+    indexStoreBuilder.persistent(indexDirectory);
 
     StreamsBuilder builder = new StreamsBuilder();
 
     builder.addGlobalStore(
         indexStoreBuilder,
-        traceStoreName,
+        spansTopic,
         Consumed.with(Serdes.String(), spansSerde),
         () -> new
-            Processor() {
+            Processor<String, List<Span>>() {
               private IndexStateStore index;
 
               @Override
               public void init(ProcessorContext context) {
-                index = (IndexStateStore) context.getStateStore(indexStoreName);
+                index = (IndexStateStore) context.getStateStore(globalTracesIndexStoreName);
               }
 
               @Override
-              public void process(Object key, Object value) {
-                if (value == null) { // clean index when trace removed
-                  TermQuery query = new TermQuery(new Term("trace_id", (String) key));
+              public void process(String spanId, List<Span> spans) {
+                if (spans == null) { // clean index when trace removed
+                  TermQuery query = new TermQuery(new Term("id", spanId));
                   index.delete(query);
                 } else { // index spans
                   List<Document> docs = new ArrayList<>();
-                  List spans = (ArrayList) value;
-                  for (Object s : spans) {
-                    Span span = (Span) s;
-                    String kind = span.kind() != null ? span.kind().name() : "";
+                  for (Span span : spans) {
                     Document doc = new Document();
-                    doc.add(new SortedDocValuesField("trace_id_sorted", new BytesRef(span.traceId())));
+
+                    doc.add(
+                        new SortedDocValuesField("trace_id_sorted", new BytesRef(span.traceId())));
+                    doc.add(new NumericDocValuesField("ts_sorted", span.timestampAsLong()));
+
                     doc.add(new StringField("trace_id", span.traceId(), Field.Store.YES));
                     doc.add(new StringField("id", span.id(), Field.Store.YES));
+
+                    String kind = span.kind() != null ? span.kind().name() : "";
                     doc.add(new StringField("kind", kind, Field.Store.YES));
+
                     String localServiceName =
                         span.localServiceName() != null ? span.localServiceName() : "";
                     doc.add(
                         new StringField("local_service_name", localServiceName, Field.Store.YES));
+
                     String remoteServiceName =
                         span.remoteServiceName() != null ? span.remoteServiceName() : "";
                     doc.add(
                         new StringField("remote_service_name", remoteServiceName, Field.Store.YES));
+
                     String name = span.name() != null ? span.name() : "";
                     doc.add(new StringField("name", name, Field.Store.YES));
-                    long micros = span.timestampAsLong();
-                    doc.add(new LongPoint("ts", micros));
-                    doc.add(new NumericDocValuesField("ts_sorted", micros));
+
+                    doc.add(new LongPoint("ts", span.timestampAsLong()));
                     doc.add(new LongPoint("duration", span.durationAsLong()));
+
                     for (Map.Entry<String, String> tag : span.tags().entrySet()) {
-                      doc.add(new StringField(tag.getKey(), tag.getValue(), Field.Store.YES));
+                      doc.add(new StringField("tag", tag.getKey() + "=" + tag.getValue(),
+                          Field.Store.YES));
+                      doc.add(new TextField("annotation", tag.getKey() + "=" + tag.getValue(),
+                          Field.Store.YES));
                     }
+
+                    for (Annotation annotation : span.annotations()) {
+                      doc.add(new TextField("annotation", annotation.value(), Field.Store.YES));
+                      doc.add(new StringField("annotation_value", annotation.value(), Field.Store.YES));
+                    }
+
+                    for (Annotation annotation : span.annotations()) {
+                      doc.add(new StringField("annotation_ts", annotation.timestamp() + "",
+                          Field.Store.YES));
+                    }
+
                     docs.add(doc);
                   }
                   index.put(docs);
