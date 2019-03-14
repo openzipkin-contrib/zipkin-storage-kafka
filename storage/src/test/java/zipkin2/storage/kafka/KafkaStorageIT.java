@@ -462,21 +462,15 @@ public class KafkaStorageIT {
           return traces.size() == 2;
         });
 
-    // query by service name `non_existing_span_name` = 0 trace
-    await()
-        .pollDelay(10, TimeUnit.SECONDS)
-        .until(() -> {
-          List<List<Span>> traces =
-              spanStore.getTraces(
-                  QueryRequest.newBuilder()
-                      .serviceName("non_existing_span_name")
-                      .endTs(TODAY + 1)
-                      .limit(10)
-                      .lookback(Duration.ofMinutes(1).toMillis())
-                      .build())
-                  .execute();
-          return traces.size() == 0;
-        });
+    List<List<Span>> traces = spanStore.getTraces(
+        QueryRequest.newBuilder()
+            .serviceName("non_existing_span_name")
+            .endTs(TODAY + 1)
+            .limit(10)
+            .lookback(Duration.ofMinutes(1).toMillis())
+            .build())
+        .execute();
+    assertEquals(0, traces.size());
   }
 
   @Test
