@@ -104,6 +104,13 @@ make zipkin-test
 
 This will start a browser and check a traces has been registered.
 
+### Examples
+
+There are two examples, running zipkin with kafka as storage:
+
++ Single-node: `examples/single-node`
++ Multi-mode: `examples/multi-mode`
+
 ## Acknowledged
 
 This project is inspired in Adrian Cole's <https://github.com/adriancole/zipkin-voltdb>
