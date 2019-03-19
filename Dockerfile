@@ -37,5 +37,7 @@ CMD exec java \
     ${JAVA_OPTS} \
     -Dloader.path='zipkin-storage-kafka.jar,zipkin-autoconfigure-storage-kafka.jar' \
     -Dspring.profiles.active=kafkastore \
+    -Dcom.linecorp.armeria.annotatedServiceExceptionVerbosity=all \
+    -Dcom.linecorp.armeria.verboseExceptions=true \
     -cp zipkin.jar \
     org.springframework.boot.loader.PropertiesLauncher

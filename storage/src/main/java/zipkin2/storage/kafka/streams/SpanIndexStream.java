@@ -147,8 +147,7 @@ public class SpanIndexStream implements Supplier<Topology> {
               }
 
               @Override
-              public void close() {
-                index.close();
+              public void close() { // State is closed by Kafka Streams.
               }
             });
 

@@ -140,6 +140,7 @@ public class KafkaStorage extends StorageComponent {
         builder.spanConsumerStreamStoreDirectory());
     spanConsumerStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
+    spanConsumerStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
 
     spanConsumerTopology =
         new SpanConsumerStream(spansTopic.name, traceSpansTopic.name).get();
@@ -157,6 +158,7 @@ public class KafkaStorage extends StorageComponent {
         builder.traceStoreStreamStoreDirectory());
     traceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
+    traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
 
     traceStoreTopology = new TraceStoreStream(traceSpansTopic.name, traceStoreName).get();
 
@@ -174,6 +176,7 @@ public class KafkaStorage extends StorageComponent {
         builder.traceAggregationStreamStoreDirectory());
     traceAggregationStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
+    traceAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
 
     traceInactivityGap = builder.traceInactivityGap;
 
@@ -194,6 +197,7 @@ public class KafkaStorage extends StorageComponent {
         builder.spanIndexStreamStoreDirectory());
     spanIndexStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
+    spanIndexStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
 
     spanIndexTopology = new SpanIndexStream(
         spansTopic.name, spanIndexStoreName, builder.indexStorageDirectory()).get();
@@ -211,6 +215,7 @@ public class KafkaStorage extends StorageComponent {
         builder.serviceStoreStreamStoreDirectory());
     serviceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
+    serviceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
 
     serviceStoreTopology = new ServiceStoreStream(traceSpansTopic.name, serviceStoreName).get();
 
@@ -228,6 +233,7 @@ public class KafkaStorage extends StorageComponent {
         builder.serviceStoreStreamStoreDirectory());
     dependencyStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
+    dependencyStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
 
     dependencyStoreTopology =
         new DependencyStoreStream(dependenciesTopic.name, dependencyStoreName).get();
@@ -244,6 +250,7 @@ public class KafkaStorage extends StorageComponent {
         builder.traceRetentionStoreStreamApplicationId);
     traceRetentionStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.retentionStreamStoreDirectory());
+    traceAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
 
     traceRetentionStoreTopology = new TraceRetentionStoreStream(
         traceSpansTopic.name, traceStoreName, builder.retentionScanFrequency,
@@ -407,8 +414,13 @@ public class KafkaStorage extends StorageComponent {
     if (spanIndexStream == null) {
       synchronized (this) {
         if (spanIndexStream == null) {
-          spanIndexStream = new KafkaStreams(spanIndexTopology, spanIndexStreamConfig);
-          spanIndexStream.start();
+          try {
+            spanIndexStream = new KafkaStreams(spanIndexTopology, spanIndexStreamConfig);
+            spanIndexStream.start();
+          }catch (Exception e) {
+            LOG.error("Error building span index stream process", e);
+            spanIndexStream = null;
+          }
         }
       }
     }
