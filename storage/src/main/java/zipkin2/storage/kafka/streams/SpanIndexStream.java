@@ -70,8 +70,7 @@ public class SpanIndexStream implements Supplier<Topology> {
   @Override
   public Topology get() {
     IndexStateStore.Builder indexStoreBuilder =
-        IndexStateStore.builder(globalTracesIndexStoreName);
-    indexStoreBuilder.persistent(indexDirectory);
+        IndexStateStore.builder(globalTracesIndexStoreName, indexDirectory);
 
     StreamsBuilder builder = new StreamsBuilder();
 

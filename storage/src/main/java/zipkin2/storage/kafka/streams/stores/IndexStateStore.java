@@ -35,7 +35,6 @@ import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.GroupingSearch;
 import org.apache.lucene.search.grouping.TopGroups;
-import org.apache.lucene.store.ByteBuffersDirectory;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.util.BytesRef;
@@ -47,29 +46,36 @@ public class IndexStateStore implements StateStore {
   private static final Logger LOG = LoggerFactory.getLogger(IndexStateStore.class);
 
   final String name;
-  final boolean persistent;
-  final IndexWriter indexWriter;
-
   final Directory directory;
 
-  IndexStateStore(Builder builder) throws IOException {
-    if (builder.isPersistent()) {
-      LOG.info("Storing index on path={}", builder.indexDirectory);
-      directory = new MMapDirectory(Paths.get(builder.indexDirectory));
-    } else {
-      directory = new ByteBuffersDirectory();
-    }
-    StandardAnalyzer analyzer = new StandardAnalyzer();
-    IndexWriterConfig indexWriterConfigs = new IndexWriterConfig(analyzer);
-    indexWriter = new IndexWriter(directory, indexWriterConfigs);
-    indexWriter.commit();
+  volatile IndexWriter indexWriter;
 
+  IndexStateStore(Builder builder) throws IOException {
+    LOG.info("Storing index on path={}", builder.indexDirectory);
+    directory = new MMapDirectory(Paths.get(builder.indexDirectory));
     name = builder.name();
-    persistent = builder.isPersistent();
   }
 
-  public static Builder builder(String name) {
-    return new Builder(name);
+  public static Builder builder(String name, String indexDirectory) {
+    return new Builder(name, indexDirectory);
+  }
+
+  public IndexWriter getIndexWriter() {
+    if (indexWriter == null) {
+      synchronized (this) {
+        if (indexWriter == null) {
+          try {
+            StandardAnalyzer analyzer = new StandardAnalyzer();
+            IndexWriterConfig indexWriterConfigs = new IndexWriterConfig(analyzer);
+            indexWriter = new IndexWriter(directory, indexWriterConfigs);
+            indexWriter.commit();
+          } catch (Exception e) {
+            LOG.error("Error opening index writer", e);
+          }
+        }
+      }
+    }
+    return indexWriter;
   }
 
   @Override
@@ -89,13 +95,17 @@ public class IndexStateStore implements StateStore {
 
   @Override
   public void flush() {
-
+    try {
+      getIndexWriter().flush();
+    } catch (IOException e) {
+      LOG.error("Error flushing state", e);
+    }
   }
 
   @Override
   public void close() {
     try {
-      indexWriter.close();
+      getIndexWriter().close();
     } catch (IOException e) {
       LOG.error("Error closing index writer", e);
     }
@@ -103,20 +113,20 @@ public class IndexStateStore implements StateStore {
 
   @Override
   public boolean persistent() {
-    return persistent;
+    return true;
   }
 
   @Override
   public boolean isOpen() {
-    return indexWriter.isOpen();
+    return getIndexWriter().isOpen();
   }
 
   public void put(List<Document> value) {
     try {
       for (Document doc : value) {
-        indexWriter.addDocument(doc);
+        getIndexWriter().addDocument(doc);
       }
-      indexWriter.commit();
+      getIndexWriter().commit();
       LOG.debug("{} indexed documents", value.size());
     } catch (IOException e) {
       LOG.error("Error indexing documents", e);
@@ -125,8 +135,8 @@ public class IndexStateStore implements StateStore {
 
   public void delete(Query query) {
     try {
-      indexWriter.deleteDocuments(query);
-      indexWriter.commit();
+      getIndexWriter().deleteDocuments(query);
+      getIndexWriter().commit();
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -175,31 +185,12 @@ public class IndexStateStore implements StateStore {
   public static class Builder implements StoreBuilder<IndexStateStore> {
     final String name;
 
-    boolean persistent;
     String indexDirectory;
     boolean loggingEnabled;
 
-    Builder(String name) {
+    Builder(String name, String indexDirectory) {
       this.name = name;
-    }
-
-    public Builder persistent(String indexDirectory) {
-      this.persistent = true;
       this.indexDirectory = indexDirectory;
-      return this;
-    }
-
-    public Builder inMemory() {
-      this.persistent = false;
-      return this;
-    }
-
-    public boolean isPersistent() {
-      return persistent;
-    }
-
-    public String indexDirectory() {
-      return indexDirectory;
     }
 
     @Override
