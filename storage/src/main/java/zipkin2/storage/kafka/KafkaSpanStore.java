@@ -17,7 +17,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
@@ -62,12 +61,12 @@ public class KafkaSpanStore implements SpanStore {
   final String dependenciesStoreName;
   final String spanIndexStoreName;
 
-  final Supplier<KafkaStreams> spanIndexStream;
-  final Supplier<KafkaStreams> traceStoreStream;
-  final Supplier<KafkaStreams> traceAggregationStream;
-  final Supplier<KafkaStreams> serviceStoreStream;
-  final Supplier<KafkaStreams> dependencyStoreStream;
-  final Supplier<KafkaStreams> traceRetentionStoreStream;
+  final KafkaStreams spanIndexStream;
+  final KafkaStreams traceStoreStream;
+  final KafkaStreams traceAggregationStream;
+  final KafkaStreams serviceStoreStream;
+  final KafkaStreams dependencyStoreStream;
+  final KafkaStreams traceRetentionStoreStream;
 
   KafkaSpanStore(KafkaStorage storage) {
     tracesStoreName = storage.traceStoreName;
@@ -75,12 +74,12 @@ public class KafkaSpanStore implements SpanStore {
     dependenciesStoreName = storage.dependencyStoreName;
     spanIndexStoreName = storage.spanIndexStoreName;
 
-    spanIndexStream = storage::getSpanIndexStream;
-    traceStoreStream = storage::getTraceStoreStream;
-    serviceStoreStream = storage::getServiceStoreStream;
-    dependencyStoreStream = storage::getDependencyStoreStream;
-    traceAggregationStream = storage::getTraceAggregationStream;
-    traceRetentionStoreStream = storage::getTraceRetentionStream;
+    spanIndexStream = storage.getSpanIndexStream();
+    traceStoreStream = storage.getTraceStoreStream();
+    serviceStoreStream = storage.getServiceStoreStream();
+    dependencyStoreStream = storage.getDependencyStoreStream();
+    traceAggregationStream = storage.getTraceAggregationStream();
+    traceRetentionStoreStream = storage.getTraceRetentionStream();
   }
 
   static Span hydrateSpan(Span lightSpan, Document document) {
@@ -117,9 +116,9 @@ public class KafkaSpanStore implements SpanStore {
   public Call<List<List<Span>>> getTraces(QueryRequest request) {
     try {
       ReadOnlyKeyValueStore<String, List<Span>> traceStore =
-          traceStoreStream.get().store(tracesStoreName, QueryableStoreTypes.keyValueStore());
+          traceStoreStream.store(tracesStoreName, QueryableStoreTypes.keyValueStore());
       IndexStateStore spanIndexStore =
-          spanIndexStream.get().store(spanIndexStoreName, new IndexStoreType());
+          spanIndexStream.store(spanIndexStoreName, new IndexStoreType());
       return new GetTracesCall(traceStore, spanIndexStore, request);
     } catch (Exception e) {
       LOG.error("Error getting traces", request, e);
@@ -131,9 +130,9 @@ public class KafkaSpanStore implements SpanStore {
   public Call<List<Span>> getTrace(String traceId) {
     try {
       ReadOnlyKeyValueStore<String, List<Span>> traceStore =
-          traceStoreStream.get().store(tracesStoreName, QueryableStoreTypes.keyValueStore());
+          traceStoreStream.store(tracesStoreName, QueryableStoreTypes.keyValueStore());
       IndexStateStore spanIndexStore =
-          spanIndexStream.get().store(spanIndexStoreName, new IndexStoreType());
+          spanIndexStream.store(spanIndexStoreName, new IndexStoreType());
       return new GetTraceCall(traceStore, spanIndexStore, traceId);
     } catch (Exception e) {
       LOG.error("Error getting trace {}", traceId, e);
@@ -145,7 +144,7 @@ public class KafkaSpanStore implements SpanStore {
   public Call<List<String>> getServiceNames() {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> serviceStore =
-          serviceStoreStream.get().store(servicesStoreName, QueryableStoreTypes.keyValueStore());
+          serviceStoreStream.store(servicesStoreName, QueryableStoreTypes.keyValueStore());
       return new GetServiceNamesCall(serviceStore);
     } catch (Exception e) {
       LOG.error("Error getting service names", e);
@@ -157,7 +156,7 @@ public class KafkaSpanStore implements SpanStore {
   public Call<List<String>> getSpanNames(String serviceName) {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> serviceStore =
-          serviceStoreStream.get().store(servicesStoreName, QueryableStoreTypes.keyValueStore());
+          serviceStoreStream.store(servicesStoreName, QueryableStoreTypes.keyValueStore());
       return new GetSpanNamesCall(serviceStore, serviceName);
     } catch (Exception e) {
       LOG.error("Error getting span names from service {}", serviceName, e);
@@ -169,8 +168,8 @@ public class KafkaSpanStore implements SpanStore {
   public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
     try {
       ReadOnlyKeyValueStore<String, DependencyLink> dependenciesStore =
-          dependencyStoreStream.get()
-              .store(dependenciesStoreName, QueryableStoreTypes.keyValueStore());
+          dependencyStoreStream.
+              store(dependenciesStoreName, QueryableStoreTypes.keyValueStore());
       return new GetDependenciesCall(dependenciesStore);
     } catch (Exception e) {
       LOG.error("Error getting dependencies", e);

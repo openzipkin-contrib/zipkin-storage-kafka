@@ -188,7 +188,7 @@ public class KafkaStorageIT {
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopic.name, 2, 10000);
-    await().atMost(10, TimeUnit.SECONDS)
+    await().atMost(30, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
               spanStore.getTraces(QueryRequest.newBuilder()

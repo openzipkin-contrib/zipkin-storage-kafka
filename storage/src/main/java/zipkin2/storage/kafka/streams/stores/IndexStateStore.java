@@ -36,7 +36,7 @@ import org.apache.lucene.search.grouping.GroupDocs;
 import org.apache.lucene.search.grouping.GroupingSearch;
 import org.apache.lucene.search.grouping.TopGroups;
 import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.NIOFSDirectory;
+import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.util.BytesRef;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,32 +48,19 @@ public class IndexStateStore implements StateStore {
   final String name;
   final String indexDirectory;
 
-  volatile Directory directory;
+  final Directory directory;
+
   volatile IndexWriter indexWriter;
 
-  IndexStateStore(Builder builder) {
+  IndexStateStore(Builder builder) throws IOException {
     LOG.info("Storing index on path={}", builder.indexDirectory);
     name = builder.name();
     indexDirectory = builder.indexDirectory;
+    directory = new MMapDirectory(Paths.get(indexDirectory));
   }
 
   public static Builder builder(String name, String indexDirectory) {
     return new Builder(name, indexDirectory);
-  }
-
-  Directory getDirectory() {
-    if (directory == null) {
-      synchronized (this) {
-        if (directory == null) {
-          try {
-            directory = new NIOFSDirectory(Paths.get(indexDirectory));
-          } catch (IOException e) {
-            LOG.error("Error creating lucene directory", e);
-          }
-        }
-      }
-    }
-    return directory;
   }
 
   IndexWriter getIndexWriter() {
@@ -83,7 +70,8 @@ public class IndexStateStore implements StateStore {
           try {
             StandardAnalyzer analyzer = new StandardAnalyzer();
             IndexWriterConfig indexWriterConfigs = new IndexWriterConfig(analyzer);
-            indexWriter = new IndexWriter(getDirectory(), indexWriterConfigs);
+            indexWriter = new IndexWriter(directory, indexWriterConfigs);
+            indexWriter.commit();
           } catch (Exception e) {
             LOG.error("Error opening index writer", e);
           }
@@ -158,7 +146,7 @@ public class IndexStateStore implements StateStore {
   }
 
   public Document get(Query query) {
-    try (IndexReader reader = DirectoryReader.open(getDirectory())) {
+    try (IndexReader reader = DirectoryReader.open(directory)) {
       IndexSearcher indexSearcher = new IndexSearcher(reader);
       TopDocs docs = indexSearcher.search(query, 1);
       if (docs.totalHits > 0) {
@@ -176,7 +164,7 @@ public class IndexStateStore implements StateStore {
       BooleanQuery query,
       int offset,
       int limit) {
-    try (IndexReader reader = DirectoryReader.open(getDirectory())) {
+    try (IndexReader reader = DirectoryReader.open(directory)) {
       IndexSearcher indexSearcher = new IndexSearcher(reader);
 
       TopGroups<BytesRef> search = groupingSearch.search(indexSearcher, query, offset, limit);
@@ -226,7 +214,12 @@ public class IndexStateStore implements StateStore {
 
     @Override
     public IndexStateStore build() {
-      return new IndexStateStore(this);
+      try {
+        return new IndexStateStore(this);
+      } catch (IOException e) {
+        LOG.error("Error building index state store", e);
+        throw new RuntimeException(e);
+      }
     }
 
     @Override
