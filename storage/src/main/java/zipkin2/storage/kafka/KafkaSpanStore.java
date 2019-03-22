@@ -85,6 +85,7 @@ public class KafkaSpanStore implements SpanStore {
   static Span hydrateSpan(Span lightSpan, Document document) {
     Span.Builder spanBuilder = Span.newBuilder()
         .id(lightSpan.id())
+        .name(lightSpan.name())
         .parentId(lightSpan.parentId())
         .traceId(lightSpan.traceId())
         .localEndpoint(lightSpan.localEndpoint())
