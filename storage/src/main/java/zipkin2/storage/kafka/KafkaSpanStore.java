@@ -15,7 +15,9 @@ package zipkin2.storage.kafka;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
@@ -45,13 +47,13 @@ import zipkin2.storage.kafka.streams.stores.IndexStateStore;
 import zipkin2.storage.kafka.streams.stores.IndexStoreType;
 
 /**
- * Span Store based on Kafka Streams State Stores.
+ * Span Store based on Kafka Streams.
  *
  * This store supports all searches (e.g. findTraces, getTrace, getServiceNames, getSpanNames, and
  * getDependencies).
  *
  * NOTE: Currently State Stores are based on global state stores (i.e., all data is replicated on
- * every Zipkin instance with spanStoreEnabled=true.
+ * every Zipkin instance with spanStoreEnabled=true).
  */
 public class KafkaSpanStore implements SpanStore {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
@@ -330,10 +332,18 @@ public class KafkaSpanStore implements SpanStore {
     @Override
     List<DependencyLink> query() {
         try {
-          List<DependencyLink> dependencyLinks = new ArrayList<>();
-          dependenciesStore.range(endTs - loopback, endTs)
-              .forEachRemaining(dependencyLink -> dependencyLinks.add(dependencyLink.value));
-          return dependencyLinks;
+          Map<String, DependencyLink> dependencyLinks = new HashMap<>();
+          long from = endTs - loopback;
+          dependenciesStore.range(from, endTs)
+              .forEachRemaining(dependencyLink -> {
+                String pair = String.format("%s-%s", dependencyLink.value.parent(),
+                    dependencyLink.value.child());
+                dependencyLinks.put(pair, dependencyLink.value);
+              });
+
+          LOG.info("Dependencies found from={}-to={}: {}", from, endTs, dependencyLinks.size());
+
+          return new ArrayList<>(dependencyLinks.values());
         } catch (Exception e) {
           LOG.error("Error looking up for dependencies", e);
           return new ArrayList<>();

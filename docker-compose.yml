@@ -48,7 +48,6 @@ services:
       KAFKA_STORE_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_STORE_DIRECTORY: /zipkin/data
       KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
-
     volumes:
       - zipkin:/zipkin/data
 volumes:

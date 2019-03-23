@@ -30,7 +30,7 @@ import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 /**
- * Aggregation and storage of Light spans into traces.
+ * Aggregation and storage of spans into traces.
  */
 public class TraceStoreStream implements Supplier<Topology> {
 

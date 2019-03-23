@@ -485,8 +485,6 @@ public class KafkaStorage extends StorageComponent {
 
     Topic spansTopic = Topic.builder("zipkin-spans_v1")
         .build();
-    Topic traceSpansTopic = Topic.builder("zipkin-trace-spans_v1")
-        .build();
     Topic tracesTopic = Topic.builder("zipkin-traces_v1")
         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
         .build();
@@ -554,27 +552,14 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * Kafka topic name where incoming raw spans are stored.
+     * Kafka topic name where incoming spans are stored.
      *
-     * A Raw span is a span received from Collectors that contains all metadata and is partitioned
-     * by Span Id.
+     * A Span is received from Collectors that contains all metadata and is partitioned
+     * by Trace Id.
      */
     public Builder spansTopic(Topic spansTopic) {
       if (spansTopic == null) throw new NullPointerException("spansTopic == null");
       this.spansTopic = spansTopic;
-      return this;
-    }
-
-    /**
-     * Kafka topic name where "light" Spans, partitioned by Trace Id are stored.
-     *
-     * A Light Spans is a span without annotations and tags.
-     */
-    public Builder traceSpansTopic(Topic traceSpansTopic) {
-      if (traceSpansTopic == null) {
-        throw new NullPointerException("dependenciesTopic == null");
-      }
-      this.traceSpansTopic = traceSpansTopic;
       return this;
     }
 

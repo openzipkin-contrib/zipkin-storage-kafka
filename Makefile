@@ -26,6 +26,11 @@ docker-up:
 	TAG=${VERSION} \
 	docker-compose up -d
 
+.PHONY: docker-down
+docker-down:
+	TAG=${VERSION} \
+	docker-compose down --remove-orphans
+
 .PHONY: docker-kafka-up
 docker-kafka-up:
 	docker-compose up -d kafka zookeeper

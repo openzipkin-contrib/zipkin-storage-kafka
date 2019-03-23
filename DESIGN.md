@@ -35,27 +35,9 @@ A Zipkin Storage component has the following internal parts:
 
 ### Kafka Zipkin Storage
 
-#### `KafkaSpanConsumer`
-
-Span Consumer ingest Spans collected by different transports (potentially Kafka as well).
-
-Collected Spans will be known as *Raw Spans* that represents spans with all metadata, including
-tags and annotations. Raw spans are stored as-is in a Spans Kafka topic.
-
-A later process will turn `Raw Spans` into Spans without annotations and tags, known as 
-*Light Spans*.
-
-- `Raw Spans` are meant to be used for indexing as they contain most metadata. This spans are 
-partitioned by span id.
-- `Light Spans` are meant to be used on aggregations as traces and dependency graphs. This spans are
-partitioned by trace id, in order to be processed together.
-
 #### `KafkaSpanStore`
 
-Span Store is expecting 2 source topics: 
-
-- `Raw Spans` and
-- `Light Spans`
+Span Store is expecting Spans to be stored in topics partitioned by `TraceId`.
 
 > These can be created by Span Consumer, or can be **enriched** by other Stream Processors, outside of
 Zipkin Server.
@@ -65,23 +47,16 @@ Kafka Span Store will need to support different kind of queries:
 
 ##### Get Service Names/Get Span Names
 
-Service name to Span names pairs are indexed by aggregating `light` spans.
+Service name to Span names pairs are indexed by aggregating spans.
 
 ##### Get Trace/Find Traces
-
-Traces are processed in 2 different processes:
-
-- `Light spans` are aggregated into traces. This traces are stored to represent span DAG.
-- `Raw spans` are indexed using a `Lucene` state store. This index enabled trace searches.
 
 When search requests are received, span index is used to search for trace ids. After a list is 
 retrieved, trace DAG is retrieved from trace state store.
 
-As trace are retrieved, trace are hydrated from index to return a complete trace.
-
 ##### Get Dependencies
 
-After `light spans` are aggregated into traces, traces are processed to collect dependencies. 
+After `spans` are aggregated into traces, traces are processed to collect dependencies. 
 Dependencies changelog are stored in a Kafka topic to be be stored as materialized view on 
 Zipkin instances.
 

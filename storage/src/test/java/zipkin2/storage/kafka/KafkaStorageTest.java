@@ -53,7 +53,6 @@ public class KafkaStorageTest {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
     assertNotNull(builder.tracesTopic);
     assertNotNull(builder.dependencyStoreName);
-    assertNotNull(builder.traceSpansTopic);
     assertNotNull(builder.storeDirectory);
 
     try {
@@ -64,12 +63,6 @@ public class KafkaStorageTest {
 
     try {
       builder.dependenciesTopic(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    try {
-      builder.traceSpansTopic(null);
       fail();
     } catch (NullPointerException ignored) {
     }

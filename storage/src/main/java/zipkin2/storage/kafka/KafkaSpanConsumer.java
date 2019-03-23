@@ -31,8 +31,7 @@ import zipkin2.storage.kafka.internal.AggregateCall;
 /**
  * Collected Spans processor.
  *
- * Spans are processed by turning "raw spans" into "light spans" for aggregation, and collecting
- * serviceName:spanName pairs.
+ * Spans are partitioned by trace ID to enabled downstream processing of spans as part of a trace.
  */
 public class KafkaSpanConsumer implements SpanConsumer {
 

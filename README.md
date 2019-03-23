@@ -8,17 +8,18 @@ Kafka-based storage for Zipkin.
 
 ```
                     +-----------------------------zipkin------------------------------------------
-                    |                                                         +-->( service:span )
-                    |                                                         +-->( span-index   )
-( collected-spans )-|->[ span-consumer ]                      [ span-store ]--+-->( traces       )
-                    |         |                                    ^    |     +-->( dependencies )
-                    +---------|------------------------------------|----|--------------------------
-                              |                                    |    |
-------------------------------|------------------------------------|----|--------------------
-                              |                                    |    |
-kafka                         +-->(  raw-spans  )--// potential //-+    +-->( traces )
-                              |                    // enriching // |    |
-                              +-->( light-spans )--// sampling  //-+    +-->( dependencies )
+                    |                                                          +-->( service:span )
+                    |                                                          +-->( span-index   )
+( collected-spans )-|->[ span-consumer ]                       [ span-store ]--+-->( traces       )
+                    |         |                                     ^    |     +-->( dependencies )
+                    +---------|-------------------------------------|----|--------------------------
+                              |                                     |    |
+------------------------------|-------------------------------------|----|--------------------
+                              |                                     |    |
+                              |                     // potential // |    |
+kafka                         +-->( trace-spans )--// enriching //--+    +-->( traces )
+                                                  // sampling //         |
+                                                                         +-->( dependencies )
 
 --------------------------------------------------------------------------------------------
 
@@ -27,6 +28,8 @@ kafka                         +-->(  raw-spans  )--// potential //-+    +-->( tr
 - [Design notes](DESIGN.md)
 
 ## Configuration
+
+### Storage configurations
 
 | Configuration | Description | Default |
 |---------------|-------------|---------|
@@ -38,15 +41,16 @@ kafka                         +-->(  raw-spans  )--// potential //-+    +-->( tr
 | `KAFKA_STORE_COMPRESSION_TYPE` | Compression type used to store data in Kafka topics | `NONE` |
 | `KAFKA_STORE_RETENTION_SCAN_FREQUENCY` | Frequency to scan old records, in milliseconds. | `86400000` (1 day) |
 | `KAFKA_STORE_RETENTION_MAX_AGE` | Max age of a trace, to recognize old one for retention policies. | `604800000` (7 day) |
+
+### Topics configuration
+
+| Configuration | Description | Default |
 | `KAFKA_STORE_SPANS_TOPIC` | Topic where incoming spans are stored. | `zipkin-spans` |
 | `KAFKA_STORE_SPANS_TOPIC_PARTITIONS` | Span topic number of partitions. | `1` |
 | `KAFKA_STORE_SPANS_TOPIC_REPLICATION_FACTOR` | Span topic replication factor. | `1` |
 | `KAFKA_STORE_TRACES_TOPIC` | Topic where aggregated traces are stored. | `zipkin-traces` |
 | `KAFKA_STORE_TRACES_TOPIC_PARTITIONS` | Traces topic number of partitions. | `1` |
 | `KAFKA_STORE_TRACES_TOPIC_REPLICATION_FACTOR` | Traces topic replication factor. | `1` |
-| `KAFKA_STORE_TRACE_SPANS_TOPIC` | Topic where aggregated service names are stored. | `zipkin-services` |
-| `KAFKA_STORE_TRACE_SPANS_TOPIC_PARTITIONS` | Services topic number of partitions. | `1` |
-| `KAFKA_STORE_TRACE_SPANS_TOPIC_REPLICATION_FACTOR` | Services topic replication factor. | `1` |
 | `KAFKA_STORE_DEPENDENCIES_TOPIC` | Topic where aggregated service dependencies names are stored. | `zipkin-dependencies` |
 | `KAFKA_STORE_DEPENDENCIES_TOPIC_PARTITIONS` | Services topic number of partitions. | `1` |
 | `KAFKA_STORE_DEPENDENCIES_TOPIC_REPLICATION_FACTOR` | Services topic replication factor. | `1` |

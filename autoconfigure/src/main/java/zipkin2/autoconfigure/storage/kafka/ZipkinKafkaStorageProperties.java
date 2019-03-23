@@ -43,9 +43,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String dependenciesTopic = "zipkin-dependencies_v1";
   private Integer dependenciesTopicPartitions = 1;
   private Short dependenciesTopicReplicationFactor = 1;
-  private String traceSpansTopic = "zipkin-trace-spans_v1";
-  private Integer traceSpansTopicPartitions = 1;
-  private Short traceSpansTopicReplicationFactor = 1;
 
   private String storeDirectory = "/tmp/zipkin";
 
@@ -70,10 +67,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
         .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic)
             .partitions(dependenciesTopicPartitions)
             .replicationFactor(dependenciesTopicReplicationFactor)
-            .build())
-        .traceSpansTopic(KafkaStorage.Topic.builder(traceSpansTopic)
-            .partitions(traceSpansTopicPartitions)
-            .replicationFactor(traceSpansTopicReplicationFactor)
             .build())
         .storeDirectory(storeDirectory);
   }
@@ -142,14 +135,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.tracesTopic = tracesTopic;
   }
 
-  public String getTraceSpansTopic() {
-    return traceSpansTopic;
-  }
-
-  public void setTraceSpansTopic(String traceSpansTopic) {
-    this.traceSpansTopic = traceSpansTopic;
-  }
-
   public String getStoreDirectory() {
     return storeDirectory;
   }
@@ -196,22 +181,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setTracesTopicReplicationFactor(Short tracesTopicReplicationFactor) {
     this.tracesTopicReplicationFactor = tracesTopicReplicationFactor;
-  }
-
-  public Integer getTraceSpansTopicPartitions() {
-    return traceSpansTopicPartitions;
-  }
-
-  public void setTraceSpansTopicPartitions(Integer traceSpansTopicPartitions) {
-    this.traceSpansTopicPartitions = traceSpansTopicPartitions;
-  }
-
-  public Short getTraceSpansTopicReplicationFactor() {
-    return traceSpansTopicReplicationFactor;
-  }
-
-  public void setTraceSpansTopicReplicationFactor(Short traceSpansTopicReplicationFactor) {
-    this.traceSpansTopicReplicationFactor = traceSpansTopicReplicationFactor;
   }
 
   public String getDependenciesTopic() {
