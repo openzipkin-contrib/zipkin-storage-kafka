@@ -103,7 +103,7 @@ public class KafkaStorageIT {
     spanConsumer.accept(spans0).execute();
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.traceSpansTopic.name, 2, 10000);
+        testConsumerConfig, storage.spansTopic.name, 2, 10000);
 
     await().atMost(10, TimeUnit.SECONDS)
         .until(() -> {
@@ -147,13 +147,15 @@ public class KafkaStorageIT {
     spanConsumer.accept(spans).execute();
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.traceSpansTopic.name, 2, 10000);
+        testConsumerConfig, storage.spansTopic.name, 2, 10000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.tracesTopic.name, 1, 10000);
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.dependenciesTopic.name, 1, 10000);
 
-    await().atMost(10, TimeUnit.SECONDS)
+    await().atMost(30, TimeUnit.SECONDS)
         .until(() -> {
-          List<DependencyLink> dependencyLinks = spanStore.getDependencies(0L, 0L).execute();
+          List<DependencyLink> dependencyLinks = spanStore.getDependencies(System.currentTimeMillis(), 600000).execute();
           return dependencyLinks.size() == 1;
         });
   }

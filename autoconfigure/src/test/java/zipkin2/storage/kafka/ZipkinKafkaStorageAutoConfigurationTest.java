@@ -237,46 +237,4 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.replicationFactor).isEqualTo(
         (short) 2);
   }
-
-  @Test
-  public void canOverridesProperty_traceSpansTopicName() {
-    context = new AnnotationConfigApplicationContext();
-    TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.traceSpans-topic:zipkin-traceSpans-1"
-    ).applyTo(context);
-    Access.registerKafka(context);
-    context.refresh();
-
-    assertThat(context.getBean(KafkaStorage.class).traceSpansTopic.name).isEqualTo(
-        "zipkin-traceSpans-1");
-  }
-
-
-  @Test
-  public void canOverridesProperty_traceSpansTopicPartitions() {
-    context = new AnnotationConfigApplicationContext();
-    TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.traceSpans-topic-partitions:2"
-    ).applyTo(context);
-    Access.registerKafka(context);
-    context.refresh();
-
-    assertThat(context.getBean(KafkaStorage.class).traceSpansTopic.partitions).isEqualTo(2);
-  }
-
-  @Test
-  public void canOverridesProperty_traceSpansTopicReplicationFactor() {
-    context = new AnnotationConfigApplicationContext();
-    TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.traceSpans-topic-replication-factor:2"
-    ).applyTo(context);
-    Access.registerKafka(context);
-    context.refresh();
-
-    assertThat(context.getBean(KafkaStorage.class).traceSpansTopic.replicationFactor).isEqualTo(
-        (short) 2);
-  }
 }

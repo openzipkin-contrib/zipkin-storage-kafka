@@ -52,34 +52,35 @@ public class DependencyStoreStream implements Supplier<Topology> {
 
   @Override public Topology get() {
     // Preparing state stores
-    StoreBuilder<KeyValueStore<String, DependencyLink>> globalDependenciesStoreBuilder =
+    StoreBuilder<KeyValueStore<Long, DependencyLink>> globalDependenciesStoreBuilder =
         Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(globalDependenciesStoreName),
-            Serdes.String(),
+            Serdes.Long(),
             dependencyLinkSerde)
             .withCachingEnabled()
             .withLoggingDisabled();
 
     StreamsBuilder builder = new StreamsBuilder();
 
-    // Aggregate Traces to Dependencies
+    // Store Dependencies changelog by time
     builder
         .addGlobalStore(
             globalDependenciesStoreBuilder,
             dependenciesTopic,
             Consumed.with(Serdes.String(), dependencyLinkSerde),
             () -> new Processor<String, DependencyLink>() {
-              KeyValueStore<String, DependencyLink> dependenciesStore;
+              KeyValueStore<Long, DependencyLink> dependenciesStore;
 
               @Override public void init(ProcessorContext context) {
                 dependenciesStore =
-                    (KeyValueStore<String, DependencyLink>) context.getStateStore(
+                    (KeyValueStore<Long, DependencyLink>) context.getStateStore(
                         globalDependenciesStoreName);
               }
 
               @Override
               public void process(String windowTraceIdLinkPair, DependencyLink dependencyLink) {
-                dependenciesStore.put(windowTraceIdLinkPair, dependencyLink);
+                long key = System.currentTimeMillis();
+                dependenciesStore.put(key, dependencyLink);
               }
 
               @Override public void close() { // Nothing to close

@@ -82,37 +82,6 @@ public class KafkaSpanStore implements SpanStore {
     traceRetentionStoreStream = storage.getTraceRetentionStream();
   }
 
-  static Span hydrateSpan(Span lightSpan, Document document) {
-    Span.Builder spanBuilder = Span.newBuilder()
-        .id(lightSpan.id())
-        .name(lightSpan.name())
-        .parentId(lightSpan.parentId())
-        .traceId(lightSpan.traceId())
-        .localEndpoint(lightSpan.localEndpoint())
-        .remoteEndpoint(lightSpan.remoteEndpoint())
-        .duration(lightSpan.duration())
-        .timestamp(lightSpan.timestamp())
-        .kind(lightSpan.kind());
-
-    if (document != null) {
-      String[] tags = document.getValues("tag");
-      for (String tag : tags) {
-        String[] tagParts = tag.split("=");
-        spanBuilder.putTag(tagParts[0], tagParts[1]);
-      }
-
-      String[] annotations = document.getValues("annotation_value");
-      String[] annotationTs = document.getValues("annotation_ts");
-      for (int i = 0; i < annotations.length; i++) {
-        spanBuilder.addAnnotation(Long.valueOf(annotationTs[i]), annotations[i]);
-      }
-    } else {
-      LOG.warn("Indexed span == null - spanId=", lightSpan.id());
-    }
-
-    return spanBuilder.build();
-  }
-
   @Override
   public Call<List<List<Span>>> getTraces(QueryRequest request) {
     try {
@@ -168,10 +137,10 @@ public class KafkaSpanStore implements SpanStore {
   @Override
   public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
     try {
-      ReadOnlyKeyValueStore<String, DependencyLink> dependenciesStore =
+      ReadOnlyKeyValueStore<Long, DependencyLink> dependenciesStore =
           dependencyStoreStream.
               store(dependenciesStoreName, QueryableStoreTypes.keyValueStore());
-      return new GetDependenciesCall(dependenciesStore);
+      return new GetDependenciesCall(endTs, lookback, dependenciesStore);
     } catch (Exception e) {
       LOG.error("Error getting dependencies", e);
       return Call.emptyList();
@@ -278,9 +247,8 @@ public class KafkaSpanStore implements SpanStore {
 
       long start = queryRequest.endTs() - queryRequest.lookback();
       long end = queryRequest.endTs();
-      //TODO No timestamp field in Lucene. Find a way to query timestamp instead of longs.
-      long lowerValue = Long.parseLong(start + "000");
-      long upperValue = Long.parseLong(end + "000");
+      long lowerValue = start * 1000;
+      long upperValue = end * 1000;
       Query tsRangeQuery = LongPoint.newRangeQuery("ts", lowerValue, upperValue);
       builder.add(tsRangeQuery, BooleanClause.Occur.MUST);
 
@@ -300,7 +268,7 @@ public class KafkaSpanStore implements SpanStore {
       for (Document doc : docs) {
         String traceId = doc.get("trace_id");
         List<Span> spans = traceStore.get(traceId);
-        result.add(hydrateSpans(spans, spanIndexStore));
+        result.add(spans);
       }
 
       LOG.info("Total results of query {}: {}", query, result.size());
@@ -333,9 +301,9 @@ public class KafkaSpanStore implements SpanStore {
     @Override
     List<Span> query() {
         try {
-          final List<Span> lightSpans = traceStore.get(traceId);
-          if (lightSpans == null) return new ArrayList<>();
-          return hydrateSpans(lightSpans, spanIndexStore);
+          final List<Span> spans = traceStore.get(traceId);
+          if (spans == null) return new ArrayList<>();
+          return spans;
         } catch (Exception e) {
           LOG.error("Error getting trace with ID {}", traceId, e);
           return null;
@@ -348,21 +316,14 @@ public class KafkaSpanStore implements SpanStore {
     }
   }
 
-  private static List<Span> hydrateSpans(List<Span> lightSpans, IndexStateStore indexStateStore) {
-    List<Span> hydratedSpans = new ArrayList<>();
-    for (Span lightSpan : lightSpans) {
-      Query query = new TermQuery(new Term("id", lightSpan.id()));
-      Document document = indexStateStore.get(query);
-      final Span span = hydrateSpan(lightSpan, document);
-      hydratedSpans.add(span);
-    }
-    return hydratedSpans;
-  }
-
   static class GetDependenciesCall extends KafkaStreamsStoreCall<List<DependencyLink>> {
-    final ReadOnlyKeyValueStore<String, DependencyLink> dependenciesStore;
+    final long endTs, loopback;
+    final ReadOnlyKeyValueStore<Long, DependencyLink> dependenciesStore;
 
-    GetDependenciesCall(ReadOnlyKeyValueStore<String, DependencyLink> dependenciesStore) {
+    GetDependenciesCall(long endTs, long loopback,
+        ReadOnlyKeyValueStore<Long, DependencyLink> dependenciesStore) {
+      this.endTs = endTs;
+      this.loopback = loopback;
       this.dependenciesStore = dependenciesStore;
     }
 
@@ -370,7 +331,7 @@ public class KafkaSpanStore implements SpanStore {
     List<DependencyLink> query() {
         try {
           List<DependencyLink> dependencyLinks = new ArrayList<>();
-          dependenciesStore.all()
+          dependenciesStore.range(endTs - loopback, endTs)
               .forEachRemaining(dependencyLink -> dependencyLinks.add(dependencyLink.value));
           return dependencyLinks;
         } catch (Exception e) {
@@ -381,7 +342,7 @@ public class KafkaSpanStore implements SpanStore {
 
     @Override
     public Call<List<DependencyLink>> clone() {
-      return new GetDependenciesCall(dependenciesStore);
+      return new GetDependenciesCall(endTs, loopback, dependenciesStore);
     }
   }
 

@@ -35,7 +35,7 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 public class TraceStoreStream implements Supplier<Topology> {
 
   // Kafka topics
-  final String traceSpansTopic;
+  final String spansTopic;
 
   // Store names
   final String tracesStoreName;
@@ -44,8 +44,8 @@ public class TraceStoreStream implements Supplier<Topology> {
   final SpanSerde spanSerde;
   final SpansSerde spansSerde;
 
-  public TraceStoreStream(String traceSpansTopic, String tracesStoreName) {
-    this.traceSpansTopic = traceSpansTopic;
+  public TraceStoreStream(String spansTopic, String tracesStoreName) {
+    this.spansTopic = spansTopic;
     this.tracesStoreName = tracesStoreName;
 
     spanSerde = new SpanSerde();
@@ -70,7 +70,7 @@ public class TraceStoreStream implements Supplier<Topology> {
     builder
         .addGlobalStore(
             globalTracesStoreBuilder,
-            traceSpansTopic,
+            spansTopic,
             Consumed.with(Serdes.String(), spanSerde),
             () -> new Processor<String, Span>() {
               KeyValueStore<String, List<Span>> tracesStore;

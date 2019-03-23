@@ -44,7 +44,7 @@ public class TraceAggregationStream implements Supplier<Topology> {
   static final String LINK_PATTERN = "%s|%s";
 
   // Kafka topics
-  final String traceSpansTopic;
+  final String spansTopic;
   final String tracesTopic;
   final String dependenciesTopic;
 
@@ -61,12 +61,12 @@ public class TraceAggregationStream implements Supplier<Topology> {
   final DependencyLinker dependencyLinker;
 
   public TraceAggregationStream(
-      String traceSpansTopic,
+      String spansTopic,
       String tracesStoreName,
       String tracesTopic,
       String dependenciesTopic,
       Duration traceInactivityGap) {
-    this.traceSpansTopic = traceSpansTopic;
+    this.spansTopic = spansTopic;
     this.tracesStoreName = tracesStoreName;
     this.tracesTopic = tracesTopic;
     this.dependenciesTopic = dependenciesTopic;
@@ -83,7 +83,7 @@ public class TraceAggregationStream implements Supplier<Topology> {
 
     // Aggregate Spans to Traces
     final KStream<String, List<Span>> traceStream =
-        builder.stream(traceSpansTopic, Consumed.with(Serdes.String(), spanSerde))
+        builder.stream(spansTopic, Consumed.with(Serdes.String(), spanSerde))
             .groupByKey()
             .windowedBy(SessionWindows.with(traceInactivityGap))
             .aggregate(ArrayList::new,

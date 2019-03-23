@@ -32,7 +32,7 @@ import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 public class ServiceStoreStream implements Supplier<Topology> {
 
   // Topic names
-  final String traceSpansTopic;
+  final String spansTopic;
 
   // Store names
   final String globalServicesStoreName;
@@ -42,9 +42,9 @@ public class ServiceStoreStream implements Supplier<Topology> {
   final SpanNamesSerde spanNamesSerde;
 
   public ServiceStoreStream(
-      String traceSpansTopic,
+      String spansTopic,
       String globalServicesStoreName) {
-    this.traceSpansTopic = traceSpansTopic;
+    this.spansTopic = spansTopic;
     this.globalServicesStoreName = globalServicesStoreName;
 
     spanSerde = new SpanSerde();
@@ -67,7 +67,7 @@ public class ServiceStoreStream implements Supplier<Topology> {
     builder
         .addGlobalStore(
             globalServiceStoreBuilder,
-            traceSpansTopic,
+            spansTopic,
             Consumed.with(Serdes.String(), spanSerde),
             () -> new Processor<String, Span>() {
               KeyValueStore<String, Set<String>> servicesStore;

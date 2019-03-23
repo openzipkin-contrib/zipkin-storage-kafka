@@ -42,7 +42,7 @@ public class TraceRetentionStoreStream implements Supplier<Topology> {
   static final Logger LOG = LoggerFactory.getLogger(TraceRetentionStoreStream.class);
 
   // Kafka topics
-  final String traceSpansTopic;
+  final String spansTopic;
 
   // Store names
   final String traceTsStoreName;
@@ -55,11 +55,11 @@ public class TraceRetentionStoreStream implements Supplier<Topology> {
   final SpanSerde spanSerde;
 
   public TraceRetentionStoreStream(
-      String traceSpansTopic,
+      String spansTopic,
       String traceTsStoreName,
       Duration scanFrequency,
       Duration maxAge) {
-    this.traceSpansTopic = traceSpansTopic;
+    this.spansTopic = spansTopic;
     this.traceTsStoreName = traceTsStoreName;
     this.scanFrequency = scanFrequency;
     this.maxAge = maxAge;
@@ -76,7 +76,7 @@ public class TraceRetentionStoreStream implements Supplier<Topology> {
             Serdes.Long())
             .withCachingEnabled()
             .withLoggingDisabled())
-        .stream(traceSpansTopic, Consumed.with(Serdes.String(), spanSerde))
+        .stream(spansTopic, Consumed.with(Serdes.String(), spanSerde))
         .transform(
             () -> new Transformer<String, Span, KeyValue<String, Span>>() {
               KeyValueStore<String, Long> stateStore;
@@ -124,7 +124,7 @@ public class TraceRetentionStoreStream implements Supplier<Topology> {
                 // no need to close anything; Streams already closes the state store.
               }
             }, traceTsStoreName)
-        .to(traceSpansTopic);
+        .to(spansTopic);
     return builder.build();
   }
 }
