@@ -13,7 +13,7 @@
  */
 package zipkin2.storage.kafka.streams;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
@@ -26,6 +26,7 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 import zipkin2.Span;
+import zipkin2.storage.kafka.index.SpanIndexService;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
@@ -33,21 +34,23 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
  * Aggregation and storage of spans into traces.
  */
 public class TraceStoreStream implements Supplier<Topology> {
-
   // Kafka topics
   final String spansTopic;
-
   // Store names
   final String tracesStoreName;
-
   // SerDes
   final SpanSerde spanSerde;
   final SpansSerde spansSerde;
+  // Index Service
+  final SpanIndexService spanIndexService;
 
-  public TraceStoreStream(String spansTopic, String tracesStoreName) {
+  public TraceStoreStream(
+      String spansTopic,
+      String tracesStoreName,
+      SpanIndexService spanIndexService) {
     this.spansTopic = spansTopic;
     this.tracesStoreName = tracesStoreName;
-
+    this.spanIndexService = spanIndexService;
     spanSerde = new SpanSerde();
     spansSerde = new SpansSerde();
   }
@@ -65,7 +68,7 @@ public class TraceStoreStream implements Supplier<Topology> {
     StreamsBuilder builder = new StreamsBuilder();
 
     // Aggregate TraceId:Spans
-    // This store could be removed once an RPC is used to find Traces per instance based on prior
+    // This store could be removed once an RPC is used to getTraceIds Traces per instance based on prior
     // aggregation.
     builder
         .addGlobalStore(
@@ -86,13 +89,12 @@ public class TraceStoreStream implements Supplier<Topology> {
                 } else {
                   List<Span> currentSpans = tracesStore.get(traceId);
                   if (currentSpans == null) {
-                    List<Span> spans = new ArrayList<>();
-                    spans.add(span);
-                    tracesStore.put(traceId, spans);
+                    currentSpans = Collections.singletonList(span);
                   } else {
                     currentSpans.add(span);
-                    tracesStore.put(traceId, currentSpans);
                   }
+                  tracesStore.put(traceId, currentSpans);
+                  spanIndexService.insert(span);
                 }
               }
 

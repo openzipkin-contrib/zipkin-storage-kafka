@@ -69,7 +69,9 @@ This is the main processors that take incoming spans and aggregate them into:
 - Traces
 - Dependencies
 
-![trace aggregation](docs/trace-aggregation-stream.png)
+![service aggregation](docs/service-aggregation-stream.png)
+
+![dependency aggregation](docs/dependency-aggregation-stream.png)
 
 #### Store Stream Processors
 

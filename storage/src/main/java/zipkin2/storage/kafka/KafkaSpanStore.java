@@ -22,19 +22,6 @@ import java.util.Set;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
-import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.document.Document;
-import org.apache.lucene.document.LongPoint;
-import org.apache.lucene.index.Term;
-import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.queryparser.classic.QueryParser;
-import org.apache.lucene.search.BooleanClause;
-import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.Sort;
-import org.apache.lucene.search.SortField;
-import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.grouping.GroupingSearch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
@@ -43,8 +30,7 @@ import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
 import zipkin2.storage.SpanStore;
-import zipkin2.storage.kafka.streams.stores.IndexStateStore;
-import zipkin2.storage.kafka.streams.stores.IndexStoreType;
+import zipkin2.storage.kafka.index.SpanIndexService;
 
 /**
  * Span Store based on Kafka Streams.
@@ -57,31 +43,25 @@ import zipkin2.storage.kafka.streams.stores.IndexStoreType;
  */
 public class KafkaSpanStore implements SpanStore {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
-
+  // Store names
   final String tracesStoreName;
   final String servicesStoreName;
   final String dependenciesStoreName;
-  final String spanIndexStoreName;
-
-  final KafkaStreams spanIndexStream;
+  // Kafka Streams
   final KafkaStreams traceStoreStream;
-  final KafkaStreams traceAggregationStream;
   final KafkaStreams serviceStoreStream;
   final KafkaStreams dependencyStoreStream;
-  final KafkaStreams traceRetentionStoreStream;
+  // Span index
+  final SpanIndexService spanIndexService;
 
   KafkaSpanStore(KafkaStorage storage) {
     tracesStoreName = storage.traceStoreName;
     servicesStoreName = storage.serviceStoreName;
     dependenciesStoreName = storage.dependencyStoreName;
-    spanIndexStoreName = storage.spanIndexStoreName;
-
-    spanIndexStream = storage.getSpanIndexStream();
     traceStoreStream = storage.getTraceStoreStream();
     serviceStoreStream = storage.getServiceStoreStream();
     dependencyStoreStream = storage.getDependencyStoreStream();
-    traceAggregationStream = storage.getTraceAggregationStream();
-    traceRetentionStoreStream = storage.getTraceRetentionStream();
+    spanIndexService = storage.getSpanIndexService();
   }
 
   @Override
@@ -89,9 +69,7 @@ public class KafkaSpanStore implements SpanStore {
     try {
       ReadOnlyKeyValueStore<String, List<Span>> traceStore =
           traceStoreStream.store(tracesStoreName, QueryableStoreTypes.keyValueStore());
-      IndexStateStore spanIndexStore =
-          spanIndexStream.store(spanIndexStoreName, new IndexStoreType());
-      return new GetTracesCall(traceStore, spanIndexStore, request);
+      return new GetTracesCall(traceStore, spanIndexService, request);
     } catch (Exception e) {
       LOG.error("Error getting traces", request, e);
       return Call.emptyList();
@@ -103,9 +81,7 @@ public class KafkaSpanStore implements SpanStore {
     try {
       ReadOnlyKeyValueStore<String, List<Span>> traceStore =
           traceStoreStream.store(tracesStoreName, QueryableStoreTypes.keyValueStore());
-      IndexStateStore spanIndexStore =
-          spanIndexStream.store(spanIndexStoreName, new IndexStoreType());
-      return new GetTraceCall(traceStore, spanIndexStore, traceId);
+      return new GetTraceCall(traceStore, traceId);
     } catch (Exception e) {
       LOG.error("Error getting trace {}", traceId, e);
       return Call.emptyList();
@@ -204,99 +180,44 @@ public class KafkaSpanStore implements SpanStore {
 
   static class GetTracesCall extends KafkaStreamsStoreCall<List<List<Span>>> {
     final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
-    final IndexStateStore spanIndexStore;
+    final SpanIndexService spanIndexService;
     final QueryRequest queryRequest;
 
     GetTracesCall(
         ReadOnlyKeyValueStore<String, List<Span>> traceStore,
-        IndexStateStore spanIndexStore,
+        SpanIndexService spanIndexService,
         QueryRequest queryRequest) {
       this.traceStore = traceStore;
-      this.spanIndexStore = spanIndexStore;
+      this.spanIndexService = spanIndexService;
       this.queryRequest = queryRequest;
     }
 
     List<List<Span>> query() {
-      BooleanQuery.Builder builder = new BooleanQuery.Builder();
-
-      if (queryRequest.serviceName() != null) {
-        String serviceName = queryRequest.serviceName();
-        TermQuery serviceNameQuery = new TermQuery(new Term("local_service_name", serviceName));
-        builder.add(serviceNameQuery, BooleanClause.Occur.MUST);
-      }
-
-      if (queryRequest.spanName() != null) {
-        String spanName = queryRequest.spanName();
-        TermQuery spanNameQuery = new TermQuery(new Term("name", spanName));
-        builder.add(spanNameQuery, BooleanClause.Occur.MUST);
-      }
-
-      if (queryRequest.annotationQueryString() != null) {
-        try {
-          QueryParser queryParser = new QueryParser("annotation", new StandardAnalyzer());
-          Query annotationQuery = queryParser.parse(queryRequest.annotationQueryString());
-          builder.add(annotationQuery, BooleanClause.Occur.MUST);
-        } catch (ParseException e) {
-          e.printStackTrace();
-        }
-      }
-
-      if (queryRequest.maxDuration() != null) {
-        Query durationRangeQuery = LongPoint.newRangeQuery(
-            "duration", queryRequest.minDuration(), queryRequest.maxDuration());
-        builder.add(durationRangeQuery, BooleanClause.Occur.MUST);
-      }
-
-      long start = queryRequest.endTs() - queryRequest.lookback();
-      long end = queryRequest.endTs();
-      long lowerValue = start * 1000;
-      long upperValue = end * 1000;
-      Query tsRangeQuery = LongPoint.newRangeQuery("ts", lowerValue, upperValue);
-      builder.add(tsRangeQuery, BooleanClause.Occur.MUST);
-
-      BooleanQuery query = builder.build();
-
-      GroupingSearch groupingSearch = new GroupingSearch("trace_id_sorted");
-
-      Sort sort = new Sort(new SortField("ts_sorted", SortField.Type.LONG, true));
-      groupingSearch.setGroupDocsLimit(1);
-      groupingSearch.setGroupSort(sort);
-
-      List<Document> docs =
-          spanIndexStore.groupSearch(groupingSearch, query, 0, queryRequest.limit());
-
       List<List<Span>> result = new ArrayList<>();
-
-      for (Document doc : docs) {
-        String traceId = doc.get("trace_id");
+      for (String traceId : spanIndexService.getTraceIds(queryRequest)) {
         List<Span> spans = traceStore.get(traceId);
         result.add(spans);
       }
 
-      LOG.info("Total results of query {}: {}", query, result.size());
+      LOG.info("Total results of query {}: {}", queryRequest, result.size());
 
       return result;
     }
 
     @Override
     public Call<List<List<Span>>> clone() {
-      return new GetTracesCall(
-          traceStore,
-          spanIndexStore,
-          queryRequest);
+      return new GetTracesCall(traceStore, spanIndexService, queryRequest);
     }
   }
 
   static class GetTraceCall extends KafkaStreamsStoreCall<List<Span>> {
     final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
-    final IndexStateStore spanIndexStore;
     final String traceId;
 
     GetTraceCall(
         ReadOnlyKeyValueStore<String, List<Span>> traceStore,
-        IndexStateStore spanIndexStore, String traceId) {
+        String traceId) {
       this.traceStore = traceStore;
-      this.spanIndexStore = spanIndexStore;
       this.traceId = traceId;
     }
 
@@ -314,7 +235,7 @@ public class KafkaSpanStore implements SpanStore {
 
     @Override
     public Call<List<Span>> clone() {
-      return new GetTraceCall(traceStore, spanIndexStore, traceId);
+      return new GetTraceCall(traceStore, traceId);
     }
   }
 
