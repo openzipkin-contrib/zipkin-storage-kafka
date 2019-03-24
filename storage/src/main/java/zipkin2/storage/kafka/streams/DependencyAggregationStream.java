@@ -87,7 +87,7 @@ public class DependencyAggregationStream implements Supplier<Topology> {
                 .withCachingDisabled()
                 .withLoggingDisabled())
         .suppress(untilWindowCloses(unbounded()).withName("traces-suppressed"))
-        .toStream() // Potential output of traces completed.
+        .toStream() // Potential output of *completed* traces.
         // Changelog of dependency links over time
         .flatMap(spansToDependencyLinks())
         .through(spanDependenciesTopicName, Produced.with(Serdes.String(), dependencyLinkSerde))
@@ -95,7 +95,8 @@ public class DependencyAggregationStream implements Supplier<Topology> {
         .reduce(reduceDependencyLinks(),
             Materialized.
                 <String, DependencyLink, KeyValueStore<Bytes, byte[]>>with(
-                    Serdes.String(), dependencyLinkSerde)
+                    Serdes.String(),
+                    dependencyLinkSerde)
                 .withLoggingDisabled()
                 .withCachingEnabled())
         .toStream()
