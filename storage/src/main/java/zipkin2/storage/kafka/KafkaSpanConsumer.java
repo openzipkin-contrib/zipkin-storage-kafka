@@ -16,10 +16,10 @@ package zipkin2.storage.kafka;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -45,13 +45,15 @@ public class KafkaSpanConsumer implements SpanConsumer {
   final Producer<String, byte[]> producer;
   final StringSerializer stringSerializer;
   // In-memory map of ServiceNames:SpanNames
-  static final Map<String, Set<String>> serviceSpanMap = new ConcurrentHashMap<>();
+  final Map<String, Set<String>> serviceSpanMap;
+
 
   KafkaSpanConsumer(KafkaStorage storage) {
     spansTopicName = storage.spansTopic.name;
     spanServicesTopicName = storage.spanServicesTopic.name;
     producer = storage.getProducer();
     stringSerializer = new StringSerializer();
+    serviceSpanMap = storage.serviceSpanMap;
   }
 
   @Override
@@ -64,24 +66,15 @@ public class KafkaSpanConsumer implements SpanConsumer {
       byte[] value = SpanBytesEncoder.PROTO3.encode(span);
       calls.add(KafkaProducerCall.create(producer, spansTopicName, key, value));
       // Check if new spanNames are in place
-      Set<String> spanNames = serviceSpanMap.get(span.name());
-      if (spanNames == null) {
+      Set<String> spanNames = serviceSpanMap.getOrDefault(span.localServiceName(), new HashSet<>());
+      if (!spanNames.contains(span.name())) {
+        spanNames.add(span.name());
+        serviceSpanMap.put(span.localServiceName(), spanNames);
         calls.add(KafkaProducerCall.create(
             producer,
             spanServicesTopicName,
             span.localServiceName(),
             stringSerializer.serialize(spanServicesTopicName, span.name())));
-        serviceSpanMap.put(span.localServiceName(), Collections.singleton(span.name()));
-      } else {
-        if (!spanNames.contains(span.name())) {
-          calls.add(KafkaProducerCall.create(
-              producer,
-              spanServicesTopicName,
-              span.localServiceName(),
-              stringSerializer.serialize(spanServicesTopicName, span.name())));
-          spanNames.add(span.name());
-          serviceSpanMap.replace(span.localServiceName(), spanNames);
-        }
       }
     }
     return AggregateCall.create(calls);

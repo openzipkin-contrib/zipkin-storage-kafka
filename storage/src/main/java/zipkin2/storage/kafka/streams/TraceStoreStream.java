@@ -86,6 +86,7 @@ public class TraceStoreStream implements Supplier<Topology> {
               @Override public void process(String traceId, Span span) {
                 if (span == null) {
                   tracesStore.delete(traceId);
+                  spanIndexService.deleteByTraceId(traceId);
                 } else {
                   List<Span> currentSpans = tracesStore.get(traceId);
                   if (currentSpans == null) {

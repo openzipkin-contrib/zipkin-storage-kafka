@@ -40,17 +40,13 @@ import zipkin2.storage.kafka.streams.serdes.SpanSerde;
  */
 public class TraceRetentionStoreStream implements Supplier<Topology> {
   static final Logger LOG = LoggerFactory.getLogger(TraceRetentionStoreStream.class);
-
   // Kafka topics
   final String spansTopic;
-
   // Store names
   final String traceTsStoreName;
-
   // Retention attributes
   final Duration scanFrequency;
   final Duration maxAge;
-
   // SerDe
   final SpanSerde spanSerde;
 
@@ -89,7 +85,7 @@ public class TraceRetentionStoreStream implements Supplier<Topology> {
                     PunctuationType.WALL_CLOCK_TIME, // Run it independently of insertion
                     timestamp -> {
                       final long cutoff = timestamp - maxAge.toMillis();
-                      final long ttl = Long.valueOf(cutoff + "000");
+                      final long ttl = cutoff * 1000;
 
                       // Scan all records indexed
                       try (final KeyValueIterator<String, Long> all = stateStore.all()) {
@@ -105,8 +101,7 @@ public class TraceRetentionStoreStream implements Supplier<Topology> {
                         LOG.info("Traces deletion emitted: {}, older than {}",
                             deletions, Instant.ofEpochMilli(cutoff));
                       }
-                    }
-                );
+                    });
               }
 
               @Override

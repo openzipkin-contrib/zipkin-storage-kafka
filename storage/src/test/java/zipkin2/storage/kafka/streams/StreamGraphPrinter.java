@@ -13,7 +13,6 @@
  */
 package zipkin2.storage.kafka.streams;
 
-import java.time.Duration;
 import no.sysco.middleware.kafka.util.StreamsTopologyGraphviz;
 import org.apache.kafka.streams.Topology;
 
@@ -46,7 +45,7 @@ public class StreamGraphPrinter {
     System.out.println("# DEPENDENCY AGGREGATION TOPOLOGY");
     Topology dependencyAggregationTopology =
         new DependencyAggregationStream(spanTopicName, spanDependenciesTopicName,
-            dependenciesTopicName, Duration.ofMinutes(1)).get();
+            dependenciesTopicName).get();
     System.out.println(StreamsTopologyGraphviz.print(dependencyAggregationTopology));
     System.out.println();
 

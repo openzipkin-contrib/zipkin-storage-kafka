@@ -53,6 +53,16 @@ import zipkin2.Annotation;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
 
+import static zipkin2.storage.kafka.index.SpanIndexService.SpanFields.ANNOTATION;
+import static zipkin2.storage.kafka.index.SpanIndexService.SpanFields.DURATION;
+import static zipkin2.storage.kafka.index.SpanIndexService.SpanFields.ID;
+import static zipkin2.storage.kafka.index.SpanIndexService.SpanFields.LOCAL_SERVICE_NAME;
+import static zipkin2.storage.kafka.index.SpanIndexService.SpanFields.NAME;
+import static zipkin2.storage.kafka.index.SpanIndexService.SpanFields.SORTED_TIMESTAMP;
+import static zipkin2.storage.kafka.index.SpanIndexService.SpanFields.SORTED_TRACE_ID;
+import static zipkin2.storage.kafka.index.SpanIndexService.SpanFields.TIMESTAMP;
+import static zipkin2.storage.kafka.index.SpanIndexService.SpanFields.TRACE_ID;
+
 public class SpanIndexService {
   static final Logger LOG = LoggerFactory.getLogger(SpanIndexService.class);
 
@@ -88,6 +98,17 @@ public class SpanIndexService {
     return indexWriter;
   }
 
+  public void deleteByTraceId(String traceId) {
+    try {
+      TermQuery query = new TermQuery(new Term(TRACE_ID, traceId));
+      IndexWriter indexWriter = getIndexWriter();
+      indexWriter.deleteDocuments(query);
+      indexWriter.commit();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
   public Set<String> getTraceIds(QueryRequest queryRequest) {
     // Parsing query
     Query query = parseQuery(queryRequest);
@@ -101,7 +122,7 @@ public class SpanIndexService {
       for (GroupDocs<BytesRef> groupDocs : search.groups) {
         for (ScoreDoc scoreDoc : groupDocs.scoreDocs) {
           Document document = indexSearcher.doc(scoreDoc.doc);
-          String traceId = document.get("trace_id");
+          String traceId = document.get(TRACE_ID);
           traceIds.add(traceId);
         }
       }
@@ -116,46 +137,30 @@ public class SpanIndexService {
     try {
       Document doc = new Document();
       doc.add(
-          new SortedDocValuesField("trace_id_sorted", new BytesRef(span.traceId())));
-      doc.add(new NumericDocValuesField("ts_sorted", span.timestampAsLong()));
+          new SortedDocValuesField(SORTED_TRACE_ID, new BytesRef(span.traceId())));
+      doc.add(new NumericDocValuesField(SORTED_TIMESTAMP, span.timestampAsLong()));
 
-      doc.add(new StringField("trace_id", span.traceId(), Field.Store.YES));
-      doc.add(new StringField("id", span.id(), Field.Store.YES));
-
-      String kind = span.kind() != null ? span.kind().name() : "";
-      doc.add(new StringField("kind", kind, Field.Store.YES));
+      doc.add(new StringField(TRACE_ID, span.traceId(), Field.Store.YES));
+      doc.add(new StringField(ID, span.id(), Field.Store.YES));
 
       String localServiceName =
           span.localServiceName() != null ? span.localServiceName() : "";
       doc.add(
-          new StringField("local_service_name", localServiceName, Field.Store.YES));
-
-      String remoteServiceName =
-          span.remoteServiceName() != null ? span.remoteServiceName() : "";
-      doc.add(
-          new StringField("remote_service_name", remoteServiceName, Field.Store.YES));
+          new StringField(LOCAL_SERVICE_NAME, localServiceName, Field.Store.YES));
 
       String name = span.name() != null ? span.name() : "";
-      doc.add(new StringField("name", name, Field.Store.YES));
+      doc.add(new StringField(NAME, name, Field.Store.YES));
 
-      doc.add(new LongPoint("ts", span.timestampAsLong()));
-      doc.add(new LongPoint("duration", span.durationAsLong()));
+      doc.add(new LongPoint(TIMESTAMP, span.timestampAsLong()));
+      doc.add(new LongPoint(DURATION, span.durationAsLong()));
 
       for (Map.Entry<String, String> tag : span.tags().entrySet()) {
-        doc.add(new StringField("tag", tag.getKey() + "=" + tag.getValue(),
-            Field.Store.YES));
-        doc.add(new TextField("annotation", tag.getKey() + "=" + tag.getValue(),
+        doc.add(new TextField(ANNOTATION, tag.getKey() + "=" + tag.getValue(),
             Field.Store.YES));
       }
 
       for (Annotation annotation : span.annotations()) {
-        doc.add(new TextField("annotation", annotation.value(), Field.Store.YES));
-        doc.add(new StringField("annotation_value", annotation.value(), Field.Store.YES));
-      }
-
-      for (Annotation annotation : span.annotations()) {
-        doc.add(new StringField("annotation_ts", annotation.timestamp() + "",
-            Field.Store.YES));
+        doc.add(new TextField(ANNOTATION, annotation.value(), Field.Store.YES));
       }
 
       IndexWriter indexWriter = getIndexWriter();
@@ -167,8 +172,8 @@ public class SpanIndexService {
   }
 
   GroupingSearch parseGrouping() {
-    GroupingSearch groupingSearch = new GroupingSearch("trace_id_sorted");
-    Sort sort = new Sort(new SortField("ts_sorted", SortField.Type.LONG, true));
+    GroupingSearch groupingSearch = new GroupingSearch(SORTED_TRACE_ID);
+    Sort sort = new Sort(new SortField(SORTED_TIMESTAMP, SortField.Type.LONG, true));
     groupingSearch.setGroupDocsLimit(1);
     groupingSearch.setGroupSort(sort);
     return groupingSearch;
@@ -179,19 +184,19 @@ public class SpanIndexService {
 
     if (queryRequest.serviceName() != null) {
       String serviceName = queryRequest.serviceName();
-      TermQuery serviceNameQuery = new TermQuery(new Term("local_service_name", serviceName));
+      TermQuery serviceNameQuery = new TermQuery(new Term(LOCAL_SERVICE_NAME, serviceName));
       builder.add(serviceNameQuery, BooleanClause.Occur.MUST);
     }
 
     if (queryRequest.spanName() != null) {
       String spanName = queryRequest.spanName();
-      TermQuery spanNameQuery = new TermQuery(new Term("name", spanName));
+      TermQuery spanNameQuery = new TermQuery(new Term(NAME, spanName));
       builder.add(spanNameQuery, BooleanClause.Occur.MUST);
     }
 
     if (queryRequest.annotationQueryString() != null) {
       try {
-        QueryParser queryParser = new QueryParser("annotation", new StandardAnalyzer());
+        QueryParser queryParser = new QueryParser(ANNOTATION, new StandardAnalyzer());
         Query annotationQuery = queryParser.parse(queryRequest.annotationQueryString());
         builder.add(annotationQuery, BooleanClause.Occur.MUST);
       } catch (ParseException e) {
@@ -201,7 +206,7 @@ public class SpanIndexService {
 
     if (queryRequest.maxDuration() != null) {
       Query durationRangeQuery = LongPoint.newRangeQuery(
-          "duration", queryRequest.minDuration(), queryRequest.maxDuration());
+          DURATION, queryRequest.minDuration(), queryRequest.maxDuration());
       builder.add(durationRangeQuery, BooleanClause.Occur.MUST);
     }
 
@@ -209,7 +214,7 @@ public class SpanIndexService {
     long end = queryRequest.endTs();
     long lowerValue = start * 1000;
     long upperValue = end * 1000;
-    Query tsRangeQuery = LongPoint.newRangeQuery("ts", lowerValue, upperValue);
+    Query tsRangeQuery = LongPoint.newRangeQuery(TIMESTAMP, lowerValue, upperValue);
     builder.add(tsRangeQuery, BooleanClause.Occur.MUST);
 
     return builder.build();
@@ -227,5 +232,17 @@ public class SpanIndexService {
       this.indexDirectory = indexDirectory;
       return this;
     }
+  }
+
+  static class SpanFields {
+    static final String TRACE_ID = "trace_id";
+    static final String SORTED_TRACE_ID = "trace_id_sorted";
+    static final String ID = "id";
+    static final String LOCAL_SERVICE_NAME = "local_service_name";
+    static final String NAME = "name";
+    static final String ANNOTATION = "annotation";
+    static final String TIMESTAMP = "ts";
+    static final String SORTED_TIMESTAMP = "ts_sorted";
+    static final String DURATION = "duration";
   }
 }
