@@ -63,6 +63,7 @@ public class SpanIndexService {
   SpanIndexService(Builder builder) throws IOException {
     LOG.info("Storing index on path={}", builder.indexDirectory);
     directory = new MMapDirectory(Paths.get(builder.indexDirectory));
+    getIndexWriter();
   }
 
   public static SpanIndexService create(String indexDirectory) throws IOException {

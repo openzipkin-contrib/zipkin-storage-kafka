@@ -8,7 +8,7 @@ zipkin:
       compression-type: ${KAFKA_STORE_COMPRESSION_TYPE:NONE}
       retention-scan-frequency: ${KAFKA_STORE_RETENTION_SCAN_FREQUENCY:86400000}
       retention-max-age: ${KAFKA_STORE_RETENTION_MAX_AGE:604800000}
-      trace-inactivity-gap: ${KAFKA_STORE_TRACE_INACTIVITY_GAP:300000}
+      trace-inactivity-gap: ${KAFKA_STORE_TRACE_INACTIVITY_GAP:60000}
       spans-topic: ${KAFKA_STORE_SPANS_TOPIC:zipkin-spans-v1}
       spans-topic-partitions: ${KAFKA_STORE_SPANS_TOPIC_PARTITIONS:1}
       spans-topic-replication-factor: ${KAFKA_STORE_SPANS_TOPIC_REPLICATION_FACTOR:1}
