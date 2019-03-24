@@ -13,59 +13,126 @@
  */
 package zipkin2.storage.kafka.streams;
 
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.utils.Bytes;
+import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.kstream.Aggregator;
 import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.KeyValueMapper;
+import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.kstream.Reducer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.kafka.streams.kstream.SessionWindows;
+import org.apache.kafka.streams.kstream.Suppressed;
+import org.apache.kafka.streams.kstream.TimeWindows;
+import org.apache.kafka.streams.kstream.Windowed;
+import org.apache.kafka.streams.state.KeyValueStore;
+import org.apache.kafka.streams.state.SessionStore;
+import org.apache.kafka.streams.state.WindowStore;
 import zipkin2.DependencyLink;
+import zipkin2.Span;
+import zipkin2.internal.DependencyLinker;
+import zipkin2.storage.kafka.internal.DependencyLinkKey;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
+import zipkin2.storage.kafka.streams.serdes.SpanSerde;
+import zipkin2.storage.kafka.streams.serdes.SpansSerde;
+
+import static org.apache.kafka.streams.kstream.Suppressed.*;
+import static org.apache.kafka.streams.kstream.Suppressed.BufferConfig.*;
 
 /**
  * Reduction of span dependency events, with call/error counter equals to 0 or 1, into ever
  * increasing dependency link with updated counters.
  */
 public class DependencyAggregationStream implements Supplier<Topology> {
-  static final Logger LOG = LoggerFactory.getLogger(DependencyAggregationStream.class);
   // Kafka topics
-  final String spanDependencyTopic;
-  final String dependenciesTopic;
-  // Store names
-  final String dependenciesStoreName;
+  final String spansTopicName;
+  final String spanDependenciesTopicName;
+  final String dependenciesTopicName;
   // SerDes
+  final SpanSerde spanSerde;
+  final SpansSerde spansSerde;
   final DependencyLinkSerde dependencyLinkSerde;
+  // Config
+  final Duration traceInactivityGap;
 
   public DependencyAggregationStream(
-      String spanDependencyTopic,
-      String dependenciesTopic,
-      String dependenciesStoreName) {
-    this.spanDependencyTopic = spanDependencyTopic;
-    this.dependenciesTopic = dependenciesTopic;
-    this.dependenciesStoreName = dependenciesStoreName;
+      String spansTopicName,
+      String spanDependenciesTopicName,
+      String dependenciesTopicName,
+      Duration traceInactivityGap) {
+    this.spansTopicName = spansTopicName;
+    this.spanDependenciesTopicName = spanDependenciesTopicName;
+    this.dependenciesTopicName = dependenciesTopicName;
+    this.traceInactivityGap = traceInactivityGap;
+    spanSerde = new SpanSerde();
+    spansSerde = new SpansSerde();
     dependencyLinkSerde = new DependencyLinkSerde();
   }
 
   @Override public Topology get() {
     StreamsBuilder builder = new StreamsBuilder();
     // Aggregate Spans to Traces
-    builder.stream(spanDependencyTopic, Consumed.with(Serdes.String(), dependencyLinkSerde))
+    builder.stream(spansTopicName, Consumed.with(Serdes.String(), spanSerde))
         .groupByKey()
-        .reduce(reduceDependencyLink())
+        .windowedBy(SessionWindows.with(traceInactivityGap).grace(traceInactivityGap))
+        .aggregate(ArrayList::new,
+            aggregateSpans(),
+            (aggKey, aggOne, aggTwo) -> {
+              aggOne.addAll(aggTwo);
+              return aggOne;
+            },
+            Materialized.
+                <String, List<Span>, SessionStore<Bytes, byte[]>>with(Serdes.String(), spansSerde)
+                .withCachingDisabled()
+                .withLoggingDisabled())
+        //.suppress(untilWindowCloses(unbounded()).withName("traces-suppressed"))
         .toStream()
         // Changelog of dependency links over time
-        .peek((key, value) -> LOG.debug("Dependency transition: {}:{}", key, value))
-        .to(dependenciesTopic, Produced.with(Serdes.String(), dependencyLinkSerde));
+        .flatMap(spansToDependencyLinks())
+        .through(spanDependenciesTopicName, Produced.with(Serdes.String(), dependencyLinkSerde))
+        .groupByKey()
+        .windowedBy(TimeWindows.of(traceInactivityGap).grace(traceInactivityGap))
+        .reduce(reduceDependencyLinks(),
+            Materialized.
+                <String, DependencyLink, WindowStore<Bytes, byte[]>>with(
+                    Serdes.String(), dependencyLinkSerde)
+                .withLoggingDisabled()
+                .withCachingEnabled())
+        .toStream()
+        .selectKey((key, value) -> key.key())
+        .to(dependenciesTopicName, Produced.with(Serdes.String(), dependencyLinkSerde));
     return builder.build();
+  }
+
+  Aggregator<String, Span, List<Span>> aggregateSpans() {
+    return (traceId, span, spans) -> {
+      spans.add(span);
+      return spans;
+    };
+  }
+
+  KeyValueMapper<Windowed<String>, List<Span>, List<KeyValue<String, DependencyLink>>> spansToDependencyLinks() {
+    return (windowed, spans) -> {
+      if (spans == null) return new ArrayList<>();
+      DependencyLinker linker = new DependencyLinker();
+      return linker.putTrace(spans).link().stream()
+          .map(link -> KeyValue.pair(DependencyLinkKey.key(link), link))
+          .collect(Collectors.toList());
+    };
   }
 
   /**
    * Reducing link events into links with updated results
    */
-  Reducer<DependencyLink> reduceDependencyLink() {
+  Reducer<DependencyLink> reduceDependencyLinks() {
     return (link1, link2) -> {
       if (link2 == null) {
         return link1;

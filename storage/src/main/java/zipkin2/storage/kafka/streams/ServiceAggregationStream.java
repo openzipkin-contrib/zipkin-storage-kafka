@@ -13,7 +13,7 @@
  */
 package zipkin2.storage.kafka.streams;
 
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
@@ -34,18 +34,14 @@ public class ServiceAggregationStream implements Supplier<Topology> {
   // Kafka topics
   final String spanServiceTopicName;
   final String servicesTopicName;
-  // Store names
-  final String servicesStoreName;
   // SerDes
   final SpanNamesSerde spanNamesSerde;
 
   public ServiceAggregationStream(
       String spanServiceTopicName,
-      String servicesTopicName,
-      String servicesStoreName) {
+      String servicesTopicName) {
     this.spanServiceTopicName = spanServiceTopicName;
     this.servicesTopicName = servicesTopicName;
-    this.servicesStoreName = servicesStoreName;
     spanNamesSerde = new SpanNamesSerde();
   }
 
@@ -53,24 +49,23 @@ public class ServiceAggregationStream implements Supplier<Topology> {
     StreamsBuilder builder = new StreamsBuilder();
     // Aggregate ServiceName:SpanName into ServiceName:Set[SpanName]
     builder
-        .stream(spanServiceTopicName, Consumed.with(Serdes.String(), Serdes.ByteArray()))
-        .mapValues((serviceName, spanNameBytes) -> new String(spanNameBytes))
+        .stream(spanServiceTopicName, Consumed.with(Serdes.String(), Serdes.String()))
         .groupByKey()
-        .aggregate(Collections::emptySet,
+        .aggregate(HashSet::new,
             aggregateSpanNames(),
-            Materialized.<String, Set<String>, KeyValueStore<Bytes, byte[]>>as(servicesStoreName)
-                .withKeySerde(Serdes.String())
-                .withValueSerde(spanNamesSerde)
+            Materialized
+                .<String, Set<String>, KeyValueStore<Bytes, byte[]>>with(Serdes.String(),
+                    spanNamesSerde)
                 .withCachingEnabled()
                 .withLoggingDisabled())
         .toStream()
-        .to(servicesStoreName, Produced.with(Serdes.String(), spanNamesSerde));
+        .to(servicesTopicName, Produced.with(Serdes.String(), spanNamesSerde));
     return builder.build();
   }
 
   // Collecting span names into a set of names.
   Aggregator<String, String, Set<String>> aggregateSpanNames() {
-    return (traceId, spanName, spanNames) -> {
+    return (serviceName, spanName, spanNames) -> {
       spanNames.add(spanName);
       return spanNames;
     };

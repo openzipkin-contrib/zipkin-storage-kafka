@@ -67,6 +67,7 @@ public class KafkaStorageIT {
         .bootstrapServers(kafka.getBootstrapServers())
         .storeDirectory("target/zipkin_" + epochMilli)
         .spansTopic(KafkaStorage.Topic.builder("zipkin").build())
+        .traceInactivityGap(Duration.ofSeconds(2))
         .build();
   }
 
@@ -108,7 +109,7 @@ public class KafkaStorageIT {
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spanServicesTopic.name, 2, 10000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spanDependenciesTopic.name, 1, 10000);
+        testConsumerConfig, storage.spanDependenciesTopic.name, 1, 60000);
   }
 
   @Test

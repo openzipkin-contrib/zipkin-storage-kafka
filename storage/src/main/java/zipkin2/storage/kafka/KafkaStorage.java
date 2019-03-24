@@ -148,7 +148,7 @@ public class KafkaStorage extends StorageComponent {
         builder.serviceStoreDirectory());
     serviceAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
     serviceAggregationTopology =
-        new ServiceAggregationStream(spanServicesTopic.name, servicesTopic.name, serviceStoreName)
+        new ServiceAggregationStream(spanServicesTopic.name, servicesTopic.name)
             .get();
     // Service Store topology
     serviceStoreStreamConfig = new Properties();
@@ -163,7 +163,7 @@ public class KafkaStorage extends StorageComponent {
     serviceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
     serviceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    serviceStoreTopology = new ServiceStoreStream(spansTopic.name, serviceStoreName).get();
+    serviceStoreTopology = new ServiceStoreStream(servicesTopic.name, serviceStoreName).get();
     // Dependency Aggregation topology
     dependencyAggregationStreamConfig = new Properties();
     dependencyAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -181,8 +181,8 @@ public class KafkaStorage extends StorageComponent {
     dependencyAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION,
         StreamsConfig.OPTIMIZE);
     dependencyAggregationTopology =
-        new DependencyAggregationStream(spanDependenciesTopic.name, dependenciesTopic.name,
-            dependencyStoreName).get();
+        new DependencyAggregationStream(spansTopic.name, spanDependenciesTopic.name,
+            dependenciesTopic.name, builder.traceInactivityGap).get();
     // Dependency Store topology
     dependencyStoreStreamConfig = new Properties();
     dependencyStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -208,12 +208,12 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public SpanConsumer spanConsumer() {
+    if (ensureTopics && !topicsValidated) ensureTopics();
     if (aggregationEnabled) {
       getServiceAggregationStream();
       getDependencyAggregationStream();
     }
     if (spanConsumerEnabled) {
-      if (ensureTopics && !topicsValidated) ensureTopics();
       return new KafkaSpanConsumer(this);
     } else { // NoopSpanConsumer
       return list -> Call.create(null);
@@ -222,12 +222,12 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public SpanStore spanStore() {
+    if (ensureTopics && !topicsValidated) ensureTopics();
     if (aggregationEnabled) {
       getServiceAggregationStream();
       getDependencyAggregationStream();
     }
     if (spanStoreEnabled) {
-      if (ensureTopics && !topicsValidated) ensureTopics();
       return new KafkaSpanStore(this);
     } else { // NoopSpanStore
       return new SpanStore() {
@@ -255,25 +255,31 @@ public class KafkaStorage extends StorageComponent {
   }
 
   void ensureTopics() {
-    try {
-      Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
-      List<Topic> requiredTopics =
-          Arrays.asList(spansTopic, spanServicesTopic, servicesTopic, spanDependenciesTopic,
-              dependenciesTopic);
-      Set<NewTopic> newTopics = new HashSet<>();
-      for (Topic requiredTopic : requiredTopics) {
-        if (!topics.contains(requiredTopic.name)) {
-          NewTopic newTopic = requiredTopic.newTopic();
-          newTopics.add(newTopic);
-        } else {
-          LOG.info("Topic {} already exists.", requiredTopic.name);
+    if (!topicsValidated) {
+      synchronized (this) {
+        if (!topicsValidated) {
+          try {
+            Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
+            List<Topic> requiredTopics =
+                Arrays.asList(spansTopic, spanServicesTopic, servicesTopic, spanDependenciesTopic,
+                    dependenciesTopic);
+            Set<NewTopic> newTopics = new HashSet<>();
+            for (Topic requiredTopic : requiredTopics) {
+              if (!topics.contains(requiredTopic.name)) {
+                NewTopic newTopic = requiredTopic.newTopic();
+                newTopics.add(newTopic);
+              } else {
+                LOG.info("Topic {} already exists.", requiredTopic.name);
+              }
+            }
+
+            getAdminClient().createTopics(newTopics).all().get();
+            topicsValidated = true;
+          } catch (Exception e) {
+            LOG.error("Error ensuring topics are created", e);
+          }
         }
       }
-
-      getAdminClient().createTopics(newTopics).all().get();
-      topicsValidated = true;
-    } catch (Exception e) {
-      LOG.error("Error ensuring topics are created", e);
     }
   }
 
@@ -368,7 +374,7 @@ public class KafkaStorage extends StorageComponent {
         }
       }
     }
-    return serviceStoreStream;
+    return serviceAggregationStream;
   }
 
   KafkaStreams getServiceStoreStream() {
@@ -427,7 +433,7 @@ public class KafkaStorage extends StorageComponent {
   public static class Builder extends StorageComponent.Builder {
     boolean spanConsumerEnabled = true;
     boolean spanStoreEnabled = true;
-    boolean aggregationEnabled = false;
+    boolean aggregationEnabled = true;
 
     Duration retentionScanFrequency = Duration.ofMinutes(1);
     Duration retentionMaxAge = Duration.ofMinutes(2);
@@ -435,7 +441,7 @@ public class KafkaStorage extends StorageComponent {
     String bootstrapServers = "localhost:29092";
     CompressionType compressionType = CompressionType.NONE;
 
-    Duration traceInactivityGap = Duration.ofMinutes(5);
+    Duration traceInactivityGap = Duration.ofMinutes(1);
 
     String traceStoreStreamAppId = "zipkin-trace-store-v1";
     String serviceStoreStreamAppId = "zipkin-service-store-v1";
@@ -534,9 +540,7 @@ public class KafkaStorage extends StorageComponent {
      * Kafka topic name where span services events are stored.
      */
     public Builder spanServicesTopic(Topic spanServicesTopic) {
-      if (spanServicesTopic == null) {
-        throw new NullPointerException("spanServicesTopic == null");
-      }
+      if (spanServicesTopic == null) throw new NullPointerException("spanServicesTopic == null");
       this.spanServicesTopic = spanServicesTopic;
       return this;
     }
@@ -545,9 +549,7 @@ public class KafkaStorage extends StorageComponent {
      * Kafka topic name where services changelog are stored.
      */
     public Builder servicesTopic(Topic servicesTopic) {
-      if (servicesTopic == null) {
-        throw new NullPointerException("servicesTopic == null");
-      }
+      if (servicesTopic == null) throw new NullPointerException("servicesTopic == null");
       this.servicesTopic = servicesTopic;
       return this;
     }
@@ -567,9 +569,7 @@ public class KafkaStorage extends StorageComponent {
      * Kafka topic name where dependencies changelog are stored.
      */
     public Builder dependenciesTopic(Topic dependenciesTopic) {
-      if (dependenciesTopic == null) {
-        throw new NullPointerException("dependenciesTopic == null");
-      }
+      if (dependenciesTopic == null) throw new NullPointerException("dependenciesTopic == null");
       this.dependenciesTopic = dependenciesTopic;
       return this;
     }
@@ -578,9 +578,7 @@ public class KafkaStorage extends StorageComponent {
      * Path to root directory when aggregated and indexed data is stored.
      */
     public Builder storeDirectory(String storeDirectory) {
-      if (storeDirectory == null) {
-        throw new NullPointerException("storageDirectory == null");
-      }
+      if (storeDirectory == null) throw new NullPointerException("storageDirectory == null");
       this.storeDirectory = storeDirectory;
       return this;
     }

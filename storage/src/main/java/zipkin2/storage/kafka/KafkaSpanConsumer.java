@@ -14,7 +14,6 @@
 package zipkin2.storage.kafka;
 
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -23,18 +22,15 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.Callback;
-import zipkin2.DependencyLink;
 import zipkin2.Span;
-import zipkin2.codec.DependencyLinkBytesEncoder;
 import zipkin2.codec.SpanBytesEncoder;
-import zipkin2.internal.DependencyLinker;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.kafka.internal.AggregateCall;
-import zipkin2.storage.kafka.internal.DependencyLinkKey;
 
 /**
  * Collected Spans processor.
@@ -44,22 +40,18 @@ import zipkin2.storage.kafka.internal.DependencyLinkKey;
 public class KafkaSpanConsumer implements SpanConsumer {
   // Topic names
   final String spansTopicName;
-  final String spanDependenciesTopicName;
   final String spanServicesTopicName;
   // Kafka producers
   final Producer<String, byte[]> producer;
+  final StringSerializer stringSerializer;
   // In-memory map of ServiceNames:SpanNames
-  final Map<String, Set<String>> serviceSpanMap;
-  // DependencyLinker
-  final DependencyLinker dependencyLinker;
+  static final Map<String, Set<String>> serviceSpanMap = new ConcurrentHashMap<>();
 
   KafkaSpanConsumer(KafkaStorage storage) {
     spansTopicName = storage.spansTopic.name;
-    spanDependenciesTopicName = storage.spanDependenciesTopic.name;
     spanServicesTopicName = storage.spanServicesTopic.name;
     producer = storage.getProducer();
-    serviceSpanMap = new ConcurrentHashMap<>();
-    dependencyLinker = new DependencyLinker();
+    stringSerializer = new StringSerializer();
   }
 
   @Override
@@ -78,7 +70,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
             producer,
             spanServicesTopicName,
             span.localServiceName(),
-            span.name().getBytes(Charset.forName("utf-8"))));
+            stringSerializer.serialize(spanServicesTopicName, span.name())));
         serviceSpanMap.put(span.localServiceName(), Collections.singleton(span.name()));
       } else {
         if (!spanNames.contains(span.name())) {
@@ -86,18 +78,11 @@ public class KafkaSpanConsumer implements SpanConsumer {
               producer,
               spanServicesTopicName,
               span.localServiceName(),
-              span.name().getBytes(Charset.forName("utf-8"))));
+              stringSerializer.serialize(spanServicesTopicName, span.name())));
           spanNames.add(span.name());
           serviceSpanMap.replace(span.localServiceName(), spanNames);
         }
       }
-    }
-    // Collect Dependency Links
-    List<DependencyLink> links = dependencyLinker.putTrace(spans).link();
-    for (DependencyLink link : links) {
-      String key = DependencyLinkKey.key(link);
-      byte[] value = DependencyLinkBytesEncoder.JSON_V1.encode(link);
-      calls.add(KafkaProducerCall.create(producer, spanDependenciesTopicName, key, value));
     }
     return AggregateCall.create(calls);
   }

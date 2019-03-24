@@ -32,7 +32,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private Long retentionScanFrequency = Duration.ofDays(1).toMillis();
   private Long retentionMaxAge = Duration.ofDays(7).toMillis();
-  private Long traceInactivityGap = Duration.ofMinutes(5).toMillis();
+  private Long traceInactivityGap = Duration.ofMinutes(1).toMillis();
 
   private String spansTopic = "zipkin-spans-v1";
   private Integer spansTopicPartitions = 1;
@@ -117,6 +117,14 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.bootstrapServers = bootstrapServers;
   }
 
+  public String getCompressionType() {
+    return compressionType;
+  }
+
+  public void setCompressionType(String compressionType) {
+    this.compressionType = compressionType;
+  }
+
   public Long getRetentionScanFrequency() {
     return retentionScanFrequency;
   }
@@ -133,28 +141,20 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.retentionMaxAge = retentionMaxAge;
   }
 
+  public Long getTraceInactivityGap() {
+    return traceInactivityGap;
+  }
+
+  public void setTraceInactivityGap(Long traceInactivityGap) {
+    this.traceInactivityGap = traceInactivityGap;
+  }
+
   public String getSpansTopic() {
     return spansTopic;
   }
 
   public void setSpansTopic(String spansTopic) {
     this.spansTopic = spansTopic;
-  }
-
-  public String getStoreDirectory() {
-    return storeDirectory;
-  }
-
-  public void setStoreDirectory(String storeDirectory) {
-    this.storeDirectory = storeDirectory;
-  }
-
-  public String getCompressionType() {
-    return compressionType;
-  }
-
-  public void setCompressionType(String compressionType) {
-    this.compressionType = compressionType;
   }
 
   public Integer getSpansTopicPartitions() {
@@ -171,14 +171,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setSpansTopicReplicationFactor(Short spansTopicReplicationFactor) {
     this.spansTopicReplicationFactor = spansTopicReplicationFactor;
-  }
-
-  public Long getTraceInactivityGap() {
-    return traceInactivityGap;
-  }
-
-  public void setTraceInactivityGap(Long traceInactivityGap) {
-    this.traceInactivityGap = traceInactivityGap;
   }
 
   public String getSpanServicesTopic() {
@@ -276,5 +268,13 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setDependenciesTopicReplicationFactor(Short dependenciesTopicReplicationFactor) {
     this.dependenciesTopicReplicationFactor = dependenciesTopicReplicationFactor;
+  }
+
+  public String getStoreDirectory() {
+    return storeDirectory;
+  }
+
+  public void setStoreDirectory(String storeDirectory) {
+    this.storeDirectory = storeDirectory;
   }
 }
