@@ -3,7 +3,7 @@ all: build
 
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
-VERSION := '0.3.1-SNAPSHOT'
+VERSION := '0.3.3-SNAPSHOT'
 
 .PHONY: run
 run: build zipkin-local
@@ -25,6 +25,11 @@ docker-push: docker-build
 docker-up:
 	TAG=${VERSION} \
 	docker-compose up -d
+
+.PHONY: docker-down
+docker-down:
+	TAG=${VERSION} \
+	docker-compose down --remove-orphans
 
 .PHONY: docker-kafka-up
 docker-kafka-up:

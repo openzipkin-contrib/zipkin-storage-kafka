@@ -40,26 +40,22 @@ import zipkin2.storage.kafka.streams.serdes.SpanSerde;
  */
 public class TraceRetentionStoreStream implements Supplier<Topology> {
   static final Logger LOG = LoggerFactory.getLogger(TraceRetentionStoreStream.class);
-
   // Kafka topics
-  final String traceSpansTopic;
-
+  final String spansTopic;
   // Store names
   final String traceTsStoreName;
-
   // Retention attributes
   final Duration scanFrequency;
   final Duration maxAge;
-
   // SerDe
   final SpanSerde spanSerde;
 
   public TraceRetentionStoreStream(
-      String traceSpansTopic,
+      String spansTopic,
       String traceTsStoreName,
       Duration scanFrequency,
       Duration maxAge) {
-    this.traceSpansTopic = traceSpansTopic;
+    this.spansTopic = spansTopic;
     this.traceTsStoreName = traceTsStoreName;
     this.scanFrequency = scanFrequency;
     this.maxAge = maxAge;
@@ -76,7 +72,7 @@ public class TraceRetentionStoreStream implements Supplier<Topology> {
             Serdes.Long())
             .withCachingEnabled()
             .withLoggingDisabled())
-        .stream(traceSpansTopic, Consumed.with(Serdes.String(), spanSerde))
+        .stream(spansTopic, Consumed.with(Serdes.String(), spanSerde))
         .transform(
             () -> new Transformer<String, Span, KeyValue<String, Span>>() {
               KeyValueStore<String, Long> stateStore;
@@ -89,7 +85,7 @@ public class TraceRetentionStoreStream implements Supplier<Topology> {
                     PunctuationType.WALL_CLOCK_TIME, // Run it independently of insertion
                     timestamp -> {
                       final long cutoff = timestamp - maxAge.toMillis();
-                      final long ttl = Long.valueOf(cutoff + "000");
+                      final long ttl = cutoff * 1000;
 
                       // Scan all records indexed
                       try (final KeyValueIterator<String, Long> all = stateStore.all()) {
@@ -105,8 +101,7 @@ public class TraceRetentionStoreStream implements Supplier<Topology> {
                         LOG.info("Traces deletion emitted: {}, older than {}",
                             deletions, Instant.ofEpochMilli(cutoff));
                       }
-                    }
-                );
+                    });
               }
 
               @Override
@@ -124,7 +119,7 @@ public class TraceRetentionStoreStream implements Supplier<Topology> {
                 // no need to close anything; Streams already closes the state store.
               }
             }, traceTsStoreName)
-        .to(traceSpansTopic);
+        .to(spansTopic);
     return builder.build();
   }
 }

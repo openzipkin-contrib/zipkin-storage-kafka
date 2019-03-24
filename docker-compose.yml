@@ -36,6 +36,12 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     depends_on:
       - zookeeper
+  kafka-manager:
+    image: syscomiddleware/kafka-manager:1.3.3
+    ports:
+      - 19000:9000
+    environment:
+      ZK_HOSTS: zookeeper:2181
   zipkin:
     build:
       context: .
@@ -46,10 +52,10 @@ services:
       - 9411:9411
     environment:
       KAFKA_STORE_BOOTSTRAP_SERVERS: kafka:9092
-      KAFKA_STORE_DIRECTORY: /zipkin/data
+#      KAFKA_STORE_DIRECTORY: /zipkin/data
       KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
-
-    volumes:
-      - zipkin:/zipkin/data
-volumes:
-  zipkin:
+      ZIPKIN_LOGGING_LEVEL: DEBUG
+#    volumes:
+#      - zipkin:/zipkin/data
+#volumes:
+#  zipkin:

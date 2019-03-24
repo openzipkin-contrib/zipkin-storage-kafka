@@ -23,6 +23,8 @@ import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.DependencyLink;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 
@@ -33,13 +35,11 @@ import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
  * Store: Dependencies store (global state store)
  */
 public class DependencyStoreStream implements Supplier<Topology> {
-
+  static final Logger LOG = LoggerFactory.getLogger(DependencyStoreStream.class);
   // Kafka Topics
   final String dependenciesTopic;
-
   // Store names
   final String globalDependenciesStoreName;
-
   // SerDes
   final DependencyLinkSerde dependencyLinkSerde;
 
@@ -52,40 +52,41 @@ public class DependencyStoreStream implements Supplier<Topology> {
 
   @Override public Topology get() {
     // Preparing state stores
-    StoreBuilder<KeyValueStore<String, DependencyLink>> globalDependenciesStoreBuilder =
+    StoreBuilder<KeyValueStore<Long, DependencyLink>> globalDependenciesStoreBuilder =
         Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(globalDependenciesStoreName),
-            Serdes.String(),
+            Serdes.Long(),
             dependencyLinkSerde)
             .withCachingEnabled()
             .withLoggingDisabled();
 
     StreamsBuilder builder = new StreamsBuilder();
+    // Store Dependencies changelog by time
+    builder.addGlobalStore(
+        globalDependenciesStoreBuilder,
+        dependenciesTopic,
+        Consumed.with(Serdes.String(), dependencyLinkSerde),
+        () -> new Processor<String, DependencyLink>() {
+          KeyValueStore<Long, DependencyLink> dependenciesStore;
 
-    // Aggregate Traces to Dependencies
-    builder
-        .addGlobalStore(
-            globalDependenciesStoreBuilder,
-            dependenciesTopic,
-            Consumed.with(Serdes.String(), dependencyLinkSerde),
-            () -> new Processor<String, DependencyLink>() {
-              KeyValueStore<String, DependencyLink> dependenciesStore;
+          @Override public void init(ProcessorContext context) {
+            LOG.info("Initializing Dependency Store Stream");
+            dependenciesStore =
+                (KeyValueStore<Long, DependencyLink>) context.getStateStore(
+                    globalDependenciesStoreName);
+          }
 
-              @Override public void init(ProcessorContext context) {
-                dependenciesStore =
-                    (KeyValueStore<String, DependencyLink>) context.getStateStore(
-                        globalDependenciesStoreName);
-              }
+          @Override
+          public void process(String linkKey, DependencyLink dependencyLink) {
+            Long millis = System.currentTimeMillis();
+            LOG.debug("Storing dependency: {} at {}", dependencyLink, millis);
+            dependenciesStore.put(millis, dependencyLink);
+          }
 
-              @Override
-              public void process(String windowTraceIdLinkPair, DependencyLink dependencyLink) {
-                dependenciesStore.put(windowTraceIdLinkPair, dependencyLink);
-              }
-
-              @Override public void close() { // Nothing to close
-              }
-            }
-        );
+          @Override public void close() { // Nothing to close
+          }
+        }
+    );
 
     return builder.build();
   }

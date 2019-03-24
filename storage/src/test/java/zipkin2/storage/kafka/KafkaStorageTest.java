@@ -51,25 +51,33 @@ public class KafkaStorageTest {
   @Test
   public void buildDefaultBuilder() {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
-    assertNotNull(builder.tracesTopic);
     assertNotNull(builder.dependencyStoreName);
-    assertNotNull(builder.traceSpansTopic);
     assertNotNull(builder.storeDirectory);
 
     try {
-      builder.tracesTopic(null);
+      builder.spansTopic(null);
       fail();
     } catch (NullPointerException ignored) {
     }
 
+    try {
+      builder.spanServicesTopic(null);
+      fail();
+    } catch (NullPointerException ignored) {
+    }
+    try {
+      builder.servicesTopic(null);
+      fail();
+    } catch (NullPointerException ignored) {
+    }
+
+    try {
+      builder.spanDependenciesTopic(null);
+      fail();
+    } catch (NullPointerException ignored) {
+    }
     try {
       builder.dependenciesTopic(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    try {
-      builder.traceSpansTopic(null);
       fail();
     } catch (NullPointerException ignored) {
     }

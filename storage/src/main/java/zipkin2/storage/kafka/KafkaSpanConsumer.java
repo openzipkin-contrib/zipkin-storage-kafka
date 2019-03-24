@@ -15,11 +15,14 @@ package zipkin2.storage.kafka;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
@@ -32,59 +35,52 @@ import zipkin2.storage.kafka.internal.AggregateCall;
 /**
  * Collected Spans processor.
  *
- * Spans are processed by turning "raw spans" into "light spans" for aggregation, and collecting
- * serviceName:spanName pairs.
+ * Spans are partitioned by trace ID to enabled downstream processing of spans as part of a trace.
  */
 public class KafkaSpanConsumer implements SpanConsumer {
+  // Topic names
+  final String spansTopicName;
+  final String spanServicesTopicName;
+  // Kafka producers
+  final Producer<String, byte[]> producer;
+  final StringSerializer stringSerializer;
+  // In-memory map of ServiceNames:SpanNames
+  final Map<String, Set<String>> serviceSpanMap;
 
-  final String spansTopic;
-  final Producer<String, byte[]> kafkaProducer;
-  final KafkaStreams spanConsumerStream;
 
   KafkaSpanConsumer(KafkaStorage storage) {
-    spansTopic = storage.spansTopic.name;
-    kafkaProducer = storage.getProducer();
-    spanConsumerStream = storage.getSpanConsumerStream();
+    spansTopicName = storage.spansTopic.name;
+    spanServicesTopicName = storage.spanServicesTopic.name;
+    producer = storage.getProducer();
+    stringSerializer = new StringSerializer();
+    serviceSpanMap = storage.serviceSpanMap;
   }
 
   @Override
   public Call<Void> accept(List<Span> spans) {
     if (spans.isEmpty()) return Call.create(null);
     List<Call<Void>> calls = new ArrayList<>();
-    for (Span span : spans) calls.add(StoreSpanCall.create(kafkaProducer, spansTopic, span));
+    // Collect traceId:spans
+    for (Span span : spans) {
+      String key = span.traceId();
+      byte[] value = SpanBytesEncoder.PROTO3.encode(span);
+      calls.add(KafkaProducerCall.create(producer, spansTopicName, key, value));
+      // Check if new spanNames are in place
+      Set<String> spanNames = serviceSpanMap.getOrDefault(span.localServiceName(), new HashSet<>());
+      if (!spanNames.contains(span.name())) {
+        spanNames.add(span.name());
+        serviceSpanMap.put(span.localServiceName(), spanNames);
+        calls.add(KafkaProducerCall.create(
+            producer,
+            spanServicesTopicName,
+            span.localServiceName(),
+            stringSerializer.serialize(spanServicesTopicName, span.name())));
+      }
+    }
     return AggregateCall.create(calls);
   }
 
-  static final class StoreSpanCall extends KafkaProducerCall<Void>
-      implements Call.ErrorHandler<Void> {
-
-    StoreSpanCall(Producer<String, byte[]> kafkaProducer, String topic, String key, byte[] value) {
-      super(kafkaProducer, topic, key, value);
-    }
-
-    static Call<Void> create(Producer<String, byte[]> producer, String spansTopic, Span span) {
-      byte[] encodedSpan = SpanBytesEncoder.PROTO3.encode(span);
-      StoreSpanCall call = new StoreSpanCall(producer, spansTopic, span.id(), encodedSpan);
-      return call.handleError(call);
-    }
-
-    @Override
-    public void onErrorReturn(Throwable error, Callback<Void> callback) {
-      callback.onError(error);
-    }
-
-    @Override
-    Void convert(RecordMetadata recordMetadata) {
-      return null;
-    }
-
-    @Override
-    public Call<Void> clone() {
-      return new StoreSpanCall(kafkaProducer, topic, key, value);
-    }
-  }
-
-  abstract static class KafkaProducerCall<V> extends Call.Base<V> {
+  static class KafkaProducerCall extends Call.Base<Void> {
     static final Logger LOG = LoggerFactory.getLogger(KafkaProducerCall.class);
 
     final Producer<String, byte[]> kafkaProducer;
@@ -92,7 +88,8 @@ public class KafkaSpanConsumer implements SpanConsumer {
     final String key;
     final byte[] value;
 
-    KafkaProducerCall(Producer<String, byte[]> kafkaProducer,
+    KafkaProducerCall(
+        Producer<String, byte[]> kafkaProducer,
         String topic,
         String key,
         byte[] value) {
@@ -102,32 +99,42 @@ public class KafkaSpanConsumer implements SpanConsumer {
       this.value = value;
     }
 
+    static Call<Void> create(
+        Producer<String, byte[]> producer,
+        String topicName,
+        String key,
+        byte[] value) {
+      return new KafkaProducerCall(producer, topicName, key, value);
+    }
+
     @Override
-    protected V doExecute() throws IOException {
+    protected Void doExecute() throws IOException {
       try {
         ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
-        RecordMetadata recordMetadata = kafkaProducer.send(producerRecord).get();
-        return convert(recordMetadata);
+        kafkaProducer.send(producerRecord);
+        return null;
       } catch (Exception e) {
         LOG.error("Error sending span to Kafka", e);
         throw new IOException(e);
       }
     }
 
-    abstract V convert(RecordMetadata recordMetadata);
-
     @Override
     @SuppressWarnings("FutureReturnValueIgnored")
-    protected void doEnqueue(Callback<V> callback) {
+    protected void doEnqueue(Callback<Void> callback) {
       ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
       kafkaProducer.send(producerRecord, (recordMetadata, e) -> {
         if (e == null) {
-          callback.onSuccess(convert(recordMetadata));
+          callback.onSuccess(null);
         } else {
           LOG.error("Error sending span to Kafka", e);
           callback.onError(e);
         }
       });
+    }
+
+    @Override public Call<Void> clone() {
+      return new KafkaProducerCall(kafkaProducer, topic, key, value);
     }
   }
 }

@@ -32,7 +32,6 @@ import org.testcontainers.containers.KafkaContainer;
 import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.CheckResult;
-import zipkin2.DependencyLink;
 import zipkin2.Endpoint;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
@@ -68,6 +67,7 @@ public class KafkaStorageIT {
         .bootstrapServers(kafka.getBootstrapServers())
         .storeDirectory("target/zipkin_" + epochMilli)
         .spansTopic(KafkaStorage.Topic.builder("zipkin").build())
+        .traceInactivityGap(Duration.ofSeconds(5))
         .build();
   }
 
@@ -78,53 +78,11 @@ public class KafkaStorageIT {
   }
 
   @Test
-  public void shouldStoreSpansAndServices() throws Exception {
+  public void shouldCreateSpanAndService() throws Exception {
     Span root = Span.newBuilder()
         .traceId("a")
         .id("a")
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-        .name("op_a")
-        .timestamp(TODAY)
-        .duration(10)
-        .build();
-    Span child = Span.newBuilder()
-        .traceId("a")
-        .id("b")
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-        .name("op_b")
-        .timestamp(TODAY)
-        .duration(2)
-        .build();
-    List<Span> spans0 = Arrays.asList(root, child);
-
-    final SpanConsumer spanConsumer = storage.spanConsumer();
-    final SpanStore spanStore = storage.spanStore();
-
-    spanConsumer.accept(spans0).execute();
-
-    IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.traceSpansTopic.name, 2, 10000);
-
-    await().atMost(10, TimeUnit.SECONDS)
-        .until(() -> {
-          List<String> serviceNames = spanStore.getServiceNames().execute();
-          return serviceNames.size() == 1;
-        });
-
-    await().atMost(10, TimeUnit.SECONDS)
-        .until(() -> {
-          List<String> spanNames = spanStore.getSpanNames("svc_a").execute();
-          return spanNames.size() == 2;
-        });
-  }
-
-  @Test
-  public void shouldCreateDependencyGraph() throws Exception {
-    Span root = Span.newBuilder()
-        .traceId("a")
-        .id("a")
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-        .remoteEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
         .name("op_a")
         .kind(Span.Kind.CLIENT)
         .timestamp(TODAY)
@@ -141,22 +99,17 @@ public class KafkaStorageIT {
         .build();
 
     final SpanConsumer spanConsumer = storage.spanConsumer();
-    final SpanStore spanStore = storage.spanStore();
 
     List<Span> spans = Arrays.asList(root, child);
     spanConsumer.accept(spans).execute();
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.traceSpansTopic.name, 2, 10000);
+        testConsumerConfig, storage.spansTopic.name, 2, 10000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopic.name, 1, 10000);
-
-    await().atMost(10, TimeUnit.SECONDS)
-        .until(() -> {
-          List<DependencyLink> dependencyLinks = spanStore.getDependencies(0L, 0L).execute();
-          return dependencyLinks.size() == 1;
-        });
+        testConsumerConfig, storage.spanServicesTopic.name, 2, 10000);
   }
+
+  // TODO: implement dependency building validation as it is unclear how to test suppress feature i.e. how long to wait for dependencies?
 
   @Test
   public void shouldFindTraces() throws Exception {
@@ -474,7 +427,7 @@ public class KafkaStorageIT {
   }
 
   @Test
-  public void traceQueryEnqueue() {
+  public void shouldEnqueueTraceQuery() {
     final SpanStore spanStore = storage.spanStore();
     Call<List<List<Span>>> callTraces =
         spanStore.getTraces(
@@ -511,7 +464,7 @@ public class KafkaStorageIT {
   }
 
   @Test
-  public void checkShouldErrorWhenKafkaNotAvailable() {
+  public void shouldFailWhenKafkaNotAvailable() {
     CheckResult checked = storage.check();
     assertEquals(CheckResult.OK, checked);
 
@@ -521,5 +474,6 @@ public class KafkaStorageIT {
           CheckResult check = storage.check();
           return check != CheckResult.OK;
         });
+    storage.close();
   }
 }

@@ -18,6 +18,7 @@ ARG KAFKA_STORAGE_VERSION=0.1.1
 
 ENV ZIPKIN_REPO https://jcenter.bintray.com
 ENV ZIPKIN_VERSION 2.12.6
+ENV ZIPKIN_LOGGING_LEVEL INFO
 
 # Use to set heap, trust store or other system properties.
 ENV JAVA_OPTS -Djava.security.egd=file:/dev/./urandom
@@ -40,4 +41,5 @@ CMD exec java \
     -Dcom.linecorp.armeria.annotatedServiceExceptionVerbosity=all \
     -Dcom.linecorp.armeria.verboseExceptions=true \
     -cp zipkin.jar \
-    org.springframework.boot.loader.PropertiesLauncher
+    org.springframework.boot.loader.PropertiesLauncher \
+    --logging.level.zipkin2=${ZIPKIN_LOGGING_LEVEL}
