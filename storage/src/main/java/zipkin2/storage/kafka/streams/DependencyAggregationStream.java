@@ -31,7 +31,6 @@ import org.apache.kafka.streams.state.KeyValueStore;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.internal.DependencyLinker;
-import zipkin2.storage.kafka.internal.DependencyLinkKey;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
@@ -41,6 +40,7 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
  * increasing dependency link with updated counters.
  */
 public class DependencyAggregationStream implements Supplier<Topology> {
+  static final String KEY_PATTERN = "%s:%s";
   // Kafka topics
   final String tracesTopicName;
   final String spanDependenciesTopicName;
@@ -84,7 +84,7 @@ public class DependencyAggregationStream implements Supplier<Topology> {
       if (spans == null) return new ArrayList<>();
       DependencyLinker linker = new DependencyLinker();
       return linker.putTrace(spans).link().stream()
-          .map(link -> KeyValue.pair(DependencyLinkKey.key(link), link))
+          .map(link -> KeyValue.pair(key(link), link))
           .collect(Collectors.toList());
     };
   }
@@ -105,5 +105,9 @@ public class DependencyAggregationStream implements Supplier<Topology> {
             .build();
       }
     };
+  }
+
+  String key(DependencyLink link) {
+    return String.format(KEY_PATTERN, link.parent(), link.child());
   }
 }
