@@ -15,7 +15,6 @@ package zipkin2.storage.kafka;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -29,8 +28,8 @@ import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.Span;
 import zipkin2.codec.SpanBytesEncoder;
+import zipkin2.internal.AggregateCall;
 import zipkin2.storage.SpanConsumer;
-import zipkin2.storage.kafka.internal.AggregateCall;
 
 /**
  * Collected Spans processor.
@@ -77,7 +76,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
             stringSerializer.serialize(spanServicesTopicName, span.name())));
       }
     }
-    return AggregateCall.create(calls);
+    return AggregateCall.newVoidCall(calls);
   }
 
   static class KafkaProducerCall extends Call.Base<Void> {
