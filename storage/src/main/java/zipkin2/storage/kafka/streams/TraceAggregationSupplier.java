@@ -39,7 +39,7 @@ import static org.apache.kafka.streams.kstream.Suppressed.untilWindowCloses;
 /**
  *
  */
-public class TraceAggregationStream implements Supplier<Topology> {
+public class TraceReductionStream implements Supplier<Topology> {
   // Kafka topics
   final String spansTopicName;
   final String tracesTopicName;
@@ -49,7 +49,7 @@ public class TraceAggregationStream implements Supplier<Topology> {
   // Config
   final Duration traceInactivityGap;
 
-  public TraceAggregationStream(
+  public TraceReductionStream(
       String spansTopicName,
       String tracesTopicName,
       Duration traceInactivityGap) {
@@ -64,7 +64,6 @@ public class TraceAggregationStream implements Supplier<Topology> {
     StreamsBuilder builder = new StreamsBuilder();
     // Aggregate Spans to Traces
     builder.stream(spansTopicName, Consumed.with(Serdes.String(), spanSerde))
-        .filter((key, value) -> Objects.nonNull(value))
         .groupByKey()
         .windowedBy(SessionWindows.with(traceInactivityGap).grace(traceInactivityGap))
         .aggregate(ArrayList::new, aggregateSpans(), joinAggregates(),
