@@ -39,7 +39,7 @@ import static org.apache.kafka.streams.kstream.Suppressed.untilWindowCloses;
 /**
  *
  */
-public class TraceReductionStream implements Supplier<Topology> {
+public class TraceAggregationSupplier implements Supplier<Topology> {
   // Kafka topics
   final String spansTopicName;
   final String tracesTopicName;
@@ -49,7 +49,7 @@ public class TraceReductionStream implements Supplier<Topology> {
   // Config
   final Duration traceInactivityGap;
 
-  public TraceReductionStream(
+  public TraceAggregationSupplier(
       String spansTopicName,
       String tracesTopicName,
       Duration traceInactivityGap) {

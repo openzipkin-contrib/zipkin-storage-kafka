@@ -25,7 +25,7 @@ public class StreamGraphPrinter {
     String dependenciesTopicName = "zipkin-dependencies-v1";
 
     System.out.println("# TRACE STORE TOPOLOGY");
-    Topology traceStoreTopology = new TraceStoreStream(spanTopicName, spanTopicName,
+    Topology traceStoreTopology = new TraceStoreSupplier(spanTopicName, spanTopicName,
         null).get();
     System.out.println(StreamsTopologyGraphviz.print(traceStoreTopology));
     System.out.println();

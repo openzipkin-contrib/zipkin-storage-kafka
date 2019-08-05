@@ -54,9 +54,8 @@ import zipkin2.storage.kafka.streams.DependencyAggregationStream;
 import zipkin2.storage.kafka.streams.DependencyStoreStream;
 import zipkin2.storage.kafka.streams.ServiceAggregationStream;
 import zipkin2.storage.kafka.streams.ServiceStoreStream;
-import zipkin2.storage.kafka.streams.TraceAggregationStream;
-import zipkin2.storage.kafka.streams.TraceRetentionStoreStream;
-import zipkin2.storage.kafka.streams.TraceStoreStream;
+import zipkin2.storage.kafka.streams.TraceAggregationSupplier;
+import zipkin2.storage.kafka.streams.TraceStoreSupplier;
 
 /**
  * Kafka Storage entry-point.
@@ -83,8 +82,8 @@ public class KafkaStorage extends StorageComponent {
       serviceAggregationStreamConfig, dependencyAggregationStreamConfig, traceRetentionStreamConfig,
       traceAggregationStreamConfig;
   final Topology traceStoreTopology, serviceStoreTopology, dependencyStoreTopology,
-      serviceAggregationTopology, dependencyAggregationTopology, traceAggregationTopology,
-      traceRetentionTopology;
+      serviceAggregationTopology, dependencyAggregationTopology, traceAggregationTopology;
+      //traceRetentionTopology; //FIXME
   final String spanIndexDirectory;
   // Resources
   volatile AdminClient adminClient;
@@ -142,7 +141,9 @@ public class KafkaStorage extends StorageComponent {
         builder.compressionType.name);
     traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
     traceStoreTopology =
-        new TraceStoreStream(spansTopic.name, traceStoreName, getSpanIndexService()).get();
+        // FIXME
+        new TraceStoreSupplier(spansTopic.name, traceStoreName, "",
+            builder.retentionScanFrequency, builder.retentionMaxAge).get();
     // Service Aggregation topology
     serviceAggregationStreamConfig = new Properties();
     serviceAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -224,8 +225,8 @@ public class KafkaStorage extends StorageComponent {
     traceRetentionStreamConfig.put(
         StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
-    traceRetentionTopology = new TraceRetentionStoreStream(spansTopic.name, traceStoreName,
-        builder.retentionScanFrequency, builder.retentionMaxAge).get();
+    //traceRetentionTopology = new TraceRetentionStoreStream(spansTopic.name, traceStoreName,
+    //    builder.retentionScanFrequency, builder.retentionMaxAge).get();
     // Trace Aggregation topology
     traceAggregationStreamConfig = new Properties();
     traceAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -241,7 +242,7 @@ public class KafkaStorage extends StorageComponent {
     traceAggregationStreamConfig.put(
         StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
-    traceAggregationTopology = new TraceAggregationStream(spansTopic.name, tracesTopic.name,
+    traceAggregationTopology = new TraceAggregationSupplier(spansTopic.name, tracesTopic.name,
         builder.traceInactivityGap).get();
   }
 
@@ -408,25 +409,26 @@ public class KafkaStorage extends StorageComponent {
         if (traceStoreStream == null) {
           traceStoreStream = new KafkaStreams(traceStoreTopology, traceStoreStreamConfig);
           traceStoreStream.start();
-          getTraceRetentionStream();
+          //getTraceRetentionStream();
         }
       }
     }
     return traceStoreStream;
   }
 
-  KafkaStreams getTraceRetentionStream() {
-    if (traceRetentionStream == null) {
-      synchronized (this) {
-        if (traceRetentionStream == null) {
-          traceRetentionStream =
-              new KafkaStreams(traceRetentionTopology, traceRetentionStreamConfig);
-          traceRetentionStream.start();
-        }
-      }
-    }
-    return traceRetentionStream;
-  }
+  // FIXME
+  //KafkaStreams getTraceRetentionStream() {
+  //  if (traceRetentionStream == null) {
+  //    synchronized (this) {
+  //      if (traceRetentionStream == null) {
+  //        traceRetentionStream =
+  //            new KafkaStreams(traceRetentionTopology, traceRetentionStreamConfig);
+  //        traceRetentionStream.start();
+  //      }
+  //    }
+  //  }
+  //  return traceRetentionStream;
+  //}
 
   KafkaStreams getTraceAggregationStream() {
     if (traceAggregationStream == null) {
