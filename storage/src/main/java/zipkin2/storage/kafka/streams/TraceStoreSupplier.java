@@ -15,8 +15,6 @@ package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,13 +25,11 @@ import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.TimeWindows;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
 import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.state.StoreBuilder;
 import org.apache.kafka.streams.state.Stores;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -191,6 +187,7 @@ public class TraceStoreSupplier implements Supplier<Topology> {
             scanFrequency,
             PunctuationType.STREAM_TIME,
             timestamp -> {
+              // TODO check this logic
               final long cutoff = timestamp - maxAge.toMillis();
               final long ttl = cutoff * 1000;
               final long now = System.currentTimeMillis() * 1000;

@@ -50,8 +50,6 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 import zipkin2.storage.kafka.index.SpanIndexService;
-import zipkin2.storage.kafka.streams.DependencyAggregationStream;
-import zipkin2.storage.kafka.streams.DependencyStoreStream;
 import zipkin2.storage.kafka.streams.ServiceAggregationStream;
 import zipkin2.storage.kafka.streams.ServiceStoreStream;
 import zipkin2.storage.kafka.streams.TraceAggregationSupplier;
@@ -81,8 +79,11 @@ public class KafkaStorage extends StorageComponent {
   final Properties traceStoreStreamConfig, serviceStoreStreamConfig, dependencyStoreStreamConfig,
       serviceAggregationStreamConfig, dependencyAggregationStreamConfig, traceRetentionStreamConfig,
       traceAggregationStreamConfig;
-  final Topology traceStoreTopology, serviceStoreTopology, dependencyStoreTopology,
-      serviceAggregationTopology, dependencyAggregationTopology, traceAggregationTopology;
+  final Topology traceStoreTopology, serviceStoreTopology,
+      //dependencyStoreTopology, //FIXME
+      serviceAggregationTopology,
+      //dependencyAggregationTopology, //FIXME
+      traceAggregationTopology;
       //traceRetentionTopology; //FIXME
   final String spanIndexDirectory;
   // Resources
@@ -190,9 +191,10 @@ public class KafkaStorage extends StorageComponent {
         builder.compressionType.name);
     dependencyAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION,
         StreamsConfig.OPTIMIZE);
-    dependencyAggregationTopology =
-        new DependencyAggregationStream(tracesTopic.name, spanDependenciesTopic.name,
-            dependenciesTopic.name).get();
+    // FIXME
+    //dependencyAggregationTopology =
+    //    new DependencyAggregationStream(tracesTopic.name, spanDependenciesTopic.name,
+    //        dependenciesTopic.name).get();
     // Dependency Store topology
     dependencyStoreStreamConfig = new Properties();
     dependencyStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -208,8 +210,9 @@ public class KafkaStorage extends StorageComponent {
     dependencyStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
     dependencyStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    dependencyStoreTopology =
-        new DependencyStoreStream(dependenciesTopic.name, dependencyStoreName).get();
+    //FIXME
+    //dependencyStoreTopology =
+    //    new DependencyStoreStream(dependenciesTopic.name, dependencyStoreName).get();
     // Trace Retention topology
     traceRetentionStreamConfig = new Properties();
     traceRetentionStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -256,7 +259,7 @@ public class KafkaStorage extends StorageComponent {
     if (aggregationEnabled) {
       getTraceAggregationStream();
       getServiceAggregationStream();
-      getDependencyAggregationStream();
+      //FIXME getDependencyAggregationStream();
     }
     if (spanConsumerEnabled) {
       return new KafkaSpanConsumer(this);
@@ -270,7 +273,7 @@ public class KafkaStorage extends StorageComponent {
     if (ensureTopics && !topicsValidated) ensureTopics();
     if (aggregationEnabled) {
       getServiceAggregationStream();
-      getDependencyAggregationStream();
+      //FIXME getDependencyAggregationStream();
     }
     if (spanStoreEnabled) {
       return new KafkaSpanStore(this);
@@ -468,31 +471,33 @@ public class KafkaStorage extends StorageComponent {
     return serviceStoreStream;
   }
 
-  KafkaStreams getDependencyAggregationStream() {
-    if (dependencyAggregationStream == null) {
-      synchronized (this) {
-        if (dependencyAggregationStream == null) {
-          dependencyAggregationStream =
-              new KafkaStreams(dependencyAggregationTopology, dependencyAggregationStreamConfig);
-          dependencyAggregationStream.start();
-        }
-      }
-    }
-    return dependencyAggregationStream;
-  }
+  //FIXME
+  //KafkaStreams getDependencyAggregationStream() {
+  //  if (dependencyAggregationStream == null) {
+  //    synchronized (this) {
+  //      if (dependencyAggregationStream == null) {
+  //        dependencyAggregationStream =
+  //            new KafkaStreams(dependencyAggregationTopology, dependencyAggregationStreamConfig);
+  //        dependencyAggregationStream.start();
+  //      }
+  //    }
+  //  }
+  //  return dependencyAggregationStream;
+  //}
 
-  KafkaStreams getDependencyStoreStream() {
-    if (dependencyStoreStream == null) {
-      synchronized (this) {
-        if (dependencyStoreStream == null) {
-          dependencyStoreStream =
-              new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
-          dependencyStoreStream.start();
-        }
-      }
-    }
-    return dependencyStoreStream;
-  }
+  //FIXME
+  //KafkaStreams getDependencyStoreStream() {
+  //  if (dependencyStoreStream == null) {
+  //    synchronized (this) {
+  //      if (dependencyStoreStream == null) {
+  //        dependencyStoreStream =
+  //            new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
+  //        dependencyStoreStream.start();
+  //      }
+  //    }
+  //  }
+  //  return dependencyStoreStream;
+  //}
 
   SpanIndexService getSpanIndexService() {
     if (spanIndexService == null) {

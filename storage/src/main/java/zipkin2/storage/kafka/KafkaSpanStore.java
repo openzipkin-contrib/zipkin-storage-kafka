@@ -60,7 +60,7 @@ public class KafkaSpanStore implements SpanStore {
     dependenciesStoreName = storage.dependencyStoreName;
     traceStoreStream = storage.getTraceStoreStream();
     serviceStoreStream = storage.getServiceStoreStream();
-    dependencyStoreStream = storage.getDependencyStoreStream();
+    dependencyStoreStream = null;//FIXME storage.getDependencyStoreStream();
     spanIndexService = storage.getSpanIndexService();
   }
 

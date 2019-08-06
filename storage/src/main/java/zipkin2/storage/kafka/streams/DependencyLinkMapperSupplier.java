@@ -18,16 +18,12 @@ import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KeyValueMapper;
-import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Produced;
-import org.apache.kafka.streams.kstream.Reducer;
-import org.apache.kafka.streams.state.KeyValueStore;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.internal.DependencyLinker;
@@ -39,24 +35,21 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
  * Reduction of span dependency events, with call/error counter equals to 0 or 1, into ever
  * increasing dependency link with updated counters.
  */
-public class DependencyAggregationStream implements Supplier<Topology> {
+public class DependencyLinkMapperSupplier implements Supplier<Topology> {
   static final String KEY_PATTERN = "%s:%s";
   // Kafka topics
   final String tracesTopicName;
-  final String spanDependenciesTopicName;
-  final String dependenciesTopicName;
+  final String dependencyLinksTopicName;
   // SerDes
   final SpanSerde spanSerde;
   final SpansSerde spansSerde;
   final DependencyLinkSerde dependencyLinkSerde;
 
-  public DependencyAggregationStream(
+  public DependencyLinkMapperSupplier(
       String tracesTopicName,
-      String spanDependenciesTopicName,
-      String dependenciesTopicName) {
+      String dependencyLinksTopicName) {
     this.tracesTopicName = tracesTopicName;
-    this.spanDependenciesTopicName = spanDependenciesTopicName;
-    this.dependenciesTopicName = dependenciesTopicName;
+    this.dependencyLinksTopicName = dependencyLinksTopicName;
     spanSerde = new SpanSerde();
     spansSerde = new SpansSerde();
     dependencyLinkSerde = new DependencyLinkSerde();
@@ -67,15 +60,8 @@ public class DependencyAggregationStream implements Supplier<Topology> {
     // Changelog of dependency links over time
     builder.stream(tracesTopicName, Consumed.with(Serdes.String(), spansSerde))
         .flatMap(spansToDependencyLinks())
-        .through(spanDependenciesTopicName, Produced.with(Serdes.String(), dependencyLinkSerde))
-        .groupByKey()
-        .reduce(reduceDependencyLinks(),
-            Materialized.<String, DependencyLink, KeyValueStore<Bytes, byte[]>>with(
-                Serdes.String(),
-                dependencyLinkSerde).withLoggingDisabled().withCachingEnabled())
-        .toStream()
-        .selectKey((key, value) -> key)
-        .to(dependenciesTopicName, Produced.with(Serdes.String(), dependencyLinkSerde));
+        .selectKey((key, value) -> key(value))
+        .to(dependencyLinksTopicName, Produced.with(Serdes.String(), dependencyLinkSerde));
     return builder.build();
   }
 
@@ -86,24 +72,6 @@ public class DependencyAggregationStream implements Supplier<Topology> {
       return linker.putTrace(spans).link().stream()
           .map(link -> KeyValue.pair(key(link), link))
           .collect(Collectors.toList());
-    };
-  }
-
-  /**
-   * Reducing link events into links with updated results
-   */
-  Reducer<DependencyLink> reduceDependencyLinks() {
-    return (link1, link2) -> {
-      if (link2 == null) {
-        return link1;
-      } else {
-        return DependencyLink.newBuilder()
-            .parent(link1.parent())
-            .child(link1.child())
-            .callCount(link1.callCount() + link2.callCount())
-            .errorCount(link1.errorCount() + link2.errorCount())
-            .build();
-      }
     };
   }
 
