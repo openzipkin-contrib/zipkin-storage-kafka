@@ -35,8 +35,10 @@ import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
 
 import static zipkin2.storage.kafka.streams.stores.DependencyStoreSupplier.DEPENDENCY_LINKS_BY_TIMESTAMP_STORE_NAME;
+import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.TRACES_BY_TIMESTAMP_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.TRACES_STORE_NAME;
 
 /**
@@ -65,7 +67,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
           traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTimestampStore =
-          traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+          traceStoreStream.store(TRACES_BY_TIMESTAMP_STORE_NAME, QueryableStoreTypes.keyValueStore());
       return new GetTracesCall(tracesStore, traceIdsByTimestampStore, request);
     } catch (Exception e) {
       LOG.error("Error getting traces. Request: {}", request, e);
@@ -98,8 +100,15 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   }
 
   @Override
-  public Call<List<String>> getRemoteServiceNames(String s) {
-    return null;
+  public Call<List<String>> getRemoteServiceNames(String serviceName) {
+    try {
+      ReadOnlyKeyValueStore<String, Set<String>> remoteServiceNamesStore =
+          traceStoreStream.store(REMOTE_SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+      return new GetRemoteServiceNamesCall(remoteServiceNamesStore, serviceName);
+    } catch (Exception e) {
+      LOG.error("Error getting remote service names from service {}", serviceName, e);
+      return Call.emptyList();
+    }
   }
 
   @Override
@@ -181,6 +190,37 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     @Override
     public Call<List<String>> clone() {
       return new GetSpanNamesCall(spanNamesStore, serviceName);
+    }
+  }
+
+  static class GetRemoteServiceNamesCall extends KafkaStreamsStoreCall<List<String>> {
+    final ReadOnlyKeyValueStore<String, Set<String>> remoteServiceNamesStore;
+    final String serviceName;
+
+    GetRemoteServiceNamesCall(ReadOnlyKeyValueStore<String, Set<String>> remoteServiceNamesStore,
+        String serviceName) {
+      this.remoteServiceNamesStore = remoteServiceNamesStore;
+      this.serviceName = serviceName;
+    }
+
+    @Override
+    List<String> query() {
+      try {
+        if (serviceName == null || serviceName.equals("all")) return new ArrayList<>();
+        Set<String> remoteServiceNamesSet = remoteServiceNamesStore.get(serviceName);
+        if (remoteServiceNamesSet == null) return new ArrayList<>();
+        List<String> remoteServiceNames = new ArrayList<>(remoteServiceNamesSet);
+        Collections.sort(remoteServiceNames);
+        return remoteServiceNames;
+      } catch (Exception e) {
+        LOG.error("Error looking up for remote service names for service {}", serviceName, e);
+        return new ArrayList<>();
+      }
+    }
+
+    @Override
+    public Call<List<String>> clone() {
+      return new GetRemoteServiceNamesCall(remoteServiceNamesStore, serviceName);
     }
   }
 
