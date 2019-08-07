@@ -24,7 +24,7 @@ import java.util.Set;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public class SpanNamesSerde implements Serde<Set<String>> {
+public class NamesSerde implements Serde<Set<String>> {
   @Override
   public void configure(Map<String, ?> configs, boolean isKey) {
     //Nothing to do.

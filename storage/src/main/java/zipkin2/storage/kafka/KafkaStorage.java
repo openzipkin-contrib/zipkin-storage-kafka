@@ -13,17 +13,6 @@
  */
 package zipkin2.storage.kafka;
 
-import java.io.IOException;
-import java.time.Duration;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -49,11 +38,14 @@ import zipkin2.storage.QueryRequest;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
-import zipkin2.storage.kafka.index.SpanIndexService;
-import zipkin2.storage.kafka.streams.ServiceAggregationStream;
-import zipkin2.storage.kafka.streams.ServiceStoreStream;
-import zipkin2.storage.kafka.streams.TraceAggregationSupplier;
-import zipkin2.storage.kafka.streams.TraceStoreSupplier;
+import zipkin2.storage.kafka.streams.aggregation.DependencyLinkMapperSupplier;
+import zipkin2.storage.kafka.streams.aggregation.TraceAggregationSupplier;
+import zipkin2.storage.kafka.streams.stores.DependencyStoreSupplier;
+import zipkin2.storage.kafka.streams.stores.TraceStoreSupplier;
+
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Kafka Storage entry-point.
@@ -68,32 +60,24 @@ public class KafkaStorage extends StorageComponent {
   final boolean spanConsumerEnabled, spanStoreEnabled, aggregationEnabled;
   final boolean ensureTopics;
   // Kafka Storage configs
-  final String storageDirectory, traceStoreName, dependencyStoreName, serviceStoreName;
+  final String storageDirectory;
   // Kafka Topics
-  final Topic spansTopic, tracesTopic, spanServicesTopic, servicesTopic, spanDependenciesTopic,
-      dependenciesTopic;
+  final Topic spansTopic, tracesTopic, dependencyLinksTopic;
   // Kafka Clients config
   final Properties adminConfig;
   final Properties producerConfig;
   // Kafka Streams topology configs
-  final Properties traceStoreStreamConfig, serviceStoreStreamConfig, dependencyStoreStreamConfig,
-      serviceAggregationStreamConfig, dependencyAggregationStreamConfig, traceRetentionStreamConfig,
-      traceAggregationStreamConfig;
-  final Topology traceStoreTopology, serviceStoreTopology,
-      //dependencyStoreTopology, //FIXME
-      serviceAggregationTopology,
-      //dependencyAggregationTopology, //FIXME
-      traceAggregationTopology;
-      //traceRetentionTopology; //FIXME
-  final String spanIndexDirectory;
+  final Properties
+          traceAggregationStreamConfig, traceStoreStreamConfig,
+          dependencyStoreStreamConfig, dependencyLinkMapperStreamConfig;
+  final Topology
+          traceAggregationTopology, traceStoreTopology, dependencyLinkMapperTopology, dependencyStoreTopology;
   // Resources
   volatile AdminClient adminClient;
   volatile Producer<String, byte[]> producer;
-  volatile KafkaStreams serviceAggregationStream, dependencyAggregationStream, traceStoreStream,
-      serviceStoreStream, dependencyStoreStream, traceAggregationStream, traceRetentionStream;
+  volatile KafkaStreams dependencyLinkMapperStream,
+          dependencyStoreStream, traceAggregationStream, traceStoreStream;
   volatile boolean closeCalled, topicsValidated;
-  volatile SpanIndexService spanIndexService;
-  volatile Map<String, Set<String>> serviceSpanMap;
 
   KafkaStorage(Builder builder) {
     // Kafka Storage modes
@@ -104,19 +88,9 @@ public class KafkaStorage extends StorageComponent {
     this.ensureTopics = builder.ensureTopics;
     this.spansTopic = builder.spansTopic;
     this.tracesTopic = builder.tracesTopic;
-    this.spanServicesTopic = builder.spanServicesTopic;
-    this.servicesTopic = builder.servicesTopic;
-    this.spanDependenciesTopic = builder.spanDependenciesTopic;
-    this.dependenciesTopic = builder.dependenciesTopic;
+    this.dependencyLinksTopic = builder.dependenciesTopic;
     // State store directories
     this.storageDirectory = builder.storeDirectory;
-    this.traceStoreName = builder.traceStoreName;
-    this.dependencyStoreName = builder.dependencyStoreName;
-    this.serviceStoreName = builder.serviceStoreName;
-    // Span Index service
-    spanIndexDirectory = builder.spanIndexDirectory();
-    // Service:Span names map
-    serviceSpanMap = new ConcurrentHashMap<>();
     // Kafka Clients configuration
     adminConfig = new Properties();
     adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -127,6 +101,22 @@ public class KafkaStorage extends StorageComponent {
     producerConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
     producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
     producerConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, builder.compressionType.name);
+    // Trace Aggregation topology
+    traceAggregationStreamConfig = new Properties();
+    traceAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
+            builder.bootstrapServers);
+    traceAggregationStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+            Serdes.StringSerde.class);
+    traceAggregationStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+            Serdes.ByteArraySerde.class);
+    traceAggregationStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
+            builder.traceAggregationStreamAppId);
+    traceAggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.traceStoreDirectory());
+    traceAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
+    traceAggregationStreamConfig.put(
+            StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
+            builder.compressionType.name);
+    traceAggregationTopology = new TraceAggregationSupplier(spansTopic.name, tracesTopic.name, builder.traceInactivityGap).get();
     // Trace Store Stream Topology configuration
     traceStoreStreamConfig = new Properties();
     traceStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -141,60 +131,24 @@ public class KafkaStorage extends StorageComponent {
     traceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
     traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    traceStoreTopology =
-        // FIXME
-        new TraceStoreSupplier(spansTopic.name, traceStoreName, "",
-            builder.retentionScanFrequency, builder.retentionMaxAge).get();
-    // Service Aggregation topology
-    serviceAggregationStreamConfig = new Properties();
-    serviceAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
-        builder.bootstrapServers);
-    serviceAggregationStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
-        Serdes.StringSerde.class);
-    serviceAggregationStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
-        Serdes.ByteArraySerde.class);
-    serviceAggregationStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
-        builder.serviceAggregationStreamAppId);
-    serviceAggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
-        builder.serviceStoreDirectory());
-    serviceAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    serviceAggregationTopology =
-        new ServiceAggregationStream(spanServicesTopic.name, servicesTopic.name)
-            .get();
-    // Service Store topology
-    serviceStoreStreamConfig = new Properties();
-    serviceStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
-    serviceStoreStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
-        Serdes.StringSerde.class);
-    serviceStoreStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
-        Serdes.ByteArraySerde.class);
-    serviceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
-        builder.serviceStoreStreamAppId);
-    serviceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.serviceStoreDirectory());
-    serviceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
-        builder.compressionType.name);
-    serviceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    serviceStoreTopology = new ServiceStoreStream(servicesTopic.name, serviceStoreName).get();
+    traceStoreTopology = new TraceStoreSupplier(spansTopic.name, builder.retentionScanFrequency, builder.retentionMaxAge).get();
     // Dependency Aggregation topology
-    dependencyAggregationStreamConfig = new Properties();
-    dependencyAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
+    dependencyLinkMapperStreamConfig = new Properties();
+    dependencyLinkMapperStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
         builder.bootstrapServers);
-    dependencyAggregationStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+    dependencyLinkMapperStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
         Serdes.StringSerde.class);
-    dependencyAggregationStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+    dependencyLinkMapperStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
         Serdes.ByteArraySerde.class);
-    dependencyAggregationStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
+    dependencyLinkMapperStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
         builder.dependencyAggregationStreamAppId);
-    dependencyAggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
+    dependencyLinkMapperStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
         builder.dependencyStoreDirectory());
-    dependencyAggregationStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
+    dependencyLinkMapperStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
-    dependencyAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION,
+    dependencyLinkMapperStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION,
         StreamsConfig.OPTIMIZE);
-    // FIXME
-    //dependencyAggregationTopology =
-    //    new DependencyAggregationStream(tracesTopic.name, spanDependenciesTopic.name,
-    //        dependenciesTopic.name).get();
+    dependencyLinkMapperTopology = new DependencyLinkMapperSupplier(tracesTopic.name, dependencyLinksTopic.name).get();
     // Dependency Store topology
     dependencyStoreStreamConfig = new Properties();
     dependencyStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -210,43 +164,7 @@ public class KafkaStorage extends StorageComponent {
     dependencyStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
     dependencyStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    //FIXME
-    //dependencyStoreTopology =
-    //    new DependencyStoreStream(dependenciesTopic.name, dependencyStoreName).get();
-    // Trace Retention topology
-    traceRetentionStreamConfig = new Properties();
-    traceRetentionStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
-        builder.bootstrapServers);
-    traceRetentionStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
-        Serdes.StringSerde.class);
-    traceRetentionStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
-        Serdes.ByteArraySerde.class);
-    traceRetentionStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
-        builder.traceRetentionStreamAppId);
-    traceRetentionStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.traceStoreDirectory());
-    traceRetentionStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    traceRetentionStreamConfig.put(
-        StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
-        builder.compressionType.name);
-    //traceRetentionTopology = new TraceRetentionStoreStream(spansTopic.name, traceStoreName,
-    //    builder.retentionScanFrequency, builder.retentionMaxAge).get();
-    // Trace Aggregation topology
-    traceAggregationStreamConfig = new Properties();
-    traceAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
-        builder.bootstrapServers);
-    traceAggregationStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
-        Serdes.StringSerde.class);
-    traceAggregationStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
-        Serdes.ByteArraySerde.class);
-    traceAggregationStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
-        builder.traceAggregationStreamAppId);
-    traceAggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.traceStoreDirectory());
-    traceAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    traceAggregationStreamConfig.put(
-        StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
-        builder.compressionType.name);
-    traceAggregationTopology = new TraceAggregationSupplier(spansTopic.name, tracesTopic.name,
-        builder.traceInactivityGap).get();
+    dependencyStoreTopology = new DependencyStoreSupplier(dependencyLinksTopic.name, builder.retentionScanFrequency, builder.retentionMaxAge).get();
   }
 
   public static Builder newBuilder() {
@@ -258,8 +176,9 @@ public class KafkaStorage extends StorageComponent {
     if (ensureTopics && !topicsValidated) ensureTopics();
     if (aggregationEnabled) {
       getTraceAggregationStream();
-      getServiceAggregationStream();
-      //FIXME getDependencyAggregationStream();
+
+//      getServiceAggregationStream();
+      //FIXME getDependencyLinkMapperStream();
     }
     if (spanConsumerEnabled) {
       return new KafkaSpanConsumer(this);
@@ -272,8 +191,8 @@ public class KafkaStorage extends StorageComponent {
   public SpanStore spanStore() {
     if (ensureTopics && !topicsValidated) ensureTopics();
     if (aggregationEnabled) {
-      getServiceAggregationStream();
-      //FIXME getDependencyAggregationStream();
+      getTraceAggregationStream();
+      getDependencyLinkMapperStream();
     }
     if (spanStoreEnabled) {
       return new KafkaSpanStore(this);
@@ -309,8 +228,7 @@ public class KafkaStorage extends StorageComponent {
           try {
             Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
             List<Topic> requiredTopics =
-                Arrays.asList(spansTopic, spanServicesTopic, servicesTopic, spanDependenciesTopic,
-                    dependenciesTopic, tracesTopic);
+                    Arrays.asList(spansTopic, dependencyLinksTopic, tracesTopic);
             Set<NewTopic> newTopics = new HashSet<>();
             for (Topic requiredTopic : requiredTopics) {
               if (!topics.contains(requiredTopic.name)) {
@@ -356,25 +274,19 @@ public class KafkaStorage extends StorageComponent {
       if (adminClient != null) adminClient.close(1, TimeUnit.SECONDS);
       if (producer != null) {
         producer.flush();
-        producer.close(1, TimeUnit.SECONDS);
+        producer.close(Duration.ofSeconds(1));
       }
       if (traceStoreStream != null) {
         traceStoreStream.close(Duration.ofSeconds(1));
       }
-      if (traceRetentionStream != null) {
-        traceRetentionStream.close(Duration.ofSeconds(1));
+      if (traceStoreStream != null) {
+        traceStoreStream.close(Duration.ofSeconds(1));
       }
       if (traceAggregationStream != null) {
         traceAggregationStream.close(Duration.ofSeconds(1));
       }
-      if (serviceAggregationStream != null) {
-        serviceAggregationStream.close(Duration.ofSeconds(1));
-      }
-      if (serviceStoreStream != null) {
-        serviceStoreStream.close(Duration.ofSeconds(1));
-      }
-      if (dependencyAggregationStream != null) {
-        dependencyAggregationStream.close(Duration.ofSeconds(1));
+      if (dependencyLinkMapperStream != null) {
+        dependencyLinkMapperStream.close(Duration.ofSeconds(1));
       }
       if (dependencyStoreStream != null) {
         dependencyStoreStream.close(Duration.ofSeconds(1));
@@ -419,20 +331,6 @@ public class KafkaStorage extends StorageComponent {
     return traceStoreStream;
   }
 
-  // FIXME
-  //KafkaStreams getTraceRetentionStream() {
-  //  if (traceRetentionStream == null) {
-  //    synchronized (this) {
-  //      if (traceRetentionStream == null) {
-  //        traceRetentionStream =
-  //            new KafkaStreams(traceRetentionTopology, traceRetentionStreamConfig);
-  //        traceRetentionStream.start();
-  //      }
-  //    }
-  //  }
-  //  return traceRetentionStream;
-  //}
-
   KafkaStreams getTraceAggregationStream() {
     if (traceAggregationStream == null) {
       synchronized (this) {
@@ -446,72 +344,30 @@ public class KafkaStorage extends StorageComponent {
     return traceAggregationStream;
   }
 
-  KafkaStreams getServiceAggregationStream() {
-    if (serviceAggregationStream == null) {
+  KafkaStreams getDependencyLinkMapperStream() {
+    if (dependencyLinkMapperStream == null) {
       synchronized (this) {
-        if (serviceAggregationStream == null) {
-          serviceAggregationStream =
-              new KafkaStreams(serviceAggregationTopology, serviceAggregationStreamConfig);
-          serviceAggregationStream.start();
+        if (dependencyLinkMapperStream == null) {
+          dependencyLinkMapperStream =
+              new KafkaStreams(dependencyLinkMapperTopology, dependencyLinkMapperStreamConfig);
+          dependencyLinkMapperStream.start();
         }
       }
     }
-    return serviceAggregationStream;
+    return dependencyLinkMapperStream;
   }
 
-  KafkaStreams getServiceStoreStream() {
-    if (serviceStoreStream == null) {
+  KafkaStreams getDependencyStoreStream() {
+    if (dependencyStoreStream == null) {
       synchronized (this) {
-        if (serviceStoreStream == null) {
-          serviceStoreStream = new KafkaStreams(serviceStoreTopology, serviceStoreStreamConfig);
-          serviceStoreStream.start();
+        if (dependencyStoreStream == null) {
+          dependencyStoreStream =
+              new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
+          dependencyStoreStream.start();
         }
       }
     }
-    return serviceStoreStream;
-  }
-
-  //FIXME
-  //KafkaStreams getDependencyAggregationStream() {
-  //  if (dependencyAggregationStream == null) {
-  //    synchronized (this) {
-  //      if (dependencyAggregationStream == null) {
-  //        dependencyAggregationStream =
-  //            new KafkaStreams(dependencyAggregationTopology, dependencyAggregationStreamConfig);
-  //        dependencyAggregationStream.start();
-  //      }
-  //    }
-  //  }
-  //  return dependencyAggregationStream;
-  //}
-
-  //FIXME
-  //KafkaStreams getDependencyStoreStream() {
-  //  if (dependencyStoreStream == null) {
-  //    synchronized (this) {
-  //      if (dependencyStoreStream == null) {
-  //        dependencyStoreStream =
-  //            new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
-  //        dependencyStoreStream.start();
-  //      }
-  //    }
-  //  }
-  //  return dependencyStoreStream;
-  //}
-
-  SpanIndexService getSpanIndexService() {
-    if (spanIndexService == null) {
-      synchronized (this) {
-        if (spanIndexService == null) {
-          try {
-            spanIndexService = SpanIndexService.create(spanIndexDirectory);
-          } catch (IOException e) {
-            LOG.error("Error creating span index service", e);
-          }
-        }
-      }
-    }
-    return spanIndexService;
+    return dependencyStoreStream;
   }
 
   public static class Builder extends StorageComponent.Builder {
@@ -529,17 +385,10 @@ public class KafkaStorage extends StorageComponent {
 
     String traceStoreStreamAppId = "zipkin-trace-store-v1";
     String traceAggregationStreamAppId = "zipkin-trace-aggregation-v1";
-    String traceRetentionStreamAppId = "zipkin-trace-retention-v1";
-    String serviceStoreStreamAppId = "zipkin-service-store-v1";
-    String serviceAggregationStreamAppId = "zipkin-service-aggregation-v1";
     String dependencyStoreStreamAppId = "zipkin-dependency-store-v1";
     String dependencyAggregationStreamAppId = "zipkin-dependency-aggregation-v1";
 
     String storeDirectory = "/tmp/zipkin";
-
-    String traceStoreName = "zipkin-trace-store-v1";
-    String dependencyStoreName = "zipkin-dependency-v1";
-    String serviceStoreName = "zipkin-service-v1";
 
     Topic spansTopic = Topic.builder("zipkin-spans-v1").build();
     Topic spanServicesTopic = Topic.builder("zipkin-span-services-v1").build();
@@ -658,7 +507,7 @@ public class KafkaStorage extends StorageComponent {
      * Kafka topic name where dependencies changelog are stored.
      */
     public Builder dependenciesTopic(Topic dependenciesTopic) {
-      if (dependenciesTopic == null) throw new NullPointerException("dependenciesTopic == null");
+      if (dependenciesTopic == null) throw new NullPointerException("dependencyLinksTopic == null");
       this.dependenciesTopic = dependenciesTopic;
       return this;
     }
@@ -706,16 +555,8 @@ public class KafkaStorage extends StorageComponent {
       return storeDirectory + "/streams/traces";
     }
 
-    String serviceStoreDirectory() {
-      return storeDirectory + "/streams/services";
-    }
-
     String dependencyStoreDirectory() {
       return storeDirectory + "/streams/dependencies";
-    }
-
-    String spanIndexDirectory() {
-      return storeDirectory + "/index";
     }
 
     @Override

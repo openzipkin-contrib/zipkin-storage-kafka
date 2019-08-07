@@ -41,10 +41,10 @@ import zipkin2.storage.SpanStore;
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
-import static zipkin2.TestObjects.TODAY;
 
 public class KafkaStorageIT {
-  @Rule
+    private static final long TODAY = System.currentTimeMillis();
+    @Rule
   public KafkaContainer kafka = new KafkaContainer("5.1.0");
 
   private KafkaStorage storage;
@@ -105,8 +105,6 @@ public class KafkaStorageIT {
 
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopic.name, 2, 10000);
-    IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spanServicesTopic.name, 2, 10000);
   }
 
   // TODO: implement dependency building validation as it is unclear how to test suppress feature i.e. how long to wait for dependencies?

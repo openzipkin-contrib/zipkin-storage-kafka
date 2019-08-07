@@ -51,7 +51,6 @@ public class KafkaStorageTest {
   @Test
   public void buildDefaultBuilder() {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
-    assertNotNull(builder.dependencyStoreName);
     assertNotNull(builder.storeDirectory);
 
     try {

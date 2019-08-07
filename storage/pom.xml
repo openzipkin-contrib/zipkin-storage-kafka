@@ -28,7 +28,6 @@
     <properties>
         <main.basedir>${project.basedir}/..</main.basedir>
         <kafka.version>2.3.0</kafka.version>
-      <lucene.version>7.7.0</lucene.version>
     </properties>
 
     <dependencies>
@@ -43,21 +42,6 @@
             <artifactId>kafka-streams</artifactId>
             <version>${kafka.version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.apache.lucene</groupId>
-            <artifactId>lucene-core</artifactId>
-            <version>${lucene.version}</version>
-        </dependency>
-      <dependency>
-        <groupId>org.apache.lucene</groupId>
-        <artifactId>lucene-grouping</artifactId>
-        <version>${lucene.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.lucene</groupId>
-        <artifactId>lucene-queryparser</artifactId>
-        <version>${lucene.version}</version>
-      </dependency>
 
         <dependency>
             <groupId>org.apache.kafka</groupId>

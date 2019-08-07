@@ -13,11 +13,9 @@
  */
 package zipkin2.storage.kafka;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
@@ -27,6 +25,11 @@ import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.AggregateCall;
 import zipkin2.storage.SpanConsumer;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Future;
+
 /**
  * Collected Spans processor.
  *
@@ -35,20 +38,12 @@ import zipkin2.storage.SpanConsumer;
 public class KafkaSpanConsumer implements SpanConsumer {
   // Topic names
   final String spansTopicName;
-  //final String spanServicesTopicName;
   // Kafka producers
   final Producer<String, byte[]> producer;
-  //final StringSerializer stringSerializer;
-  // In-memory map of ServiceNames:SpanNames
-  //final Map<String, Set<String>> serviceSpanMap;
-
 
   KafkaSpanConsumer(KafkaStorage storage) {
     spansTopicName = storage.spansTopic.name;
-    //spanServicesTopicName = storage.spanServicesTopic.name;
     producer = storage.getProducer();
-    //stringSerializer = new StringSerializer();
-    //serviceSpanMap = storage.serviceSpanMap;
   }
 
   @Override
@@ -60,17 +55,6 @@ public class KafkaSpanConsumer implements SpanConsumer {
       String key = span.traceId();
       byte[] value = SpanBytesEncoder.PROTO3.encode(span);
       calls.add(KafkaProducerCall.create(producer, spansTopicName, key, value));
-      // Check if new spanNames are in place
-      //Set<String> spanNames = serviceSpanMap.getOrDefault(span.localServiceName(), new HashSet<>());
-      //if (!spanNames.contains(span.name())) {
-      //  spanNames.add(span.name());
-      //  serviceSpanMap.put(span.localServiceName(), spanNames);
-      //  calls.add(KafkaProducerCall.create(
-      //      producer,
-      //      spanServicesTopicName,
-      //      span.localServiceName(),
-      //      stringSerializer.serialize(spanServicesTopicName, span.name())));
-      //}
     }
     return AggregateCall.newVoidCall(calls);
   }
@@ -106,7 +90,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
     protected Void doExecute() throws IOException {
       try {
         ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
-        kafkaProducer.send(producerRecord);
+        kafkaProducer.send(producerRecord).get();
         return null;
       } catch (Exception e) {
         LOG.error("Error sending span to Kafka", e);
@@ -117,7 +101,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
     @Override
     protected void doEnqueue(Callback<Void> callback) {
       ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
-      kafkaProducer.send(producerRecord, (recordMetadata, e) -> {
+      Future<RecordMetadata> ignored = kafkaProducer.send(producerRecord, (recordMetadata, e) -> {
         if (e == null) {
           callback.onSuccess(null);
         } else {
