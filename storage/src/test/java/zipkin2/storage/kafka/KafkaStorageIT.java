@@ -45,7 +45,7 @@ import static org.junit.Assert.fail;
 public class KafkaStorageIT {
   private static final long TODAY = System.currentTimeMillis();
   @Rule
-  public KafkaContainer kafka = new KafkaContainer("5.1.0");
+  public KafkaContainer kafka = new KafkaContainer("5.3.0");
 
   private KafkaStorage storage;
   private Properties testConsumerConfig;
