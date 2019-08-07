@@ -16,6 +16,7 @@ package zipkin2.storage.kafka;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,8 +67,8 @@ public class KafkaStorageIT {
     storage = (KafkaStorage) new KafkaStorage.Builder().ensureTopics(true)
         .bootstrapServers(kafka.getBootstrapServers())
         .storeDirectory("target/zipkin_" + epochMilli)
-        .spansTopic(KafkaStorage.Topic.builder("zipkin").build())
-        .traceInactivityGap(Duration.ofSeconds(5))
+        .traceInactivityGap(Duration.ofSeconds(3))
+        .traceAggregationSuppressUntil(Duration.ofSeconds(3))
         .build();
   }
 
@@ -78,7 +79,55 @@ public class KafkaStorageIT {
   }
 
   @Test
-  public void shouldCreateSpanAndService() throws Exception {
+  public void should_persist_spans() throws Exception {
+    Span parent = Span.newBuilder()
+        .traceId("a")
+        .id("a")
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+        .name("op_a")
+        .kind(Span.Kind.CLIENT)
+        .timestamp(TODAY)
+        .duration(10)
+        .build();
+    Span child = Span.newBuilder()
+        .traceId("a")
+        .id("b")
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+        .name("op_b")
+        .kind(Span.Kind.SERVER)
+        .timestamp(TODAY)
+        .duration(2)
+        .build();
+
+    final SpanConsumer spanConsumer = storage.spanConsumer();
+
+    spanConsumer.accept(Arrays.asList(parent, child)).execute();
+
+    // Store spans
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.spansTopic.name, 2, 10000);
+
+    Thread.sleep(10_000);
+
+    Span another = Span.newBuilder()
+        .traceId("c")
+        .id("d")
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+        .name("op_a")
+        .kind(Span.Kind.SERVER)
+        .timestamp(TODAY)
+        .duration(2)
+        .build();
+
+    spanConsumer.accept(Collections.singletonList(another)).execute();
+
+    // Aggregate traces
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.tracesTopic.name, 1, 30000);
+
+  }
+
+  @Test public void should_aggregate_traces() throws Exception {
     Span root = Span.newBuilder()
         .traceId("a")
         .id("a")
@@ -103,8 +152,10 @@ public class KafkaStorageIT {
     List<Span> spans = Arrays.asList(root, child);
     spanConsumer.accept(spans).execute();
 
+    //storage.traceAggregationStream.start();
+
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopic.name, 2, 10000);
+        testConsumerConfig, storage.tracesTopic.name, 1, 10000);
   }
 
   // TODO: implement dependency building validation as it is unclear how to test suppress feature i.e. how long to wait for dependencies?

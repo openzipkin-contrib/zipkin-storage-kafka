@@ -60,23 +60,7 @@ public class KafkaStorageTest {
     }
 
     try {
-      builder.spanServicesTopic(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-    try {
-      builder.servicesTopic(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    try {
-      builder.spanDependenciesTopic(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-    try {
-      builder.dependenciesTopic(null);
+      builder.dependencyLinksTopic(null);
       fail();
     } catch (NullPointerException ignored) {
     }

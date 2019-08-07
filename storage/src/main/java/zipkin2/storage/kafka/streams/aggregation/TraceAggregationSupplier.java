@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.common.utils.Bytes;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.Aggregator;
@@ -27,7 +26,8 @@ import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Merger;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.kstream.SessionWindows;
-import org.apache.kafka.streams.state.SessionStore;
+import org.apache.kafka.streams.kstream.Suppressed;
+import org.apache.kafka.streams.kstream.TimeWindows;
 import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
@@ -47,14 +47,17 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
   final SpansSerde spansSerde;
   // Config
   final Duration traceInactivityGap;
+  final Duration suppressUntil;
 
   public TraceAggregationSupplier(
       String spansTopicName,
       String tracesTopicName,
-      Duration traceInactivityGap) {
+      Duration traceInactivityGap,
+      Duration suppressUntil) {
     this.spansTopicName = spansTopicName;
     this.tracesTopicName = tracesTopicName;
     this.traceInactivityGap = traceInactivityGap;
+    this.suppressUntil = suppressUntil;
     spanSerde = new SpanSerde();
     spansSerde = new SpansSerde();
   }
@@ -64,13 +67,10 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
     // Aggregate Spans to Traces
     builder.stream(spansTopicName, Consumed.with(Serdes.String(), spanSerde))
         .groupByKey()
-        .windowedBy(SessionWindows.with(traceInactivityGap).grace(traceInactivityGap))
+        .windowedBy(SessionWindows.with(traceInactivityGap).grace(Duration.ZERO))
         .aggregate(ArrayList::new, aggregateSpans(), joinAggregates(),
-            Materialized.
-                <String, List<Span>, SessionStore<Bytes, byte[]>>with(Serdes.String(), spansSerde)
-                .withCachingDisabled()
-                .withLoggingDisabled())
-        .suppress(untilWindowCloses(unbounded()).withName("traces-suppressed"))
+            Materialized.with(Serdes.String(), spansSerde))
+        .suppress(untilWindowCloses(unbounded()))
         .toStream()
         .selectKey((windowed, spans) -> windowed.key())
         .to(tracesTopicName, Produced.with(Serdes.String(), spansSerde));
@@ -80,13 +80,15 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
   Merger<String, List<Span>> joinAggregates() {
     return (aggKey, aggOne, aggTwo) -> {
       aggOne.addAll(aggTwo);
+      System.out.println("join agg: "+ aggOne);
       return aggOne;
     };
   }
 
   Aggregator<String, Span, List<Span>> aggregateSpans() {
     return (traceId, span, spans) -> {
-      spans.add(span);
+      if (!spans.contains(span)) spans.add(span);
+      System.out.println("aggregate: "+spans);
       return spans;
     };
   }

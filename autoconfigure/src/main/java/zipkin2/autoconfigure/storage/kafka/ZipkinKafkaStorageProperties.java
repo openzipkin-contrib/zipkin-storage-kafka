@@ -59,7 +59,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
             .partitions(spansTopicPartitions)
             .replicationFactor(spansTopicReplicationFactor)
             .build())
-        .dependenciesTopic(KafkaStorage.Topic.builder(dependencyLinksTopic)
+        .dependencyLinksTopic(KafkaStorage.Topic.builder(dependencyLinksTopic)
             .partitions(dependencyLinksTopicPartitions)
             .replicationFactor(dependencyLinksReplicationFactor)
             .build())
