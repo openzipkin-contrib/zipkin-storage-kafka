@@ -24,6 +24,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
 
   private boolean spanConsumerEnabled = true;
+  private boolean aggregationEnabled = true;
   private boolean spanStoreEnabled = true;
 
   private boolean ensureTopics = true;
@@ -37,24 +38,16 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String spansTopic = "zipkin-spans-v1";
   private Integer spansTopicPartitions = 1;
   private Short spansTopicReplicationFactor = 1;
-  private String spanServicesTopic = "zipkin-span-services-v1";
-  private Integer spanServicesTopicPartitions = 1;
-  private Short spanServicesTopicReplicationFactor = 1;
-  private String servicesTopic = "zipkin-services-v1";
-  private Integer servicesTopicPartitions = 1;
-  private Short servicesTopicReplicationFactor = 1;
-  private String spanDependenciesTopic = "zipkin-span-dependencies-v1";
-  private Integer spanDependenciesTopicPartitions = 1;
-  private Short spanDependenciesTopicReplicationFactor = 1;
-  private String dependenciesTopic = "zipkin-dependencies-v1";
-  private Integer dependenciesTopicPartitions = 1;
-  private Short dependenciesTopicReplicationFactor = 1;
+  private String dependencyLinksTopic = "zipkin-dependency-links-v1";
+  private Integer dependencyLinksTopicPartitions = 1;
+  private Short dependencyLinksReplicationFactor = 1;
 
   private String storeDirectory = "/tmp/zipkin";
 
   KafkaStorage.Builder toBuilder() {
     return KafkaStorage.newBuilder()
         .spanConsumerEnabled(spanConsumerEnabled)
+        .aggregationEnabled(aggregationEnabled)
         .spanStoreEnabled(spanStoreEnabled)
         .ensureTopics(ensureTopics)
         .bootstrapServers(bootstrapServers)
@@ -66,21 +59,9 @@ public class ZipkinKafkaStorageProperties implements Serializable {
             .partitions(spansTopicPartitions)
             .replicationFactor(spansTopicReplicationFactor)
             .build())
-        .spanServicesTopic(KafkaStorage.Topic.builder(spanServicesTopic)
-            .partitions(spanServicesTopicPartitions)
-            .replicationFactor(spanServicesTopicReplicationFactor)
-            .build())
-        .servicesTopic(KafkaStorage.Topic.builder(servicesTopic)
-            .partitions(servicesTopicPartitions)
-            .replicationFactor(servicesTopicReplicationFactor)
-            .build())
-        .spanDependenciesTopic(KafkaStorage.Topic.builder(spanDependenciesTopic)
-            .partitions(spanDependenciesTopicPartitions)
-            .replicationFactor(spanDependenciesTopicReplicationFactor)
-            .build())
-        .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic)
-            .partitions(dependenciesTopicPartitions)
-            .replicationFactor(dependenciesTopicReplicationFactor)
+        .dependenciesTopic(KafkaStorage.Topic.builder(dependencyLinksTopic)
+            .partitions(dependencyLinksTopicPartitions)
+            .replicationFactor(dependencyLinksReplicationFactor)
             .build())
         .storeDirectory(storeDirectory);
   }
@@ -91,6 +72,14 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setSpanConsumerEnabled(boolean spanConsumerEnabled) {
     this.spanConsumerEnabled = spanConsumerEnabled;
+  }
+
+  public boolean isAggregationEnabled() {
+    return aggregationEnabled;
+  }
+
+  public void setAggregationEnabled(boolean aggregationEnabled) {
+    this.aggregationEnabled = aggregationEnabled;
   }
 
   public boolean isSpanStoreEnabled() {
@@ -173,101 +162,28 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.spansTopicReplicationFactor = spansTopicReplicationFactor;
   }
 
-  public String getSpanServicesTopic() {
-    return spanServicesTopic;
+  public String getDependencyLinksTopic() {
+    return dependencyLinksTopic;
   }
 
-  public void setSpanServicesTopic(String spanServicesTopic) {
-    this.spanServicesTopic = spanServicesTopic;
+  public void setDependencyLinksTopic(String dependencyLinksTopic) {
+    this.dependencyLinksTopic = dependencyLinksTopic;
   }
 
-  public Integer getSpanServicesTopicPartitions() {
-    return spanServicesTopicPartitions;
+  public Integer getDependencyLinksTopicPartitions() {
+    return dependencyLinksTopicPartitions;
   }
 
-  public void setSpanServicesTopicPartitions(Integer spanServicesTopicPartitions) {
-    this.spanServicesTopicPartitions = spanServicesTopicPartitions;
+  public void setDependencyLinksTopicPartitions(Integer dependencyLinksTopicPartitions) {
+    this.dependencyLinksTopicPartitions = dependencyLinksTopicPartitions;
   }
 
-  public Short getSpanServicesTopicReplicationFactor() {
-    return spanServicesTopicReplicationFactor;
+  public Short getDependencyLinksReplicationFactor() {
+    return dependencyLinksReplicationFactor;
   }
 
-  public void setSpanServicesTopicReplicationFactor(Short spanServicesTopicReplicationFactor) {
-    this.spanServicesTopicReplicationFactor = spanServicesTopicReplicationFactor;
-  }
-
-  public String getServicesTopic() {
-    return servicesTopic;
-  }
-
-  public void setServicesTopic(String servicesTopic) {
-    this.servicesTopic = servicesTopic;
-  }
-
-  public Integer getServicesTopicPartitions() {
-    return servicesTopicPartitions;
-  }
-
-  public void setServicesTopicPartitions(Integer servicesTopicPartitions) {
-    this.servicesTopicPartitions = servicesTopicPartitions;
-  }
-
-  public Short getServicesTopicReplicationFactor() {
-    return servicesTopicReplicationFactor;
-  }
-
-  public void setServicesTopicReplicationFactor(Short servicesTopicReplicationFactor) {
-    this.servicesTopicReplicationFactor = servicesTopicReplicationFactor;
-  }
-
-  public String getSpanDependenciesTopic() {
-    return spanDependenciesTopic;
-  }
-
-  public void setSpanDependenciesTopic(String spanDependenciesTopic) {
-    this.spanDependenciesTopic = spanDependenciesTopic;
-  }
-
-  public Integer getSpanDependenciesTopicPartitions() {
-    return spanDependenciesTopicPartitions;
-  }
-
-  public void setSpanDependenciesTopicPartitions(Integer spanDependenciesTopicPartitions) {
-    this.spanDependenciesTopicPartitions = spanDependenciesTopicPartitions;
-  }
-
-  public Short getSpanDependenciesTopicReplicationFactor() {
-    return spanDependenciesTopicReplicationFactor;
-  }
-
-  public void setSpanDependenciesTopicReplicationFactor(
-      Short spanDependenciesTopicReplicationFactor) {
-    this.spanDependenciesTopicReplicationFactor = spanDependenciesTopicReplicationFactor;
-  }
-
-  public String getDependenciesTopic() {
-    return dependenciesTopic;
-  }
-
-  public void setDependenciesTopic(String dependenciesTopic) {
-    this.dependenciesTopic = dependenciesTopic;
-  }
-
-  public Integer getDependenciesTopicPartitions() {
-    return dependenciesTopicPartitions;
-  }
-
-  public void setDependenciesTopicPartitions(Integer dependenciesTopicPartitions) {
-    this.dependenciesTopicPartitions = dependenciesTopicPartitions;
-  }
-
-  public Short getDependenciesTopicReplicationFactor() {
-    return dependenciesTopicReplicationFactor;
-  }
-
-  public void setDependenciesTopicReplicationFactor(Short dependenciesTopicReplicationFactor) {
-    this.dependenciesTopicReplicationFactor = dependenciesTopicReplicationFactor;
+  public void setDependencyLinksReplicationFactor(Short dependencyLinksReplicationFactor) {
+    this.dependencyLinksReplicationFactor = dependencyLinksReplicationFactor;
   }
 
   public String getStoreDirectory() {

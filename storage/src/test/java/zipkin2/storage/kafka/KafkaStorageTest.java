@@ -90,37 +90,42 @@ public class KafkaStorageTest {
 
   @Test
   public void topicDefault() {
-      try{
-          KafkaStorage.Topic.builder(null);
-          fail();
-      } catch (NullPointerException ignored){}
+    try {
+      KafkaStorage.Topic.builder(null);
+      fail();
+    } catch (NullPointerException ignored) {
+    }
 
-      KafkaStorage.Topic.Builder topicBuilder = KafkaStorage.Topic.builder("topic-1");
+    KafkaStorage.Topic.Builder topicBuilder = KafkaStorage.Topic.builder("topic-1");
 
-      try {
-          topicBuilder.partitions(0);
-          fail();
-      } catch (IllegalArgumentException ignored){}
+    try {
+      topicBuilder.partitions(0);
+      fail();
+    } catch (IllegalArgumentException ignored) {
+    }
 
-      try {
-          topicBuilder.partitions(null);
-          fail();
-      } catch (NullPointerException ignored){}
+    try {
+      topicBuilder.partitions(null);
+      fail();
+    } catch (NullPointerException ignored) {
+    }
 
-      try {
-          topicBuilder.partitions(-1);
-          fail();
-      } catch (IllegalArgumentException ignored){}
+    try {
+      topicBuilder.partitions(-1);
+      fail();
+    } catch (IllegalArgumentException ignored) {
+    }
 
-      try {
-          topicBuilder.replicationFactor(null);
-          fail();
-      } catch (NullPointerException ignored){}
+    try {
+      topicBuilder.replicationFactor(null);
+      fail();
+    } catch (NullPointerException ignored) {
+    }
 
-      try {
-          topicBuilder.replicationFactor( (short) 0);
-          fail();
-      } catch (IllegalArgumentException ignored){}
-
+    try {
+      topicBuilder.replicationFactor((short) 0);
+      fail();
+    } catch (IllegalArgumentException ignored) {
+    }
   }
 }

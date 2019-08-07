@@ -13,6 +13,13 @@
  */
 package zipkin2.storage.kafka;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
@@ -27,11 +34,10 @@ import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
 
-import java.io.IOException;
-import java.util.*;
-
 import static zipkin2.storage.kafka.streams.stores.DependencyStoreSupplier.DEPENDENCY_LINKS_BY_TIMESTAMP_STORE_NAME;
-import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.*;
+import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.TRACES_STORE_NAME;
 
 /**
  * Span Store based on Kafka Streams.
@@ -57,9 +63,9 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   public Call<List<List<Span>>> getTraces(QueryRequest request) {
     try {
       ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
-              traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+          traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTimestampStore =
-              traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+          traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       return new GetTracesCall(tracesStore, traceIdsByTimestampStore, request);
     } catch (Exception e) {
       LOG.error("Error getting traces. Request: {}", request, e);
@@ -71,7 +77,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   public Call<List<Span>> getTrace(String traceId) {
     try {
       ReadOnlyKeyValueStore<String, List<Span>> traceStore =
-              traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+          traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       return new GetTraceCall(traceStore, traceId);
     } catch (Exception e) {
       LOG.error("Error getting trace {}", traceId, e);
@@ -83,7 +89,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   public Call<List<String>> getServiceNames() {
     try {
       ReadOnlyKeyValueStore<String, String> serviceStore =
-              traceStoreStream.store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+          traceStoreStream.store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       return new GetServiceNamesCall(serviceStore);
     } catch (Exception e) {
       LOG.error("Error getting service names", e);
@@ -100,7 +106,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   public Call<List<String>> getSpanNames(String serviceName) {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> spanNamesStore =
-              traceStoreStream.store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+          traceStoreStream.store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       return new GetSpanNamesCall(spanNamesStore, serviceName);
     } catch (Exception e) {
       LOG.error("Error getting span names from service {}", serviceName, e);
@@ -113,7 +119,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     try {
       ReadOnlyKeyValueStore<Long, List<DependencyLink>> dependenciesStore =
           dependencyStoreStream.
-                  store(DEPENDENCY_LINKS_BY_TIMESTAMP_STORE_NAME, QueryableStoreTypes.keyValueStore());
+              store(DEPENDENCY_LINKS_BY_TIMESTAMP_STORE_NAME, QueryableStoreTypes.keyValueStore());
       return new GetDependenciesCall(endTs, lookback, dependenciesStore);
     } catch (Exception e) {
       LOG.error("Error getting dependencies", e);
@@ -130,15 +136,15 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
     @Override
     List<String> query() {
-        try {
-          List<String> serviceNames = new ArrayList<>();
-          serviceStore.all().forEachRemaining(keyValue -> serviceNames.add(keyValue.value));
-          Collections.sort(serviceNames);
-          return serviceNames;
-        } catch (Exception e) {
-          LOG.error("Error looking up services", e);
-          return new ArrayList<>();
-        }
+      try {
+        List<String> serviceNames = new ArrayList<>();
+        serviceStore.all().forEachRemaining(keyValue -> serviceNames.add(keyValue.value));
+        Collections.sort(serviceNames);
+        return serviceNames;
+      } catch (Exception e) {
+        LOG.error("Error looking up services", e);
+        return new ArrayList<>();
+      }
     }
 
     @Override
@@ -151,24 +157,25 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     final ReadOnlyKeyValueStore<String, Set<String>> spanNamesStore;
     final String serviceName;
 
-    GetSpanNamesCall(ReadOnlyKeyValueStore<String, Set<String>> spanNamesStore, String serviceName) {
+    GetSpanNamesCall(ReadOnlyKeyValueStore<String, Set<String>> spanNamesStore,
+        String serviceName) {
       this.spanNamesStore = spanNamesStore;
       this.serviceName = serviceName;
     }
 
     @Override
     List<String> query() {
-        try {
-          if (serviceName == null || serviceName.equals("all")) return new ArrayList<>();
-          Set<String> spanNamesSet = spanNamesStore.get(serviceName);
-          if (spanNamesSet == null) return new ArrayList<>();
-          List<String> spanNames = new ArrayList<>(spanNamesSet);
-          Collections.sort(spanNames);
-          return spanNames;
-        } catch (Exception e) {
-          LOG.error("Error looking up for span names for service {}", serviceName, e);
-          return new ArrayList<>();
-        }
+      try {
+        if (serviceName == null || serviceName.equals("all")) return new ArrayList<>();
+        Set<String> spanNamesSet = spanNamesStore.get(serviceName);
+        if (spanNamesSet == null) return new ArrayList<>();
+        List<String> spanNames = new ArrayList<>(spanNamesSet);
+        Collections.sort(spanNames);
+        return spanNames;
+      } catch (Exception e) {
+        LOG.error("Error looking up for span names for service {}", serviceName, e);
+        return new ArrayList<>();
+      }
     }
 
     @Override
@@ -183,9 +190,9 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     final QueryRequest queryRequest;
 
     GetTracesCall(
-            ReadOnlyKeyValueStore<String, List<Span>> tracesStore,
-            ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTimestampStore,
-            QueryRequest queryRequest) {
+        ReadOnlyKeyValueStore<String, List<Span>> tracesStore,
+        ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTimestampStore,
+        QueryRequest queryRequest) {
       this.tracesStore = tracesStore;
       this.traceIdsByTimestampStore = traceIdsByTimestampStore;
       this.queryRequest = queryRequest;
@@ -195,7 +202,8 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     List<List<Span>> query() {
       List<List<Span>> result = new ArrayList<>();
       List<String> traceIds = new ArrayList<>();
-      KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTimestampStore.range(queryRequest.lookback(), queryRequest.endTs());
+      KeyValueIterator<Long, Set<String>> spanIds =
+          traceIdsByTimestampStore.range(queryRequest.lookback(), queryRequest.endTs());
       spanIds.forEachRemaining(keyValue -> {
         for (String traceId : keyValue.value) {
           if (!traceIds.contains(traceId) && result.size() <= queryRequest.limit()) {
@@ -232,14 +240,14 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
     @Override
     List<Span> query() {
-        try {
-          final List<Span> spans = traceStore.get(traceId);
-          if (spans == null) return new ArrayList<>();
-          return spans;
-        } catch (Exception e) {
-          LOG.error("Error getting trace with ID {}", traceId, e);
-          return null;
-        }
+      try {
+        final List<Span> spans = traceStore.get(traceId);
+        if (spans == null) return new ArrayList<>();
+        return spans;
+      } catch (Exception e) {
+        LOG.error("Error getting trace with ID {}", traceId, e);
+        return null;
+      }
     }
 
     @Override
@@ -261,30 +269,30 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
     @Override
     List<DependencyLink> query() {
-        try {
-          long from = endTs - loopback;
-          Map<String, Long> dependencyLinksTime = new HashMap<>();
-          Map<String, DependencyLink> dependencyLinks = new HashMap<>();
-          dependenciesStore.range(from, endTs)
-              .forEachRemaining(keyValue -> {
-                Long ts = keyValue.key;
-                for (DependencyLink link : keyValue.value) {
-                  String pair = String.format("%s|%s", link.parent(), link.child());
-                  Long last = dependencyLinksTime.get(pair);
-                  if (last < ts) {
-                    dependencyLinks.put(pair, link);
-                    dependencyLinksTime.put(pair, ts);
-                  }
+      try {
+        long from = endTs - loopback;
+        Map<String, Long> dependencyLinksTime = new HashMap<>();
+        Map<String, DependencyLink> dependencyLinks = new HashMap<>();
+        dependenciesStore.range(from, endTs)
+            .forEachRemaining(keyValue -> {
+              Long ts = keyValue.key;
+              for (DependencyLink link : keyValue.value) {
+                String pair = String.format("%s|%s", link.parent(), link.child());
+                Long last = dependencyLinksTime.get(pair);
+                if (last < ts) {
+                  dependencyLinks.put(pair, link);
+                  dependencyLinksTime.put(pair, ts);
                 }
-              });
+              }
+            });
 
-          LOG.info("Dependencies found from={}-to={}: {}", from, endTs, dependencyLinks.size());
+        LOG.info("Dependencies found from={}-to={}: {}", from, endTs, dependencyLinks.size());
 
-          return new ArrayList<>(dependencyLinks.values());
-        } catch (Exception e) {
-          LOG.error("Error looking up for dependencies", e);
-          return new ArrayList<>();
-        }
+        return new ArrayList<>(dependencyLinks.values());
+      } catch (Exception e) {
+        LOG.error("Error looking up for dependencies", e);
+        return new ArrayList<>();
+      }
     }
 
     @Override

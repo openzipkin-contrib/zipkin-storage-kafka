@@ -13,6 +13,12 @@
  */
 package zipkin2.storage.kafka.streams.stores;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -31,13 +37,6 @@ import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.NamesSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanIdsSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.function.Supplier;
 
 /**
  * Aggregation and storage of spans into traces.
@@ -62,9 +61,9 @@ public class TraceStoreSupplier implements Supplier<Topology> {
   final NamesSerde namesSerde;
 
   public TraceStoreSupplier(
-          String tracesTopic,
-          Duration scanFrequency,
-          Duration maxAge) {
+      String tracesTopic,
+      Duration scanFrequency,
+      Duration maxAge) {
     this.tracesTopic = tracesTopic;
     this.scanFrequency = scanFrequency;
     this.maxAge = maxAge;
@@ -78,49 +77,50 @@ public class TraceStoreSupplier implements Supplier<Topology> {
     StreamsBuilder builder = new StreamsBuilder();
 
     builder
-            .addStateStore(Stores.keyValueStoreBuilder(
-                    Stores.persistentKeyValueStore(TRACES_STORE_NAME),
-                    Serdes.String(),
-                    spansSerde
-            ))
-            .addStateStore(Stores.keyValueStoreBuilder(
-                    Stores.persistentKeyValueStore(TRACES_BY_TIMESTAMP_STORE_NAME),
-                    Serdes.Long(),
-                    spanIdsSerde
-            ))
-            .addStateStore(Stores.keyValueStoreBuilder(
-                    Stores.persistentKeyValueStore(SERVICE_NAMES_STORE_NAME),
-                    Serdes.String(),
-                    Serdes.String()
-            ))
-            .addStateStore(Stores.keyValueStoreBuilder(
-                    Stores.persistentKeyValueStore(SPAN_NAMES_STORE_NAME),
-                    Serdes.String(),
-                    namesSerde
-            ))
-            .addStateStore(Stores.keyValueStoreBuilder(
-                    Stores.persistentKeyValueStore(REMOTE_SERVICE_NAMES_STORE_NAME),
-                    Serdes.String(),
-                    namesSerde
-            ));
+        .addStateStore(Stores.keyValueStoreBuilder(
+            Stores.persistentKeyValueStore(TRACES_STORE_NAME),
+            Serdes.String(),
+            spansSerde
+        ))
+        .addStateStore(Stores.keyValueStoreBuilder(
+            Stores.persistentKeyValueStore(TRACES_BY_TIMESTAMP_STORE_NAME),
+            Serdes.Long(),
+            spanIdsSerde
+        ))
+        .addStateStore(Stores.keyValueStoreBuilder(
+            Stores.persistentKeyValueStore(SERVICE_NAMES_STORE_NAME),
+            Serdes.String(),
+            Serdes.String()
+        ))
+        .addStateStore(Stores.keyValueStoreBuilder(
+            Stores.persistentKeyValueStore(SPAN_NAMES_STORE_NAME),
+            Serdes.String(),
+            namesSerde
+        ))
+        .addStateStore(Stores.keyValueStoreBuilder(
+            Stores.persistentKeyValueStore(REMOTE_SERVICE_NAMES_STORE_NAME),
+            Serdes.String(),
+            namesSerde
+        ));
 
     KStream<String, List<Span>> stream = builder
-            .stream(tracesTopic, Consumed.with(Serdes.String(), spansSerde));
+        .stream(tracesTopic, Consumed.with(Serdes.String(), spansSerde));
 
     stream
-            .process(() -> new Processor<String, List<Span>>() {
-      KeyValueStore<String, List<Span>> tracesStore;
-      KeyValueStore<Long, Set<String>> timestampAndSpanIdsStore;
-      ProcessorContext context;
+        .process(() -> new Processor<String, List<Span>>() {
+          KeyValueStore<String, List<Span>> tracesStore;
+          KeyValueStore<Long, Set<String>> timestampAndSpanIdsStore;
+          ProcessorContext context;
 
-      @Override public void init(ProcessorContext context) {
-        this.context = context;
-        tracesStore =
-            (KeyValueStore<String, List<Span>>) context.getStateStore(TRACES_STORE_NAME);
-        timestampAndSpanIdsStore =
-            (KeyValueStore<Long, Set<String>>) context.getStateStore(TRACES_BY_TIMESTAMP_STORE_NAME);
+          @Override public void init(ProcessorContext context) {
+            this.context = context;
+            tracesStore =
+                (KeyValueStore<String, List<Span>>) context.getStateStore(TRACES_STORE_NAME);
+            timestampAndSpanIdsStore =
+                (KeyValueStore<Long, Set<String>>) context.getStateStore(
+                    TRACES_BY_TIMESTAMP_STORE_NAME);
 
-        context.schedule(
+            context.schedule(
                 scanFrequency,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
@@ -130,7 +130,9 @@ public class TraceStoreSupplier implements Supplier<Topology> {
                   final long now = System.currentTimeMillis() * 1000;
 
                   // Scan all records indexed
-                  try (final KeyValueIterator<Long, Set<String>> all = timestampAndSpanIdsStore.range(ttl, now)) {
+                  try (
+                      final KeyValueIterator<Long, Set<String>> all = timestampAndSpanIdsStore.range(
+                          ttl, now)) {
                     int deletions = 0;
                     while (all.hasNext()) {
                       final KeyValue<Long, Set<String>> record = all.next();
@@ -140,30 +142,30 @@ public class TraceStoreSupplier implements Supplier<Topology> {
                       }
                     }
                     LOG.info("Traces deletion emitted: {}, older than {}",
-                            deletions, Instant.ofEpochMilli(cutoff));
+                        deletions, Instant.ofEpochMilli(cutoff));
                   }
                 });
-      }
+          }
 
-      @Override public void process(String traceId, List<Span> spans) {
-        List<Span> currentSpans = tracesStore.get(traceId);
-        if (currentSpans == null) {
-          currentSpans = spans;
-        } else {
-          currentSpans.addAll(spans);
-        }
-        Set<String> currentSpanIds = timestampAndSpanIdsStore.get(context.timestamp());
-        if (currentSpanIds == null) {
-          currentSpanIds = new HashSet<>();
-        }
-        currentSpanIds.add(traceId);
-        tracesStore.put(traceId, currentSpans);
-        timestampAndSpanIdsStore.put(context.timestamp(), currentSpanIds);
-      }
+          @Override public void process(String traceId, List<Span> spans) {
+            List<Span> currentSpans = tracesStore.get(traceId);
+            if (currentSpans == null) {
+              currentSpans = spans;
+            } else {
+              currentSpans.addAll(spans);
+            }
+            Set<String> currentSpanIds = timestampAndSpanIdsStore.get(context.timestamp());
+            if (currentSpanIds == null) {
+              currentSpanIds = new HashSet<>();
+            }
+            currentSpanIds.add(traceId);
+            tracesStore.put(traceId, currentSpans);
+            timestampAndSpanIdsStore.put(context.timestamp(), currentSpanIds);
+          }
 
-      @Override public void close() {
-      }
-    }, TRACES_STORE_NAME, TRACES_BY_TIMESTAMP_STORE_NAME);
+          @Override public void close() {
+          }
+        }, TRACES_STORE_NAME, TRACES_BY_TIMESTAMP_STORE_NAME);
 
     stream.process(() -> new Processor<String, List<Span>>() {
       KeyValueStore<String, String> serviceNameStore;
@@ -173,11 +175,12 @@ public class TraceStoreSupplier implements Supplier<Topology> {
       @Override
       public void init(ProcessorContext context) {
         serviceNameStore =
-                (KeyValueStore<String, String>) context.getStateStore(SERVICE_NAMES_STORE_NAME);
+            (KeyValueStore<String, String>) context.getStateStore(SERVICE_NAMES_STORE_NAME);
         spanNamesStore =
-                (KeyValueStore<String, Set<String>>) context.getStateStore(SPAN_NAMES_STORE_NAME);
+            (KeyValueStore<String, Set<String>>) context.getStateStore(SPAN_NAMES_STORE_NAME);
         remoteServiceNamesStore =
-                (KeyValueStore<String, Set<String>>) context.getStateStore(REMOTE_SERVICE_NAMES_STORE_NAME);
+            (KeyValueStore<String, Set<String>>) context.getStateStore(
+                REMOTE_SERVICE_NAMES_STORE_NAME);
       }
 
       @Override

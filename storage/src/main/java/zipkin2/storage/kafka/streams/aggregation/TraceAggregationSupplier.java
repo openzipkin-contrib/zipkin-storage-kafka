@@ -13,20 +13,24 @@
  */
 package zipkin2.storage.kafka.streams.aggregation;
 
-import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.common.utils.Bytes;
-import org.apache.kafka.streams.StreamsBuilder;
-import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.*;
-import org.apache.kafka.streams.state.SessionStore;
-import zipkin2.Span;
-import zipkin2.storage.kafka.streams.serdes.SpanSerde;
-import zipkin2.storage.kafka.streams.serdes.SpansSerde;
-
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
+import org.apache.kafka.common.serialization.Serdes;
+import org.apache.kafka.common.utils.Bytes;
+import org.apache.kafka.streams.StreamsBuilder;
+import org.apache.kafka.streams.Topology;
+import org.apache.kafka.streams.kstream.Aggregator;
+import org.apache.kafka.streams.kstream.Consumed;
+import org.apache.kafka.streams.kstream.Materialized;
+import org.apache.kafka.streams.kstream.Merger;
+import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.SessionWindows;
+import org.apache.kafka.streams.state.SessionStore;
+import zipkin2.Span;
+import zipkin2.storage.kafka.streams.serdes.SpanSerde;
+import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static org.apache.kafka.streams.kstream.Suppressed.BufferConfig.unbounded;
 import static org.apache.kafka.streams.kstream.Suppressed.untilWindowCloses;

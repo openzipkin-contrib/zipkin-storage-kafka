@@ -13,6 +13,15 @@
  */
 package zipkin2.storage.kafka;
 
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -43,10 +52,6 @@ import zipkin2.storage.kafka.streams.aggregation.TraceAggregationSupplier;
 import zipkin2.storage.kafka.streams.stores.DependencyStoreSupplier;
 import zipkin2.storage.kafka.streams.stores.TraceStoreSupplier;
 
-import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
-
 /**
  * Kafka Storage entry-point.
  *
@@ -68,15 +73,16 @@ public class KafkaStorage extends StorageComponent {
   final Properties producerConfig;
   // Kafka Streams topology configs
   final Properties
-          traceAggregationStreamConfig, traceStoreStreamConfig,
-          dependencyStoreStreamConfig, dependencyLinkMapperStreamConfig;
+      traceAggregationStreamConfig, traceStoreStreamConfig,
+      dependencyStoreStreamConfig, dependencyLinkMapperStreamConfig;
   final Topology
-          traceAggregationTopology, traceStoreTopology, dependencyLinkMapperTopology, dependencyStoreTopology;
+      traceAggregationTopology, traceStoreTopology, dependencyLinkMapperTopology,
+      dependencyStoreTopology;
   // Resources
   volatile AdminClient adminClient;
   volatile Producer<String, byte[]> producer;
   volatile KafkaStreams dependencyLinkMapperStream,
-          dependencyStoreStream, traceAggregationStream, traceStoreStream;
+      dependencyStoreStream, traceAggregationStream, traceStoreStream;
   volatile boolean closeCalled, topicsValidated;
 
   KafkaStorage(Builder builder) {
@@ -88,7 +94,7 @@ public class KafkaStorage extends StorageComponent {
     this.ensureTopics = builder.ensureTopics;
     this.spansTopic = builder.spansTopic;
     this.tracesTopic = builder.tracesTopic;
-    this.dependencyLinksTopic = builder.dependenciesTopic;
+    this.dependencyLinksTopic = builder.dependencyLinksTopic;
     // State store directories
     this.storageDirectory = builder.storeDirectory;
     // Kafka Clients configuration
@@ -104,19 +110,20 @@ public class KafkaStorage extends StorageComponent {
     // Trace Aggregation topology
     traceAggregationStreamConfig = new Properties();
     traceAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
-            builder.bootstrapServers);
+        builder.bootstrapServers);
     traceAggregationStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
-            Serdes.StringSerde.class);
+        Serdes.StringSerde.class);
     traceAggregationStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
-            Serdes.ByteArraySerde.class);
+        Serdes.ByteArraySerde.class);
     traceAggregationStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
-            builder.traceAggregationStreamAppId);
+        builder.traceAggregationStreamAppId);
     traceAggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.traceStoreDirectory());
     traceAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
     traceAggregationStreamConfig.put(
-            StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
-            builder.compressionType.name);
-    traceAggregationTopology = new TraceAggregationSupplier(spansTopic.name, tracesTopic.name, builder.traceInactivityGap).get();
+        StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
+        builder.compressionType.name);
+    traceAggregationTopology = new TraceAggregationSupplier(spansTopic.name, tracesTopic.name,
+        builder.traceInactivityGap).get();
     // Trace Store Stream Topology configuration
     traceStoreStreamConfig = new Properties();
     traceStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -131,7 +138,8 @@ public class KafkaStorage extends StorageComponent {
     traceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
     traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    traceStoreTopology = new TraceStoreSupplier(spansTopic.name, builder.retentionScanFrequency, builder.retentionMaxAge).get();
+    traceStoreTopology = new TraceStoreSupplier(spansTopic.name, builder.retentionScanFrequency,
+        builder.retentionMaxAge).get();
     // Dependency Aggregation topology
     dependencyLinkMapperStreamConfig = new Properties();
     dependencyLinkMapperStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -148,7 +156,8 @@ public class KafkaStorage extends StorageComponent {
         builder.compressionType.name);
     dependencyLinkMapperStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION,
         StreamsConfig.OPTIMIZE);
-    dependencyLinkMapperTopology = new DependencyLinkMapperSupplier(tracesTopic.name, dependencyLinksTopic.name).get();
+    dependencyLinkMapperTopology =
+        new DependencyLinkMapperSupplier(tracesTopic.name, dependencyLinksTopic.name).get();
     // Dependency Store topology
     dependencyStoreStreamConfig = new Properties();
     dependencyStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -164,7 +173,9 @@ public class KafkaStorage extends StorageComponent {
     dependencyStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
     dependencyStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    dependencyStoreTopology = new DependencyStoreSupplier(dependencyLinksTopic.name, builder.retentionScanFrequency, builder.retentionMaxAge).get();
+    dependencyStoreTopology =
+        new DependencyStoreSupplier(dependencyLinksTopic.name, builder.retentionScanFrequency,
+            builder.retentionMaxAge).get();
   }
 
   public static Builder newBuilder() {
@@ -177,7 +188,7 @@ public class KafkaStorage extends StorageComponent {
     if (aggregationEnabled) {
       getTraceAggregationStream();
 
-//      getServiceAggregationStream();
+      //      getServiceAggregationStream();
       //FIXME getDependencyLinkMapperStream();
     }
     if (spanConsumerEnabled) {
@@ -228,7 +239,7 @@ public class KafkaStorage extends StorageComponent {
           try {
             Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
             List<Topic> requiredTopics =
-                    Arrays.asList(spansTopic, dependencyLinksTopic, tracesTopic);
+                Arrays.asList(spansTopic, dependencyLinksTopic, tracesTopic);
             Set<NewTopic> newTopics = new HashSet<>();
             for (Topic requiredTopic : requiredTopics) {
               if (!topics.contains(requiredTopic.name)) {
@@ -399,7 +410,7 @@ public class KafkaStorage extends StorageComponent {
     Topic servicesTopic = Topic.builder("zipkin-services-v1")
         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
         .build();
-    Topic dependenciesTopic = Topic.builder("zipkin-dependencies-v1")
+    Topic dependencyLinksTopic = Topic.builder("zipkin-dependencies-v1")
         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
         .build();
 
@@ -447,6 +458,16 @@ public class KafkaStorage extends StorageComponent {
       return this;
     }
 
+    /**
+     * Enable aggregating spans into traces and traces into dependency links.
+     *
+     * When disabled, no aggregation for Traces or Dependency Links will run.
+     */
+    public Builder aggregationEnabled(boolean aggregationEnabled) {
+      this.aggregationEnabled = aggregationEnabled;
+      return this;
+    }
+
     public Builder traceInactivityGap(Duration traceInactivityGap) {
       if (traceInactivityGap == null) throw new NullPointerException("traceInactivityGap == null");
       this.traceInactivityGap = traceInactivityGap;
@@ -465,8 +486,8 @@ public class KafkaStorage extends StorageComponent {
     /**
      * Kafka topic name where incoming spans are stored.
      *
-     * A Span is received from Collectors that contains all metadata and is partitioned
-     * by Trace Id.
+     * A Span is received from Collectors that contains all metadata and is partitioned by Trace
+     * Id.
      */
     public Builder spansTopic(Topic spansTopic) {
       if (spansTopic == null) throw new NullPointerException("spansTopic == null");
@@ -508,7 +529,7 @@ public class KafkaStorage extends StorageComponent {
      */
     public Builder dependenciesTopic(Topic dependenciesTopic) {
       if (dependenciesTopic == null) throw new NullPointerException("dependencyLinksTopic == null");
-      this.dependenciesTopic = dependenciesTopic;
+      this.dependencyLinksTopic = dependenciesTopic;
       return this;
     }
 

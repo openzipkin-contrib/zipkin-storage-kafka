@@ -13,8 +13,8 @@
  */
 package zipkin2.storage.kafka.streams.serdes;
 
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
