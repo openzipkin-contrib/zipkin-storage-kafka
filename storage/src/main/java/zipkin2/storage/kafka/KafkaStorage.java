@@ -44,6 +44,7 @@ import zipkin2.CheckResult;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
+import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
@@ -199,6 +200,27 @@ public class KafkaStorage extends StorageComponent {
   }
 
   @Override
+  public ServiceAndSpanNames serviceAndSpanNames() {
+    if (spanStoreEnabled) {
+      return new KafkaSpanStore(this);
+    } else { // NoopServiceAndSpanNames
+      return new ServiceAndSpanNames() {
+        @Override public Call<List<String>> getServiceNames() {
+          return Call.emptyList();
+        }
+
+        @Override public Call<List<String>> getRemoteServiceNames(String serviceName) {
+          return Call.emptyList();
+        }
+
+        @Override public Call<List<String>> getSpanNames(String s) {
+          return Call.emptyList();
+        }
+      };
+    }
+  }
+
+  @Override
   public SpanStore spanStore() {
     if (ensureTopics && !topicsValidated) ensureTopics();
     if (aggregationEnabled) {
@@ -217,11 +239,11 @@ public class KafkaStorage extends StorageComponent {
           return Call.emptyList();
         }
 
-        @Override public Call<List<String>> getServiceNames() {
+        @Override @Deprecated public Call<List<String>> getServiceNames() {
           return Call.emptyList();
         }
 
-        @Override public Call<List<String>> getSpanNames(String s) {
+        @Override @Deprecated public Call<List<String>> getSpanNames(String s) {
           return Call.emptyList();
         }
 
@@ -282,7 +304,7 @@ public class KafkaStorage extends StorageComponent {
 
   void doClose() {
     try {
-      if (adminClient != null) adminClient.close(1, TimeUnit.SECONDS);
+      if (adminClient != null) adminClient.close(Duration.ofSeconds(1));
       if (producer != null) {
         producer.flush();
         producer.close(Duration.ofSeconds(1));
