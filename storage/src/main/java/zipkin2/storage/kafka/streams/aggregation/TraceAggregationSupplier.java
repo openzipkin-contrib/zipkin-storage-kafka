@@ -26,8 +26,6 @@ import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Merger;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.kstream.SessionWindows;
-import org.apache.kafka.streams.kstream.Suppressed;
-import org.apache.kafka.streams.kstream.TimeWindows;
 import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
@@ -69,6 +67,7 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
         .groupByKey()
         .windowedBy(SessionWindows.with(traceInactivityGap).grace(Duration.ZERO))
         .aggregate(ArrayList::new, aggregateSpans(), joinAggregates(),
+            // consider adding duration to materialized store
             Materialized.with(Serdes.String(), spansSerde))
         .suppress(untilWindowCloses(unbounded()))
         .toStream()
@@ -80,7 +79,6 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
   Merger<String, List<Span>> joinAggregates() {
     return (aggKey, aggOne, aggTwo) -> {
       aggOne.addAll(aggTwo);
-      System.out.println("join agg: "+ aggOne);
       return aggOne;
     };
   }
@@ -88,7 +86,6 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
   Aggregator<String, Span, List<Span>> aggregateSpans() {
     return (traceId, span, spans) -> {
       if (!spans.contains(span)) spans.add(span);
-      System.out.println("aggregate: "+spans);
       return spans;
     };
   }
