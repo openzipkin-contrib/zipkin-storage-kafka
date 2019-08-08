@@ -34,11 +34,11 @@ import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
 
-import static zipkin2.storage.kafka.streams.stores.DependencyStoreSupplier.DEPENDENCY_LINKS_BY_TIMESTAMP_STORE_NAME;
+import static zipkin2.storage.kafka.streams.stores.DependencyStoreSupplier.DEPENDENCY_LINKS_BY_TS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.TRACES_BY_TIMESTAMP_STORE_NAME;
+import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SPAN_IDS_BY_TS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.TRACES_STORE_NAME;
 
 /**
@@ -67,7 +67,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
           traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTimestampStore =
-          traceStoreStream.store(TRACES_BY_TIMESTAMP_STORE_NAME, QueryableStoreTypes.keyValueStore());
+          traceStoreStream.store(SPAN_IDS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
       return new GetTracesCall(tracesStore, traceIdsByTimestampStore, request);
     } catch (Exception e) {
       LOG.error("Error getting traces. Request: {}", request, e);
@@ -128,7 +128,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     try {
       ReadOnlyKeyValueStore<Long, List<DependencyLink>> dependenciesStore =
           dependencyStoreStream.
-              store(DEPENDENCY_LINKS_BY_TIMESTAMP_STORE_NAME, QueryableStoreTypes.keyValueStore());
+              store(DEPENDENCY_LINKS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
       return new GetDependenciesCall(endTs, lookback, dependenciesStore);
     } catch (Exception e) {
       LOG.error("Error getting dependencies", e);

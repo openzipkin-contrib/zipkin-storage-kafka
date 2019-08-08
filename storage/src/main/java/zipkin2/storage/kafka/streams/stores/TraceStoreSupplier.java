@@ -15,6 +15,7 @@ package zipkin2.storage.kafka.streams.stores;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -43,7 +44,7 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
  */
 public class TraceStoreSupplier implements Supplier<Topology> {
   public static final String TRACES_STORE_NAME = "zipkin-traces";
-  public static final String TRACES_BY_TIMESTAMP_STORE_NAME = "zipkin-traces-by-timestamp";
+  public static final String SPAN_IDS_BY_TS_STORE_NAME = "zipkin-traces-by-timestamp";
   public static final String SERVICE_NAMES_STORE_NAME = "zipkin-service-names";
   public static final String SPAN_NAMES_STORE_NAME = "zipkin-span-names";
   public static final String REMOTE_SERVICE_NAMES_STORE_NAME = "zipkin-remote-service-names";
@@ -60,10 +61,7 @@ public class TraceStoreSupplier implements Supplier<Topology> {
   final SpanIdsSerde spanIdsSerde;
   final NamesSerde namesSerde;
 
-  public TraceStoreSupplier(
-      String tracesTopic,
-      Duration scanFrequency,
-      Duration maxAge) {
+  public TraceStoreSupplier(String tracesTopic, Duration scanFrequency, Duration maxAge) {
     this.tracesTopic = tracesTopic;
     this.scanFrequency = scanFrequency;
     this.maxAge = maxAge;
@@ -83,7 +81,7 @@ public class TraceStoreSupplier implements Supplier<Topology> {
             spansSerde
         ))
         .addStateStore(Stores.keyValueStoreBuilder(
-            Stores.persistentKeyValueStore(TRACES_BY_TIMESTAMP_STORE_NAME),
+            Stores.persistentKeyValueStore(SPAN_IDS_BY_TS_STORE_NAME),
             Serdes.Long(),
             spanIdsSerde
         ))
@@ -109,63 +107,65 @@ public class TraceStoreSupplier implements Supplier<Topology> {
     stream
         .process(() -> new Processor<String, List<Span>>() {
           KeyValueStore<String, List<Span>> tracesStore;
-          KeyValueStore<Long, Set<String>> timestampAndSpanIdsStore;
+          KeyValueStore<Long, Set<String>> spanIdsByTsStore;
           ProcessorContext context;
 
           @Override public void init(ProcessorContext context) {
             this.context = context;
             tracesStore =
                 (KeyValueStore<String, List<Span>>) context.getStateStore(TRACES_STORE_NAME);
-            timestampAndSpanIdsStore =
-                (KeyValueStore<Long, Set<String>>) context.getStateStore(
-                    TRACES_BY_TIMESTAMP_STORE_NAME);
+            spanIdsByTsStore =
+                (KeyValueStore<Long, Set<String>>) context.getStateStore(SPAN_IDS_BY_TS_STORE_NAME);
 
             context.schedule(
                 scanFrequency,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
-                  // TODO check this logic
-                  final long cutoff = timestamp - maxAge.toMillis();
-                  final long ttl = cutoff * 1000;
-                  final long now = System.currentTimeMillis() * 1000;
-
-                  // Scan all records indexed
-                  try (
-                      final KeyValueIterator<Long, Set<String>> all = timestampAndSpanIdsStore.range(
-                          ttl, now)) {
+                  long cutoff = maxAge.toMillis();
+                  long ttl = timestamp - cutoff;
+                  long ttlMicro = ttl * 1000;
+                  try (final KeyValueIterator<Long, Set<String>> all =
+                           spanIdsByTsStore.range(0L, ttlMicro)) {
                     int deletions = 0;
                     while (all.hasNext()) {
                       final KeyValue<Long, Set<String>> record = all.next();
-                      timestampAndSpanIdsStore.delete(record.key);
+                      spanIdsByTsStore.delete(record.key);
                       for (String traceId : record.value) {
                         tracesStore.delete(traceId);
+                        deletions++;
                       }
                     }
-                    LOG.info("Traces deletion emitted: {}, older than {}",
-                        deletions, Instant.ofEpochMilli(cutoff));
+                    if (deletions > 0) {
+                      LOG.info("Traces deletion emitted: {}, older than {}",
+                          deletions, Instant.ofEpochMilli(ttl));
+                    }
                   }
                 });
           }
 
           @Override public void process(String traceId, List<Span> spans) {
-            List<Span> currentSpans = tracesStore.get(traceId);
-            if (currentSpans == null) {
-              currentSpans = spans;
-            } else {
+            if (!spans.isEmpty()) {
+              // Persist traces
+              List<Span> currentSpans = tracesStore.get(traceId);
+              if (currentSpans == null) {
+                currentSpans = new ArrayList<>();
+              }
               currentSpans.addAll(spans);
+              tracesStore.put(traceId, currentSpans);
+              // Persist timestamp indexed span ids
+              long timestamp = spans.get(0).timestamp();
+              Set<String> currentSpanIds = spanIdsByTsStore.get(timestamp);
+              if (currentSpanIds == null) {
+                currentSpanIds = new HashSet<>();
+              }
+              currentSpanIds.add(traceId);
+              spanIdsByTsStore.put(timestamp, currentSpanIds);
             }
-            Set<String> currentSpanIds = timestampAndSpanIdsStore.get(context.timestamp());
-            if (currentSpanIds == null) {
-              currentSpanIds = new HashSet<>();
-            }
-            currentSpanIds.add(traceId);
-            tracesStore.put(traceId, currentSpans);
-            timestampAndSpanIdsStore.put(context.timestamp(), currentSpanIds);
           }
 
           @Override public void close() {
           }
-        }, TRACES_STORE_NAME, TRACES_BY_TIMESTAMP_STORE_NAME);
+        }, TRACES_STORE_NAME, SPAN_IDS_BY_TS_STORE_NAME);
 
     stream.process(() -> new Processor<String, List<Span>>() {
       KeyValueStore<String, String> serviceNameStore;
@@ -198,6 +198,7 @@ public class TraceStoreSupplier implements Supplier<Topology> {
               Set<String> remoteServiceNames = remoteServiceNamesStore.get(span.localServiceName());
               if (remoteServiceNames == null) remoteServiceNames = new HashSet<>();
               remoteServiceNames.add(span.remoteServiceName());
+              remoteServiceNamesStore.put(span.localServiceName(), remoteServiceNames);
             }
           }
         }

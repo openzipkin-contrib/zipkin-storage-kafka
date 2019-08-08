@@ -42,7 +42,7 @@ import zipkin2.storage.kafka.streams.serdes.DependencyLinksSerde;
  * store)
  */
 public class DependencyStoreSupplier implements Supplier<Topology> {
-  public static final String DEPENDENCY_LINKS_BY_TIMESTAMP_STORE_NAME =
+  public static final String DEPENDENCY_LINKS_BY_TS_STORE_NAME =
       "zipkin_dependency_link_ids_by_timestamp";
 
   static final Logger LOG = LoggerFactory.getLogger(DependencyStoreSupplier.class);
@@ -79,7 +79,7 @@ public class DependencyStoreSupplier implements Supplier<Topology> {
             dependencyLinkSerde
         ))
         .addStateStore(Stores.keyValueStoreBuilder(
-            Stores.persistentKeyValueStore(DEPENDENCY_LINKS_BY_TIMESTAMP_STORE_NAME),
+            Stores.persistentKeyValueStore(DEPENDENCY_LINKS_BY_TS_STORE_NAME),
             Serdes.Long(),
             dependencyLinksSerde
         ))
@@ -89,7 +89,7 @@ public class DependencyStoreSupplier implements Supplier<Topology> {
         .process(() -> new Processor<String, DependencyLink>() {
           ProcessorContext context;
           KeyValueStore<String, DependencyLink> dependencyLinksStore;
-          KeyValueStore<Long, List<DependencyLink>> timestampAndDependencyLinkIdsStore;
+          KeyValueStore<Long, List<DependencyLink>> dependencyLinkIdsByTsStore;
 
           @Override
           public void init(ProcessorContext context) {
@@ -98,30 +98,29 @@ public class DependencyStoreSupplier implements Supplier<Topology> {
             dependencyLinksStore =
                 (KeyValueStore<String, DependencyLink>) context.getStateStore(
                     DEPENDENCY_LINKS_STORE_NAME);
-            timestampAndDependencyLinkIdsStore =
+            dependencyLinkIdsByTsStore =
                 (KeyValueStore<Long, List<DependencyLink>>) context.getStateStore(
-                    DEPENDENCY_LINKS_BY_TIMESTAMP_STORE_NAME);
+                    DEPENDENCY_LINKS_BY_TS_STORE_NAME);
 
             context.schedule(
                 scanFrequency,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
-                  // TODO check this logic
-                  final long cutoff = timestamp - maxAge.toMillis();
-                  final long ttl = cutoff * 1000;
-                  final long now = System.currentTimeMillis() * 1000;
-
-                  // Scan all records indexed
-                  try (
-                      final KeyValueIterator<Long, List<DependencyLink>> all = timestampAndDependencyLinkIdsStore
-                          .range(ttl, now)) {
+                  long cutoff = maxAge.toMillis();
+                  long ttl = timestamp - cutoff;
+                  long ttlMicro = ttl * 1000;
+                  try (final KeyValueIterator<Long, List<DependencyLink>> all =
+                           dependencyLinkIdsByTsStore.range(0L, ttlMicro)) {
                     int deletions = 0;
                     while (all.hasNext()) {
                       final KeyValue<Long, List<DependencyLink>> record = all.next();
-                      timestampAndDependencyLinkIdsStore.delete(record.key);
+                      dependencyLinkIdsByTsStore.delete(record.key);
+                      deletions++;
                     }
-                    LOG.info("Traces deletion emitted: {}, older than {}",
-                        deletions, Instant.ofEpochMilli(cutoff));
+                    if (deletions > 1) {
+                      LOG.info("Dependency links group by ts deletions emitted: {}, older than {}",
+                          deletions, Instant.ofEpochMilli(ttl));
+                    }
                   }
                 });
           }
@@ -141,19 +140,19 @@ public class DependencyStoreSupplier implements Supplier<Topology> {
             }
             dependencyLinksStore.put(dependencyLinkKey, currentLink);
             long timestamp = context.timestamp();
-            List<DependencyLink> currentLinks = timestampAndDependencyLinkIdsStore.get(
+            List<DependencyLink> currentLinks = dependencyLinkIdsByTsStore.get(
                 timestamp);
             if (currentLinks == null) {
               currentLinks = new ArrayList<>();
             }
             currentLinks.add(currentLink);
-            timestampAndDependencyLinkIdsStore.put(timestamp, currentLinks);
+            dependencyLinkIdsByTsStore.put(timestamp, currentLinks);
           }
 
           @Override
           public void close() {
           }
-        }, DEPENDENCY_LINKS_STORE_NAME, DEPENDENCY_LINKS_BY_TIMESTAMP_STORE_NAME);
+        }, DEPENDENCY_LINKS_STORE_NAME, DEPENDENCY_LINKS_BY_TS_STORE_NAME);
 
     return builder.build();
   }

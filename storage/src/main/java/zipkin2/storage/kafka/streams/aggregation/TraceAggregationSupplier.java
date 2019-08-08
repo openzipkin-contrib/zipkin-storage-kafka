@@ -27,6 +27,7 @@ import org.apache.kafka.streams.kstream.Merger;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.kstream.SessionWindows;
 import zipkin2.Span;
+import zipkin2.internal.Trace;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
@@ -79,14 +80,14 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
   Merger<String, List<Span>> joinAggregates() {
     return (aggKey, aggOne, aggTwo) -> {
       aggOne.addAll(aggTwo);
-      return aggOne;
+      return Trace.merge(aggOne);
     };
   }
 
   Aggregator<String, Span, List<Span>> aggregateSpans() {
     return (traceId, span, spans) -> {
       if (!spans.contains(span)) spans.add(span);
-      return spans;
+      return Trace.merge(spans);
     };
   }
 }
