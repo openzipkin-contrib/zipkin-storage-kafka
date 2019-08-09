@@ -34,12 +34,14 @@ import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import zipkin2.CheckResult;
+import zipkin2.DependencyLink;
 import zipkin2.Endpoint;
 import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
+import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static org.awaitility.Awaitility.await;
@@ -50,13 +52,12 @@ import static org.junit.Assert.fail;
 class KafkaStorageIT {
   private static final long TODAY = System.currentTimeMillis();
 
-  @Container
-  KafkaContainer kafka = new KafkaContainer("5.3.0");
+  @Container private KafkaContainer kafka = new KafkaContainer("5.3.0");
 
   private KafkaStorage storage;
   private Properties testConsumerConfig;
   private KafkaProducer<String, List<Span>> tracesProducer;
-  private Properties tracesProducerConfig;
+  private KafkaProducer<String, DependencyLink> linkProducer;
 
   @BeforeEach void start() {
     testConsumerConfig = new Properties();
@@ -77,10 +78,12 @@ class KafkaStorageIT {
         .traceAggregationSuppressUntil(Duration.ofSeconds(3))
         .build();
 
-    tracesProducerConfig = new Properties();
-    tracesProducerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
-    tracesProducer = new KafkaProducer<>(tracesProducerConfig, new StringSerializer(),
+    Properties producerConfig = new Properties();
+    producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
+    tracesProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
         new SpansSerde().serializer());
+    linkProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
+        new DependencyLinkSerde().serializer());
   }
 
   @AfterEach void closeStorageReleaseLock() {
@@ -136,6 +139,9 @@ class KafkaStorageIT {
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.tracesTopic.name, 1, 30000);
 
+    // Map Dependency Links
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.dependencyLinksTopic.name, 1, 10000);
   }
 
   @Test void should_return_traces_query() throws Exception {
@@ -189,8 +195,39 @@ class KafkaStorageIT {
         .until(() -> serviceAndSpanNames.getRemoteServiceNames("svc_a").execute().size() == 1);
   }
 
-  @Test
-  public void shouldFailWhenKafkaNotAvailable() {
+  @Test void should_find_dependencies() throws Exception {
+    DependencyLink link1 = DependencyLink.newBuilder()
+        .parent("svc_a")
+        .child("svc_b")
+        .callCount(1)
+        .errorCount(0)
+        .build();
+    linkProducer.send(
+        new ProducerRecord<>(storage.dependencyLinksTopic.name, "svc_a:svc_b", link1));
+    DependencyLink link2 = DependencyLink.newBuilder()
+        .parent("svc_a")
+        .child("svc_b")
+        .callCount(1)
+        .errorCount(0)
+        .build();
+    linkProducer.send(
+        new ProducerRecord<>(storage.dependencyLinksTopic.name, "svc_a:svc_b", link2));
+    linkProducer.flush();
+
+    IntegrationTestUtils.waitUntilMinRecordsReceived(
+        testConsumerConfig, storage.dependencyLinksTopic.name, 2, 10000);
+
+    SpanStore spanStore = storage.spanStore();
+
+    await().atMost(10, TimeUnit.SECONDS).until(() -> {
+      List<DependencyLink> execute =
+          spanStore.getDependencies(System.currentTimeMillis(), Duration.ofMinutes(1).toMillis())
+              .execute();
+      return execute.size() == 1 && execute.get(0).callCount() == 2;
+    });
+  }
+
+  @Test void shouldFailWhenKafkaNotAvailable() {
     CheckResult checked = storage.check();
     assertEquals(CheckResult.OK, checked);
 

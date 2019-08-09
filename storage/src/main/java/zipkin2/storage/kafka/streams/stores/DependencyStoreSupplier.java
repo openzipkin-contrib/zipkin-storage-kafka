@@ -28,7 +28,6 @@ import org.apache.kafka.streams.state.WindowStore;
 import org.apache.kafka.streams.state.WindowStoreIterator;
 import zipkin2.DependencyLink;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
-import zipkin2.storage.kafka.streams.serdes.DependencyLinksSerde;
 import zipkin2.storage.kafka.streams.serdes.NamesSerde;
 
 /**
@@ -47,7 +46,6 @@ public class DependencyStoreSupplier implements Supplier<Topology> {
   final Duration windowSize;
   // SerDes
   final DependencyLinkSerde dependencyLinkSerde;
-  final DependencyLinksSerde dependencyLinksSerde;
   final NamesSerde namesSerde;
 
   public DependencyStoreSupplier(String dependencyLinksTopic,
@@ -58,7 +56,6 @@ public class DependencyStoreSupplier implements Supplier<Topology> {
     this.windowSize = windowSize;
 
     dependencyLinkSerde = new DependencyLinkSerde();
-    dependencyLinksSerde = new DependencyLinksSerde();
     namesSerde = new NamesSerde();
   }
 
