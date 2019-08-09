@@ -139,7 +139,7 @@ public class KafkaStorage extends StorageComponent {
     traceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
     traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    traceStoreTopology = new TraceStoreSupplier(spansTopic.name, builder.tracesRetentionScanFrequency,
+    traceStoreTopology = new TraceStoreSupplier(tracesTopic.name, builder.tracesRetentionScanFrequency,
         builder.tracesRetentionMaxAge).get();
     // Dependency Aggregation topology
     dependencyLinkMapperStreamConfig = new Properties();
@@ -306,9 +306,6 @@ public class KafkaStorage extends StorageComponent {
       if (producer != null) {
         producer.flush();
         producer.close(Duration.ofSeconds(1));
-      }
-      if (traceStoreStream != null) {
-        traceStoreStream.close(Duration.ofSeconds(1));
       }
       if (traceStoreStream != null) {
         traceStoreStream.close(Duration.ofSeconds(1));

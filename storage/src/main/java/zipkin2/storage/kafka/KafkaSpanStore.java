@@ -68,9 +68,9 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     try {
       ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
           traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
-      ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTimestampStore =
+      ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore =
           traceStoreStream.store(SPAN_IDS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
-      return new GetTracesCall(tracesStore, traceIdsByTimestampStore, request);
+      return new GetTracesCall(tracesStore, traceIdsByTsStore, request);
     } catch (Exception e) {
       LOG.error("Error getting traces. Request: {}", request, e);
       return Call.emptyList();
@@ -228,15 +228,15 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
   static class GetTracesCall extends KafkaStreamsStoreCall<List<List<Span>>> {
     final ReadOnlyKeyValueStore<String, List<Span>> tracesStore;
-    final ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTimestampStore;
+    final ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore;
     final QueryRequest queryRequest;
 
     GetTracesCall(
         ReadOnlyKeyValueStore<String, List<Span>> tracesStore,
-        ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTimestampStore,
+        ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore,
         QueryRequest queryRequest) {
       this.tracesStore = tracesStore;
-      this.traceIdsByTimestampStore = traceIdsByTimestampStore;
+      this.traceIdsByTsStore = traceIdsByTsStore;
       this.queryRequest = queryRequest;
     }
 
@@ -244,8 +244,11 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     List<List<Span>> query() {
       List<List<Span>> result = new ArrayList<>();
       List<String> traceIds = new ArrayList<>();
-      KeyValueIterator<Long, Set<String>> spanIds =
-          traceIdsByTimestampStore.range(queryRequest.lookback(), queryRequest.endTs());
+      traceIdsByTsStore.all().forEachRemaining(System.out::println);
+      // milliseconds to microseconds
+      long from = (queryRequest.endTs() - queryRequest.lookback()) * 1000;
+      long to = queryRequest.endTs() * 1000;
+      KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to);
       spanIds.forEachRemaining(keyValue -> {
         for (String traceId : keyValue.value) {
           if (!traceIds.contains(traceId) && result.size() <= queryRequest.limit()) {
@@ -265,7 +268,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
     @Override
     public Call<List<List<Span>>> clone() {
-      return new GetTracesCall(tracesStore, traceIdsByTimestampStore, queryRequest);
+      return new GetTracesCall(tracesStore, traceIdsByTsStore, queryRequest);
     }
   }
 
