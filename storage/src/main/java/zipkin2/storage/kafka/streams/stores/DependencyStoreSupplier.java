@@ -15,8 +15,6 @@ package zipkin2.storage.kafka.streams.stores;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
@@ -25,15 +23,13 @@ import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.processor.Processor;
 import org.apache.kafka.streams.processor.ProcessorContext;
-import org.apache.kafka.streams.processor.PunctuationType;
-import org.apache.kafka.streams.state.KeyValueIterator;
-import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.Stores;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.kafka.streams.state.WindowStore;
+import org.apache.kafka.streams.state.WindowStoreIterator;
 import zipkin2.DependencyLink;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinksSerde;
+import zipkin2.storage.kafka.streams.serdes.NamesSerde;
 
 /**
  * Stream topology supplier for Dependency aggregation.
@@ -42,30 +38,28 @@ import zipkin2.storage.kafka.streams.serdes.DependencyLinksSerde;
  * store)
  */
 public class DependencyStoreSupplier implements Supplier<Topology> {
-  public static final String DEPENDENCY_LINKS_BY_TS_STORE_NAME =
-      "zipkin_dependency_link_ids_by_timestamp";
-
-  static final Logger LOG = LoggerFactory.getLogger(DependencyStoreSupplier.class);
-  static final String DEPENDENCY_LINKS_STORE_NAME = "zipkin_dependency_links";
+  public static final String DEPENDENCY_LINKS_STORE_NAME = "zipkin_dependency_links";
 
   // Kafka Topics
   final String dependencyLinksTopic;
   // Limits
-  final Duration scanFrequency;
-  final Duration maxAge;
+  final Duration retentionPeriod;
+  final Duration windowSize;
   // SerDes
   final DependencyLinkSerde dependencyLinkSerde;
   final DependencyLinksSerde dependencyLinksSerde;
+  final NamesSerde namesSerde;
 
   public DependencyStoreSupplier(String dependencyLinksTopic,
-      Duration scanFrequency,
-      Duration maxAge) {
+      Duration retentionPeriod,
+      Duration windowSize) {
     this.dependencyLinksTopic = dependencyLinksTopic;
-    this.scanFrequency = scanFrequency;
-    this.maxAge = maxAge;
+    this.retentionPeriod = retentionPeriod;
+    this.windowSize = windowSize;
 
     dependencyLinkSerde = new DependencyLinkSerde();
     dependencyLinksSerde = new DependencyLinksSerde();
+    namesSerde = new NamesSerde();
   }
 
   @Override public Topology get() {
@@ -73,86 +67,60 @@ public class DependencyStoreSupplier implements Supplier<Topology> {
 
     builder
         // Add state stores
-        .addStateStore(Stores.keyValueStoreBuilder(
-            Stores.persistentKeyValueStore(DEPENDENCY_LINKS_STORE_NAME),
+        .addStateStore(Stores.windowStoreBuilder(
+            Stores.persistentWindowStore(
+                DEPENDENCY_LINKS_STORE_NAME,
+                retentionPeriod,
+                windowSize,
+                false),
             Serdes.String(),
             dependencyLinkSerde
-        ))
-        .addStateStore(Stores.keyValueStoreBuilder(
-            Stores.persistentKeyValueStore(DEPENDENCY_LINKS_BY_TS_STORE_NAME),
-            Serdes.Long(),
-            dependencyLinksSerde
         ))
         // Consume dependency links stream
         .stream(dependencyLinksTopic, Consumed.with(Serdes.String(), dependencyLinkSerde))
         // Storage
         .process(() -> new Processor<String, DependencyLink>() {
           ProcessorContext context;
-          KeyValueStore<String, DependencyLink> dependencyLinksStore;
-          KeyValueStore<Long, List<DependencyLink>> dependencyLinkIdsByTsStore;
+          WindowStore<String, DependencyLink> dependencyLinksStore;
 
           @Override
           public void init(ProcessorContext context) {
             this.context = context;
 
             dependencyLinksStore =
-                (KeyValueStore<String, DependencyLink>) context.getStateStore(
+                (WindowStore<String, DependencyLink>) context.getStateStore(
                     DEPENDENCY_LINKS_STORE_NAME);
-            dependencyLinkIdsByTsStore =
-                (KeyValueStore<Long, List<DependencyLink>>) context.getStateStore(
-                    DEPENDENCY_LINKS_BY_TS_STORE_NAME);
-
-            context.schedule(
-                scanFrequency,
-                PunctuationType.STREAM_TIME,
-                timestamp -> {
-                  long cutoff = maxAge.toMillis();
-                  long ttl = timestamp - cutoff;
-                  long ttlMicro = ttl * 1000;
-                  try (final KeyValueIterator<Long, List<DependencyLink>> all =
-                           dependencyLinkIdsByTsStore.range(0L, ttlMicro)) {
-                    int deletions = 0;
-                    while (all.hasNext()) {
-                      final KeyValue<Long, List<DependencyLink>> record = all.next();
-                      dependencyLinkIdsByTsStore.delete(record.key);
-                      deletions++;
-                    }
-                    if (deletions > 1) {
-                      LOG.info("Dependency links group by ts deletions emitted: {}, older than {}",
-                          deletions, Instant.ofEpochMilli(ttl));
-                    }
-                  }
-                });
           }
 
           @Override
-          public void process(String dependencyLinkKey, DependencyLink link) {
-            DependencyLink currentLink = dependencyLinksStore.get(dependencyLinkKey);
-            if (currentLink == null) {
-              currentLink = link;
-            } else {
-              currentLink = DependencyLink.newBuilder()
+          public void process(String linkKey, DependencyLink link) {
+            Instant instant = Instant.ofEpochMilli(context.timestamp());
+            WindowStoreIterator<DependencyLink> currentLinkWindow =
+                dependencyLinksStore.fetch(linkKey, instant.minus(windowSize), instant);
+            // Get latest window. Only two are possible.
+            KeyValue<Long, DependencyLink> windowAndValue = null;
+            if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
+            if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
+
+            if (windowAndValue != null) {
+              DependencyLink currentLink = windowAndValue.value;
+              DependencyLink build = currentLink.toBuilder()
                   .callCount(currentLink.callCount() + link.callCount())
                   .errorCount(currentLink.errorCount() + link.errorCount())
-                  .child(currentLink.child())
-                  .parent(currentLink.parent())
                   .build();
+              dependencyLinksStore.put(
+                  linkKey,
+                  build,
+                  windowAndValue.key);
+            } else {
+              dependencyLinksStore.put(linkKey, link);
             }
-            dependencyLinksStore.put(dependencyLinkKey, currentLink);
-            long timestamp = context.timestamp();
-            List<DependencyLink> currentLinks = dependencyLinkIdsByTsStore.get(
-                timestamp);
-            if (currentLinks == null) {
-              currentLinks = new ArrayList<>();
-            }
-            currentLinks.add(currentLink);
-            dependencyLinkIdsByTsStore.put(timestamp, currentLinks);
           }
 
           @Override
           public void close() {
           }
-        }, DEPENDENCY_LINKS_STORE_NAME, DEPENDENCY_LINKS_BY_TS_STORE_NAME);
+        }, DEPENDENCY_LINKS_STORE_NAME);
 
     return builder.build();
   }

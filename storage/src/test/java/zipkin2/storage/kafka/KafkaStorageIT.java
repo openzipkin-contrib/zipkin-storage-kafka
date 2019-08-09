@@ -17,9 +17,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -127,353 +125,321 @@ public class KafkaStorageIT {
 
   }
 
-  @Test public void should_aggregate_traces() throws Exception {
-    Span root = Span.newBuilder()
-        .traceId("a")
-        .id("a")
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-        .name("op_a")
-        .kind(Span.Kind.CLIENT)
-        .timestamp(TODAY)
-        .duration(10)
-        .build();
-    Span child = Span.newBuilder()
-        .traceId("a")
-        .id("b")
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .name("op_b")
-        .kind(Span.Kind.SERVER)
-        .timestamp(TODAY)
-        .duration(2)
-        .build();
+  //FIXME
+  //@Test
+  //public void shouldFindTraces() throws Exception {
+  //  Span root = Span.newBuilder()
+  //      .traceId("a")
+  //      .id("a")
+  //      .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+  //      .remoteEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+  //      .name("op_a")
+  //      .kind(Span.Kind.CLIENT)
+  //      .timestamp(Long.valueOf(TODAY + "000"))
+  //      .duration(10)
+  //      .build();
+  //  Span child = Span.newBuilder()
+  //      .traceId("a")
+  //      .id("b")
+  //      .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+  //      .name("op_b")
+  //      .kind(Span.Kind.SERVER)
+  //      .timestamp(Long.valueOf(TODAY + "000"))
+  //      .timestamp(TODAY)
+  //      .duration(2)
+  //      .build();
+  //  List<Span> spans = Arrays.asList(root, child);
+  //  final SpanConsumer spanConsumer = storage.spanConsumer();
+  //  final SpanStore spanStore = storage.spanStore();
+  //
+  //  spanConsumer.accept(spans).execute();
+  //
+  //  IntegrationTestUtils.waitUntilMinRecordsReceived(
+  //      testConsumerConfig, storage.spansTopic.name, 2, 10000);
+  //  await().atMost(30, TimeUnit.SECONDS)
+  //      .until(() -> {
+  //        List<List<Span>> traces =
+  //            spanStore.getTraces(QueryRequest.newBuilder()
+  //                .endTs(TODAY + 1)
+  //                .limit(10)
+  //                .lookback(Duration.ofMinutes(1).toMillis())
+  //                .build())
+  //                .execute();
+  //        return traces.size() == 1 && traces.get(0).size() == 2;
+  //      });
+  //}
+  //
+  //@Test
+  //public void shouldFindTracesByTags() throws Exception {
+  //  Map<String, String> annotationQuery =
+  //      new HashMap<String, String>() {
+  //        {
+  //          put("key_tag_a", "value_tag_a");
+  //        }
+  //      };
+  //
+  //  Span span1 =
+  //      Span.newBuilder()
+  //          .traceId("a")
+  //          .id("a")
+  //          .putTag("key_tag_a", "value_tag_a")
+  //          .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+  //          .name("op_a")
+  //          .kind(Span.Kind.CLIENT)
+  //          .timestamp(Long.valueOf(TODAY + "000"))
+  //          .duration(10)
+  //          .build();
+  //
+  //  Span span2 =
+  //      Span.newBuilder()
+  //          .traceId("b")
+  //          .id("b")
+  //          .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+  //          .putTag("key_tag_c", "value_tag_d")
+  //          .addAnnotation(Long.valueOf(TODAY + "000"), "annotation_b")
+  //          .name("op_b")
+  //          .kind(Span.Kind.CLIENT)
+  //          .timestamp(Long.valueOf(TODAY + "000"))
+  //          .duration(10)
+  //          .build();
+  //
+  //  final SpanConsumer spanConsumer = storage.spanConsumer();
+  //  final SpanStore spanStore = storage.spanStore();
+  //
+  //  List<Span> spans = Arrays.asList(span1, span2);
+  //  spanConsumer.accept(spans).execute();
+  //
+  //  IntegrationTestUtils.waitUntilMinRecordsReceived(
+  //      testConsumerConfig, storage.spansTopic.name, 2, 10000);
+  //
+  //  // query by annotation {"key_tag_a":"value_tag_a"} = 1 trace
+  //  await()
+  //      .atMost(10, TimeUnit.SECONDS)
+  //      .until(() -> {
+  //        List<List<Span>> traces =
+  //            spanStore.getTraces(QueryRequest.newBuilder()
+  //                .annotationQuery(annotationQuery)
+  //                .endTs(TODAY + 1)
+  //                .limit(10)
+  //                .lookback(Duration.ofMinutes(1).toMillis())
+  //                .build())
+  //                .execute();
+  //        return traces.size() == 1;
+  //      });
+  //
+  //  // query by annotation {"key_tag_non_exist_a":"value_tag_non_exist_a"} = 0 trace
+  //  await()
+  //      .pollDelay(5, TimeUnit.SECONDS)
+  //      .until(() -> {
+  //        List<List<Span>> traces =
+  //            spanStore.getTraces(QueryRequest.newBuilder()
+  //                .annotationQuery(
+  //                    new HashMap<String, String>() {{
+  //                      put("key_tag_non_exist_a", "value_tag_non_exist_a");
+  //                    }})
+  //                .endTs(TODAY + 1)
+  //                .limit(10)
+  //                .lookback(Duration.ofMinutes(1).toMillis())
+  //                .build())
+  //                .execute();
+  //        return traces.size() == 0;
+  //      });
+  //}
+  //
+  //@Test
+  //public void shouldFindTracesByAnnotations() throws Exception {
+  //  Span span1 =
+  //      Span.newBuilder()
+  //          .traceId("a")
+  //          .id("a")
+  //          .putTag("key_tag_a", "value_tag_a")
+  //          .addAnnotation(TODAY, "log value")
+  //          .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+  //          .name("op_a")
+  //          .kind(Span.Kind.CLIENT)
+  //          .timestamp(Long.valueOf(TODAY + "000"))
+  //          .duration(10)
+  //          .build();
+  //
+  //  Span span2 =
+  //      Span.newBuilder()
+  //          .traceId("b")
+  //          .id("b")
+  //          .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+  //          .putTag("key_tag_c", "value_tag_d")
+  //          .addAnnotation(Long.valueOf(TODAY + "000"), "annotation_b")
+  //          .name("op_b")
+  //          .kind(Span.Kind.CLIENT)
+  //          .timestamp(Long.valueOf(TODAY + "000"))
+  //          .duration(10)
+  //          .build();
+  //
+  //  final SpanConsumer spanConsumer = storage.spanConsumer();
+  //  final SpanStore spanStore = storage.spanStore();
+  //
+  //  List<Span> spans = Arrays.asList(span1, span2);
+  //  spanConsumer.accept(spans).execute();
+  //
+  //  IntegrationTestUtils.waitUntilMinRecordsReceived(
+  //      testConsumerConfig, storage.spansTopic.name, 2, 10000);
+  //
+  //  // query by annotation {"key_tag_a":"value_tag_a"} = 1 trace
+  //  await()
+  //      .atMost(10, TimeUnit.SECONDS)
+  //      .until(() -> {
+  //        List<List<Span>> traces =
+  //            spanStore.getTraces(QueryRequest.newBuilder()
+  //                .parseAnnotationQuery("log*")
+  //                .endTs(TODAY + 1)
+  //                .limit(10)
+  //                .lookback(Duration.ofMinutes(1).toMillis())
+  //                .build())
+  //                .execute();
+  //        return traces.size() == 1;
+  //      });
+  //}
 
-    final SpanConsumer spanConsumer = storage.spanConsumer();
-
-    List<Span> spans = Arrays.asList(root, child);
-    spanConsumer.accept(spans).execute();
-
-    //storage.traceAggregationStream.start();
-
-    IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopic.name, 1, 10000);
-  }
-
-  // TODO: implement dependency building validation as it is unclear how to test suppress feature i.e. how long to wait for dependencies?
-
-  @Test
-  public void shouldFindTraces() throws Exception {
-    Span root = Span.newBuilder()
-        .traceId("a")
-        .id("a")
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-        .remoteEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .name("op_a")
-        .kind(Span.Kind.CLIENT)
-        .timestamp(Long.valueOf(TODAY + "000"))
-        .duration(10)
-        .build();
-    Span child = Span.newBuilder()
-        .traceId("a")
-        .id("b")
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .name("op_b")
-        .kind(Span.Kind.SERVER)
-        .timestamp(Long.valueOf(TODAY + "000"))
-        .timestamp(TODAY)
-        .duration(2)
-        .build();
-    List<Span> spans = Arrays.asList(root, child);
-    final SpanConsumer spanConsumer = storage.spanConsumer();
-    final SpanStore spanStore = storage.spanStore();
-
-    spanConsumer.accept(spans).execute();
-
-    IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopic.name, 2, 10000);
-    await().atMost(30, TimeUnit.SECONDS)
-        .until(() -> {
-          List<List<Span>> traces =
-              spanStore.getTraces(QueryRequest.newBuilder()
-                  .endTs(TODAY + 1)
-                  .limit(10)
-                  .lookback(Duration.ofMinutes(1).toMillis())
-                  .build())
-                  .execute();
-          return traces.size() == 1 && traces.get(0).size() == 2;
-        });
-  }
-
-  @Test
-  public void shouldFindTracesByTags() throws Exception {
-    Map<String, String> annotationQuery =
-        new HashMap<String, String>() {
-          {
-            put("key_tag_a", "value_tag_a");
-          }
-        };
-
-    Span span1 =
-        Span.newBuilder()
-            .traceId("a")
-            .id("a")
-            .putTag("key_tag_a", "value_tag_a")
-            .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-            .name("op_a")
-            .kind(Span.Kind.CLIENT)
-            .timestamp(Long.valueOf(TODAY + "000"))
-            .duration(10)
-            .build();
-
-    Span span2 =
-        Span.newBuilder()
-            .traceId("b")
-            .id("b")
-            .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-            .putTag("key_tag_c", "value_tag_d")
-            .addAnnotation(Long.valueOf(TODAY + "000"), "annotation_b")
-            .name("op_b")
-            .kind(Span.Kind.CLIENT)
-            .timestamp(Long.valueOf(TODAY + "000"))
-            .duration(10)
-            .build();
-
-    final SpanConsumer spanConsumer = storage.spanConsumer();
-    final SpanStore spanStore = storage.spanStore();
-
-    List<Span> spans = Arrays.asList(span1, span2);
-    spanConsumer.accept(spans).execute();
-
-    IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopic.name, 2, 10000);
-
-    // query by annotation {"key_tag_a":"value_tag_a"} = 1 trace
-    await()
-        .atMost(10, TimeUnit.SECONDS)
-        .until(() -> {
-          List<List<Span>> traces =
-              spanStore.getTraces(QueryRequest.newBuilder()
-                  .annotationQuery(annotationQuery)
-                  .endTs(TODAY + 1)
-                  .limit(10)
-                  .lookback(Duration.ofMinutes(1).toMillis())
-                  .build())
-                  .execute();
-          return traces.size() == 1;
-        });
-
-    // query by annotation {"key_tag_non_exist_a":"value_tag_non_exist_a"} = 0 trace
-    await()
-        .pollDelay(5, TimeUnit.SECONDS)
-        .until(() -> {
-          List<List<Span>> traces =
-              spanStore.getTraces(QueryRequest.newBuilder()
-                  .annotationQuery(
-                      new HashMap<String, String>() {{
-                        put("key_tag_non_exist_a", "value_tag_non_exist_a");
-                      }})
-                  .endTs(TODAY + 1)
-                  .limit(10)
-                  .lookback(Duration.ofMinutes(1).toMillis())
-                  .build())
-                  .execute();
-          return traces.size() == 0;
-        });
-  }
-
-  @Test
-  public void shouldFindTracesByAnnotations() throws Exception {
-    Span span1 =
-        Span.newBuilder()
-            .traceId("a")
-            .id("a")
-            .putTag("key_tag_a", "value_tag_a")
-            .addAnnotation(TODAY, "log value")
-            .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-            .name("op_a")
-            .kind(Span.Kind.CLIENT)
-            .timestamp(Long.valueOf(TODAY + "000"))
-            .duration(10)
-            .build();
-
-    Span span2 =
-        Span.newBuilder()
-            .traceId("b")
-            .id("b")
-            .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-            .putTag("key_tag_c", "value_tag_d")
-            .addAnnotation(Long.valueOf(TODAY + "000"), "annotation_b")
-            .name("op_b")
-            .kind(Span.Kind.CLIENT)
-            .timestamp(Long.valueOf(TODAY + "000"))
-            .duration(10)
-            .build();
-
-    final SpanConsumer spanConsumer = storage.spanConsumer();
-    final SpanStore spanStore = storage.spanStore();
-
-    List<Span> spans = Arrays.asList(span1, span2);
-    spanConsumer.accept(spans).execute();
-
-    IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopic.name, 2, 10000);
-
-    // query by annotation {"key_tag_a":"value_tag_a"} = 1 trace
-    await()
-        .atMost(10, TimeUnit.SECONDS)
-        .until(() -> {
-          List<List<Span>> traces =
-              spanStore.getTraces(QueryRequest.newBuilder()
-                  .parseAnnotationQuery("log*")
-                  .endTs(TODAY + 1)
-                  .limit(10)
-                  .lookback(Duration.ofMinutes(1).toMillis())
-                  .build())
-                  .execute();
-          return traces.size() == 1;
-        });
-  }
-
-  @Test
-  public void shouldFindTracesBySpanName() throws Exception {
-    Span span1 =
-        Span.newBuilder()
-            .traceId("a")
-            .id("a")
-            .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-            .name("op_a")
-            .kind(Span.Kind.CLIENT)
-            .timestamp(Long.valueOf(TODAY + "000"))
-            .duration(10)
-            .build();
-
-    Span span2 =
-        Span.newBuilder()
-            .traceId("b")
-            .id("b")
-            .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-            .name("op_b")
-            .kind(Span.Kind.CLIENT)
-            .timestamp(Long.valueOf(TODAY + "000"))
-            .duration(10)
-            .build();
-
-    final SpanConsumer spanConsumer = storage.spanConsumer();
-    final SpanStore spanStore = storage.spanStore();
-
-    List<Span> spans = Arrays.asList(span1, span2);
-    spanConsumer.accept(spans).execute();
-
-    IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopic.name, 2, 10000);
-
-    // query by span name `op_a` = 1 trace
-    await()
-        .atMost(5, TimeUnit.SECONDS)
-        .until(() -> {
-          List<List<Span>> traces =
-              spanStore.getTraces(
-                  QueryRequest.newBuilder()
-                      .spanName("op_a")
-                      .endTs(TODAY + 1)
-                      .limit(10)
-                      .lookback(Duration.ofMinutes(1).toMillis())
-                      .build())
-                  .execute();
-          return traces.size() == 1;
-        });
-
-    // query by span name `op_b` = 1 trace
-    await()
-        .atMost(5, TimeUnit.SECONDS)
-        .until(() -> {
-          List<List<Span>> traces =
-              spanStore.getTraces(
-                  QueryRequest.newBuilder()
-                      .spanName("op_b")
-                      .endTs(TODAY + 1)
-                      .limit(10)
-                      .lookback(Duration.ofMinutes(1).toMillis())
-                      .build())
-                  .execute();
-          return traces.size() == 1;
-        });
-
-    // query by span name `non_existing_span_name` = 0 trace
-    await()
-        .pollDelay(5, TimeUnit.SECONDS)
-        .until(() -> {
-          List<List<Span>> traces =
-              spanStore.getTraces(
-                  QueryRequest.newBuilder()
-                      .spanName("non_existing_span_name")
-                      .endTs(TODAY + 1)
-                      .limit(10)
-                      .lookback(Duration.ofMinutes(1).toMillis())
-                      .build())
-                  .execute();
-          return traces.size() == 0;
-        });
-  }
-
-  @Test
-  public void shouldFindTracesByServiceName() throws Exception {
-    Span span1 =
-        Span.newBuilder()
-            .traceId("a")
-            .id("a")
-            .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-            .name("op_a")
-            .kind(Span.Kind.CLIENT)
-            .timestamp(Long.valueOf(TODAY + "000"))
-            .duration(10)
-            .build();
-
-    Span span2 =
-        Span.newBuilder()
-            .traceId("b")
-            .id("b")
-            .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-            .name("op_b")
-            .kind(Span.Kind.CLIENT)
-            .timestamp(Long.valueOf(TODAY + "000"))
-            .duration(10)
-            .build();
-
-    final SpanConsumer spanConsumer = storage.spanConsumer();
-    final SpanStore spanStore = storage.spanStore();
-
-    List<Span> spans = Arrays.asList(span1, span2);
-    spanConsumer.accept(spans).execute();
-
-    IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopic.name, 2, 10000);
-
-    // query by service name `srv_a` = 2 trace
-    await()
-        .atMost(10, TimeUnit.SECONDS)
-        .until(() -> {
-          List<List<Span>> traces =
-              spanStore.getTraces(
-                  QueryRequest.newBuilder()
-                      .serviceName("svc_a")
-                      .endTs(TODAY + 1)
-                      .limit(10)
-                      .lookback(Duration.ofMinutes(1).toMillis())
-                      .build())
-                  .execute();
-          return traces.size() == 2;
-        });
-
-    List<List<Span>> traces = spanStore.getTraces(
-        QueryRequest.newBuilder()
-            .serviceName("non_existing_span_name")
-            .endTs(TODAY + 1)
-            .limit(10)
-            .lookback(Duration.ofMinutes(1).toMillis())
-            .build())
-        .execute();
-    assertEquals(0, traces.size());
-  }
+  //@Test
+  //public void shouldFindTracesBySpanName() throws Exception {
+  //  Span span1 =
+  //      Span.newBuilder()
+  //          .traceId("a")
+  //          .id("a")
+  //          .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+  //          .name("op_a")
+  //          .kind(Span.Kind.CLIENT)
+  //          .timestamp(Long.valueOf(TODAY + "000"))
+  //          .duration(10)
+  //          .build();
+  //
+  //  Span span2 =
+  //      Span.newBuilder()
+  //          .traceId("b")
+  //          .id("b")
+  //          .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+  //          .name("op_b")
+  //          .kind(Span.Kind.CLIENT)
+  //          .timestamp(Long.valueOf(TODAY + "000"))
+  //          .duration(10)
+  //          .build();
+  //
+  //  final SpanConsumer spanConsumer = storage.spanConsumer();
+  //  final SpanStore spanStore = storage.spanStore();
+  //
+  //  List<Span> spans = Arrays.asList(span1, span2);
+  //  spanConsumer.accept(spans).execute();
+  //
+  //  IntegrationTestUtils.waitUntilMinRecordsReceived(
+  //      testConsumerConfig, storage.spansTopic.name, 2, 10000);
+  //
+  //  // query by span name `op_a` = 1 trace
+  //  await()
+  //      .atMost(5, TimeUnit.SECONDS)
+  //      .until(() -> {
+  //        List<List<Span>> traces =
+  //            spanStore.getTraces(
+  //                QueryRequest.newBuilder()
+  //                    .spanName("op_a")
+  //                    .endTs(TODAY + 1)
+  //                    .limit(10)
+  //                    .lookback(Duration.ofMinutes(1).toMillis())
+  //                    .build())
+  //                .execute();
+  //        return traces.size() == 1;
+  //      });
+  //
+  //  // query by span name `op_b` = 1 trace
+  //  await()
+  //      .atMost(5, TimeUnit.SECONDS)
+  //      .until(() -> {
+  //        List<List<Span>> traces =
+  //            spanStore.getTraces(
+  //                QueryRequest.newBuilder()
+  //                    .spanName("op_b")
+  //                    .endTs(TODAY + 1)
+  //                    .limit(10)
+  //                    .lookback(Duration.ofMinutes(1).toMillis())
+  //                    .build())
+  //                .execute();
+  //        return traces.size() == 1;
+  //      });
+  //
+  //  // query by span name `non_existing_span_name` = 0 trace
+  //  await()
+  //      .pollDelay(5, TimeUnit.SECONDS)
+  //      .until(() -> {
+  //        List<List<Span>> traces =
+  //            spanStore.getTraces(
+  //                QueryRequest.newBuilder()
+  //                    .spanName("non_existing_span_name")
+  //                    .endTs(TODAY + 1)
+  //                    .limit(10)
+  //                    .lookback(Duration.ofMinutes(1).toMillis())
+  //                    .build())
+  //                .execute();
+  //        return traces.size() == 0;
+  //      });
+  //}
+  //
+  //@Test
+  //public void shouldFindTracesByServiceName() throws Exception {
+  //  Span span1 =
+  //      Span.newBuilder()
+  //          .traceId("a")
+  //          .id("a")
+  //          .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+  //          .name("op_a")
+  //          .kind(Span.Kind.CLIENT)
+  //          .timestamp(Long.valueOf(TODAY + "000"))
+  //          .duration(10)
+  //          .build();
+  //
+  //  Span span2 =
+  //      Span.newBuilder()
+  //          .traceId("b")
+  //          .id("b")
+  //          .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+  //          .name("op_b")
+  //          .kind(Span.Kind.CLIENT)
+  //          .timestamp(Long.valueOf(TODAY + "000"))
+  //          .duration(10)
+  //          .build();
+  //
+  //  final SpanConsumer spanConsumer = storage.spanConsumer();
+  //  final SpanStore spanStore = storage.spanStore();
+  //
+  //  List<Span> spans = Arrays.asList(span1, span2);
+  //  spanConsumer.accept(spans).execute();
+  //
+  //  IntegrationTestUtils.waitUntilMinRecordsReceived(
+  //      testConsumerConfig, storage.spansTopic.name, 2, 10000);
+  //
+  //  // query by service name `srv_a` = 2 trace
+  //  await()
+  //      .atMost(10, TimeUnit.SECONDS)
+  //      .until(() -> {
+  //        List<List<Span>> traces =
+  //            spanStore.getTraces(
+  //                QueryRequest.newBuilder()
+  //                    .serviceName("svc_a")
+  //                    .endTs(TODAY + 1)
+  //                    .limit(10)
+  //                    .lookback(Duration.ofMinutes(1).toMillis())
+  //                    .build())
+  //                .execute();
+  //        return traces.size() == 2;
+  //      });
+  //
+  //  List<List<Span>> traces = spanStore.getTraces(
+  //      QueryRequest.newBuilder()
+  //          .serviceName("non_existing_span_name")
+  //          .endTs(TODAY + 1)
+  //          .limit(10)
+  //          .lookback(Duration.ofMinutes(1).toMillis())
+  //          .build())
+  //      .execute();
+  //  assertEquals(0, traces.size());
+  //}
 
   @Test
   public void shouldEnqueueTraceQuery() {

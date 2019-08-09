@@ -139,8 +139,8 @@ public class KafkaStorage extends StorageComponent {
     traceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
     traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    traceStoreTopology = new TraceStoreSupplier(spansTopic.name, builder.retentionScanFrequency,
-        builder.retentionMaxAge).get();
+    traceStoreTopology = new TraceStoreSupplier(spansTopic.name, builder.tracesRetentionScanFrequency,
+        builder.tracesRetentionMaxAge).get();
     // Dependency Aggregation topology
     dependencyLinkMapperStreamConfig = new Properties();
     dependencyLinkMapperStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -175,8 +175,8 @@ public class KafkaStorage extends StorageComponent {
         builder.compressionType.name);
     dependencyStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
     dependencyStoreTopology =
-        new DependencyStoreSupplier(dependencyLinksTopic.name, builder.retentionScanFrequency,
-            builder.retentionMaxAge).get();
+        new DependencyStoreSupplier(dependencyLinksTopic.name, builder.dependenciesRetentionPeriod,
+            builder.dependenciesWindowSize).get();
   }
 
   public static Builder newBuilder() {
@@ -188,9 +188,7 @@ public class KafkaStorage extends StorageComponent {
     if (ensureTopics && !topicsValidated) ensureTopics();
     if (aggregationEnabled) {
       getTraceAggregationStream();
-
-      //      getServiceAggregationStream();
-      //FIXME getDependencyLinkMapperStream();
+      getDependencyLinkMapperStream();
     }
     if (spanConsumerEnabled) {
       return new KafkaSpanConsumer(this);
@@ -407,8 +405,10 @@ public class KafkaStorage extends StorageComponent {
     boolean spanStoreEnabled = true;
     boolean aggregationEnabled = true;
 
-    Duration retentionScanFrequency = Duration.ofMinutes(1);
-    Duration retentionMaxAge = Duration.ofMinutes(2);
+    Duration tracesRetentionScanFrequency = Duration.ofMinutes(1);
+    Duration tracesRetentionMaxAge = Duration.ofMinutes(2);
+    Duration dependenciesRetentionPeriod = Duration.ofDays(5);
+    Duration dependenciesWindowSize = Duration.ofMinutes(1);
 
     String bootstrapServers = "localhost:29092";
     CompressionType compressionType = CompressionType.NONE;
@@ -551,16 +551,32 @@ public class KafkaStorage extends StorageComponent {
     /**
      * Frequency to check retention policy.
      */
-    public Builder retentionScanFrequency(Duration retentionScanFrequency) {
-      this.retentionScanFrequency = retentionScanFrequency;
+    public Builder tracesRetentionScanFrequency(Duration tracesRetentionScanFrequency) {
+      this.tracesRetentionScanFrequency = tracesRetentionScanFrequency;
       return this;
     }
 
     /**
      * Maximum age for traces and spans to be retained on State Stores.
      */
-    public Builder retentionMaxAge(Duration retentionMaxAge) {
-      this.retentionMaxAge = retentionMaxAge;
+    public Builder tracesRetentionMaxAge(Duration tracesRetentionMaxAge) {
+      this.tracesRetentionMaxAge = tracesRetentionMaxAge;
+      return this;
+    }
+
+    /**
+     * Retention period for Dependencies.
+     */
+    public Builder dependenciesRetentionPeriod(Duration dependenciesRetentionPeriod) {
+      this.dependenciesRetentionPeriod = dependenciesRetentionPeriod;
+      return this;
+    }
+
+    /**
+     * Dependencies store window size
+     */
+    public Builder dependenciesWindowSize(Duration dependenciesWindowSize) {
+      this.dependenciesWindowSize = dependenciesWindowSize;
       return this;
     }
 

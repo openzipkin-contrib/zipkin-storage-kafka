@@ -15,7 +15,6 @@ package zipkin2.autoconfigure.storage.kafka;
 
 import java.io.Serializable;
 import java.time.Duration;
-import org.apache.kafka.common.record.CompressionType;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import zipkin2.storage.kafka.KafkaStorage;
 
@@ -23,67 +22,79 @@ import zipkin2.storage.kafka.KafkaStorage;
 public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
 
-  private boolean spanConsumerEnabled = true;
-  private boolean aggregationEnabled = true;
-  private boolean spanStoreEnabled = true;
+  private Boolean spanConsumerEnabled = true;
+  private Boolean aggregationEnabled = true;
+  private Boolean spanStoreEnabled = true;
+  private Boolean ensureTopics = true;
 
-  private boolean ensureTopics = true;
-  private String bootstrapServers = "localhost:9092";
-  private String compressionType = CompressionType.NONE.name();
+  private String bootstrapServers;
+  private String compressionType;
 
-  private Long retentionScanFrequency = Duration.ofDays(1).toMillis();
-  private Long retentionMaxAge = Duration.ofDays(7).toMillis();
-  private Long traceInactivityGap = Duration.ofMinutes(1).toMillis();
+  private Long tracesRetentionScanFrequency;
+  private Long tracesRetentionPeriod;
+
+  private Long dependenciesRetentionPeriod;
+  private Long dependenciesWindowSize;
+
+  private Long traceInactivityGap;
 
   private String spansTopic = "zipkin-spans-v1";
   private Integer spansTopicPartitions = 1;
   private Short spansTopicReplicationFactor = 1;
+
+  private String tracesTopic = "zipkin-traces-v1";
+  private Integer tracesTopicPartitions = 1;
+  private Short tracesTopicReplicationFactor = 1;
+
   private String dependencyLinksTopic = "zipkin-dependency-links-v1";
   private Integer dependencyLinksTopicPartitions = 1;
-  private Short dependencyLinksReplicationFactor = 1;
+  private Short dependencyLinksTopicReplicationFactor = 1;
 
   private String storeDirectory = "/tmp/zipkin";
 
   KafkaStorage.Builder toBuilder() {
-    return KafkaStorage.newBuilder()
-        .spanConsumerEnabled(spanConsumerEnabled)
-        .aggregationEnabled(aggregationEnabled)
-        .spanStoreEnabled(spanStoreEnabled)
-        .ensureTopics(ensureTopics)
-        .bootstrapServers(bootstrapServers)
-        .compressionType(compressionType)
-        .retentionMaxAge(Duration.ofMillis(retentionMaxAge))
-        .retentionScanFrequency(Duration.ofMillis(retentionScanFrequency))
-        .traceInactivityGap(Duration.ofMillis(traceInactivityGap))
+    KafkaStorage.Builder builder = KafkaStorage.newBuilder();
+    if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
+    if (aggregationEnabled != null) builder.aggregationEnabled(aggregationEnabled);
+    if (spanStoreEnabled != null) builder.spanStoreEnabled(spanStoreEnabled);
+    if (ensureTopics != null) builder.ensureTopics(ensureTopics);
+    if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
+    if (compressionType != null) builder.compressionType(compressionType);
+    if (traceInactivityGap != null) {
+      builder.traceInactivityGap(Duration.ofMillis(traceInactivityGap));
+    }
+    if (tracesRetentionScanFrequency != null) {
+      builder.tracesRetentionScanFrequency(Duration.ofMillis(tracesRetentionScanFrequency));
+    }
+    if (tracesRetentionPeriod != null) {
+      builder.dependenciesRetentionPeriod(Duration.ofMillis(dependenciesRetentionPeriod));
+    }
+    if (dependenciesWindowSize != null) {
+      builder.dependenciesWindowSize(Duration.ofMillis(dependenciesWindowSize));
+    }
+
+    return builder
         .spansTopic(KafkaStorage.Topic.builder(spansTopic)
             .partitions(spansTopicPartitions)
             .replicationFactor(spansTopicReplicationFactor)
             .build())
+        .tracesTopic(KafkaStorage.Topic.builder(tracesTopic)
+            .partitions(tracesTopicPartitions)
+            .replicationFactor(tracesTopicReplicationFactor)
+            .build())
         .dependencyLinksTopic(KafkaStorage.Topic.builder(dependencyLinksTopic)
             .partitions(dependencyLinksTopicPartitions)
-            .replicationFactor(dependencyLinksReplicationFactor)
+            .replicationFactor(dependencyLinksTopicReplicationFactor)
             .build())
         .storeDirectory(storeDirectory);
-  }
-
-  public boolean isSpanConsumerEnabled() {
-    return spanConsumerEnabled;
   }
 
   public void setSpanConsumerEnabled(boolean spanConsumerEnabled) {
     this.spanConsumerEnabled = spanConsumerEnabled;
   }
 
-  public boolean isAggregationEnabled() {
-    return aggregationEnabled;
-  }
-
   public void setAggregationEnabled(boolean aggregationEnabled) {
     this.aggregationEnabled = aggregationEnabled;
-  }
-
-  public boolean isSpanStoreEnabled() {
-    return spanStoreEnabled;
   }
 
   public void setSpanStoreEnabled(boolean spanStoreEnabled) {
@@ -114,20 +125,20 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.compressionType = compressionType;
   }
 
-  public Long getRetentionScanFrequency() {
-    return retentionScanFrequency;
+  public Long getTracesRetentionScanFrequency() {
+    return tracesRetentionScanFrequency;
   }
 
-  public void setRetentionScanFrequency(Long retentionScanFrequency) {
-    this.retentionScanFrequency = retentionScanFrequency;
+  public void setTracesRetentionScanFrequency(Long tracesRetentionScanFrequency) {
+    this.tracesRetentionScanFrequency = tracesRetentionScanFrequency;
   }
 
-  public Long getRetentionMaxAge() {
-    return retentionMaxAge;
+  public Long getTracesRetentionPeriod() {
+    return tracesRetentionPeriod;
   }
 
-  public void setRetentionMaxAge(Long retentionMaxAge) {
-    this.retentionMaxAge = retentionMaxAge;
+  public void setTracesRetentionPeriod(Long tracesRetentionPeriod) {
+    this.tracesRetentionPeriod = tracesRetentionPeriod;
   }
 
   public Long getTraceInactivityGap() {
@@ -162,6 +173,62 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.spansTopicReplicationFactor = spansTopicReplicationFactor;
   }
 
+  public Boolean getSpanConsumerEnabled() {
+    return spanConsumerEnabled;
+  }
+
+  public void setSpanConsumerEnabled(Boolean spanConsumerEnabled) {
+    this.spanConsumerEnabled = spanConsumerEnabled;
+  }
+
+  public Boolean getAggregationEnabled() {
+    return aggregationEnabled;
+  }
+
+  public void setAggregationEnabled(Boolean aggregationEnabled) {
+    this.aggregationEnabled = aggregationEnabled;
+  }
+
+  public Boolean getSpanStoreEnabled() {
+    return spanStoreEnabled;
+  }
+
+  public void setSpanStoreEnabled(Boolean spanStoreEnabled) {
+    this.spanStoreEnabled = spanStoreEnabled;
+  }
+
+  public Boolean getEnsureTopics() {
+    return ensureTopics;
+  }
+
+  public void setEnsureTopics(Boolean ensureTopics) {
+    this.ensureTopics = ensureTopics;
+  }
+
+  public String getTracesTopic() {
+    return tracesTopic;
+  }
+
+  public void setTracesTopic(String tracesTopic) {
+    this.tracesTopic = tracesTopic;
+  }
+
+  public Integer getTracesTopicPartitions() {
+    return tracesTopicPartitions;
+  }
+
+  public void setTracesTopicPartitions(Integer tracesTopicPartitions) {
+    this.tracesTopicPartitions = tracesTopicPartitions;
+  }
+
+  public Short getTracesTopicReplicationFactor() {
+    return tracesTopicReplicationFactor;
+  }
+
+  public void setTracesTopicReplicationFactor(Short tracesTopicReplicationFactor) {
+    this.tracesTopicReplicationFactor = tracesTopicReplicationFactor;
+  }
+
   public String getDependencyLinksTopic() {
     return dependencyLinksTopic;
   }
@@ -178,12 +245,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.dependencyLinksTopicPartitions = dependencyLinksTopicPartitions;
   }
 
-  public Short getDependencyLinksReplicationFactor() {
-    return dependencyLinksReplicationFactor;
+  public Short getDependencyLinksTopicReplicationFactor() {
+    return dependencyLinksTopicReplicationFactor;
   }
 
-  public void setDependencyLinksReplicationFactor(Short dependencyLinksReplicationFactor) {
-    this.dependencyLinksReplicationFactor = dependencyLinksReplicationFactor;
+  public void setDependencyLinksTopicReplicationFactor(Short dependencyLinksTopicReplicationFactor) {
+    this.dependencyLinksTopicReplicationFactor = dependencyLinksTopicReplicationFactor;
   }
 
   public String getStoreDirectory() {
@@ -192,5 +259,21 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setStoreDirectory(String storeDirectory) {
     this.storeDirectory = storeDirectory;
+  }
+
+  public Long getDependenciesRetentionPeriod() {
+    return dependenciesRetentionPeriod;
+  }
+
+  public void setDependenciesRetentionPeriod(Long dependenciesRetentionPeriod) {
+    this.dependenciesRetentionPeriod = dependenciesRetentionPeriod;
+  }
+
+  public Long getDependenciesWindowSize() {
+    return dependenciesWindowSize;
+  }
+
+  public void setDependenciesWindowSize(Long dependenciesWindowSize) {
+    this.dependenciesWindowSize = dependenciesWindowSize;
   }
 }

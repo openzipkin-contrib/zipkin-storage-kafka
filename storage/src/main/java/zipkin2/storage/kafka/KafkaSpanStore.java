@@ -14,31 +14,33 @@
 package zipkin2.storage.kafka;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
+import org.apache.kafka.streams.state.ReadOnlyWindowStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
+import zipkin2.internal.DependencyLinker;
 import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
 
-import static zipkin2.storage.kafka.streams.stores.DependencyStoreSupplier.DEPENDENCY_LINKS_BY_TS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.stores.DependencyStoreSupplier.DEPENDENCY_LINKS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SPAN_IDS_BY_TS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.TRACES_STORE_NAME;
 
 /**
@@ -126,9 +128,9 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   @Override
   public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
     try {
-      ReadOnlyKeyValueStore<Long, List<DependencyLink>> dependenciesStore =
-          dependencyStoreStream.
-              store(DEPENDENCY_LINKS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
+      ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore =
+          dependencyStoreStream.store(DEPENDENCY_LINKS_STORE_NAME,
+              QueryableStoreTypes.windowStore());
       return new GetDependenciesCall(endTs, lookback, dependenciesStore);
     } catch (Exception e) {
       LOG.error("Error getting dependencies", e);
@@ -298,10 +300,10 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
   static class GetDependenciesCall extends KafkaStreamsStoreCall<List<DependencyLink>> {
     final long endTs, loopback;
-    final ReadOnlyKeyValueStore<Long, List<DependencyLink>> dependenciesStore;
+    final ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore;
 
     GetDependenciesCall(long endTs, long loopback,
-        ReadOnlyKeyValueStore<Long, List<DependencyLink>> dependenciesStore) {
+        ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore) {
       this.endTs = endTs;
       this.loopback = loopback;
       this.dependenciesStore = dependenciesStore;
@@ -311,24 +313,13 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     List<DependencyLink> query() {
       try {
         long from = endTs - loopback;
-        Map<String, Long> dependencyLinksTime = new HashMap<>();
-        Map<String, DependencyLink> dependencyLinks = new HashMap<>();
-        dependenciesStore.range(from, endTs)
-            .forEachRemaining(keyValue -> {
-              Long ts = keyValue.key;
-              for (DependencyLink link : keyValue.value) {
-                String pair = String.format("%s|%s", link.parent(), link.child());
-                Long last = dependencyLinksTime.get(pair);
-                if (last < ts) {
-                  dependencyLinks.put(pair, link);
-                  dependencyLinksTime.put(pair, ts);
-                }
-              }
-            });
+        List<DependencyLink> dependencyLinks = new LinkedList<>();
+        dependenciesStore.fetchAll(Instant.ofEpochMilli(from), Instant.ofEpochMilli(endTs))
+            .forEachRemaining(keyValue -> dependencyLinks.add(keyValue.value));
 
         LOG.info("Dependencies found from={}-to={}: {}", from, endTs, dependencyLinks.size());
 
-        return new ArrayList<>(dependencyLinks.values());
+        return DependencyLinker.merge(dependencyLinks);
       } catch (Exception e) {
         LOG.error("Error looking up for dependencies", e);
         return new ArrayList<>();

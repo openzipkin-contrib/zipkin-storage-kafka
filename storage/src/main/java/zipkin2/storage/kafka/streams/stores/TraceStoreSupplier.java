@@ -55,16 +55,16 @@ public class TraceStoreSupplier implements Supplier<Topology> {
   final String tracesTopic;
   // Limits
   final Duration scanFrequency;
-  final Duration maxAge;
+  final Duration retentionPeriod;
   // SerDes
   final SpansSerde spansSerde;
   final SpanIdsSerde spanIdsSerde;
   final NamesSerde namesSerde;
 
-  public TraceStoreSupplier(String tracesTopic, Duration scanFrequency, Duration maxAge) {
+  public TraceStoreSupplier(String tracesTopic, Duration scanFrequency, Duration retentionPeriod) {
     this.tracesTopic = tracesTopic;
     this.scanFrequency = scanFrequency;
-    this.maxAge = maxAge;
+    this.retentionPeriod = retentionPeriod;
 
     spansSerde = new SpansSerde();
     spanIdsSerde = new SpanIdsSerde();
@@ -121,7 +121,7 @@ public class TraceStoreSupplier implements Supplier<Topology> {
                 scanFrequency,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
-                  long cutoff = maxAge.toMillis();
+                  long cutoff = retentionPeriod.toMillis();
                   long ttl = timestamp - cutoff;
                   long ttlMicro = ttl * 1000;
                   try (final KeyValueIterator<Long, Set<String>> all =
