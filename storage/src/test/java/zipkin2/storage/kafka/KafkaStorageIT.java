@@ -93,88 +93,61 @@ class KafkaStorageIT {
     tracesProducer = null;
   }
 
-  @Test void should_persist_spans() throws Exception {
-    Span parent = Span.newBuilder()
-        .traceId("a")
-        .id("a")
+  @Test void should_aggregate() throws Exception {
+    // Given: a set of incoming spans
+    Span parent = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-        .name("op_a")
-        .kind(Span.Kind.CLIENT)
-        .timestamp(TODAY*1000)
-        .duration(10)
+        .timestamp(TODAY * 1000).duration(10)
         .build();
-    Span child = Span.newBuilder()
-        .traceId("a")
-        .id("b")
+    Span child = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .name("op_b")
-        .kind(Span.Kind.SERVER)
-        .timestamp(TODAY*1000)
-        .duration(2)
+        .timestamp(TODAY * 1000).duration(2)
         .build();
-
+    // When: are consumed by storage
     final SpanConsumer spanConsumer = storage.spanConsumer();
-
     spanConsumer.accept(Arrays.asList(parent, child)).execute();
-
-    // Store spans
+    // Then: they are partitioned
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopic.name, 2, 10000);
-
+    // Given: some time for stream processes to kick in
     Thread.sleep(10_000);
-
-    Span another = Span.newBuilder()
-        .traceId("c")
-        .id("d")
+    // Given: another span to move 'event time' forward
+    Span another = Span.newBuilder().traceId("c").id("d").name("op_a").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .name("op_a")
-        .kind(Span.Kind.SERVER)
-        .timestamp(TODAY*1000)
-        .duration(2)
+        .timestamp(TODAY * 1000).duration(2)
         .build();
-
+    // When: published
     spanConsumer.accept(Collections.singletonList(another)).execute();
-
-    // Aggregate traces
+    // Then: a trace is published
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.tracesTopic.name, 1, 30000);
-
-    // Map Dependency Links
+    // Then: and a dependency link created
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.dependencyLinksTopic.name, 1, 10000);
   }
 
   @Test void should_return_traces_query() throws Exception {
-    Span parent = Span.newBuilder()
-        .traceId("a")
-        .id("a")
+    // Given: a trace prepared to be published
+    Span parent = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
         .remoteEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .name("op_a")
-        .kind(Span.Kind.CLIENT)
-        .timestamp(TODAY*1000)
-        .duration(10)
+        .timestamp(TODAY * 1000).duration(10)
         .build();
-    Span child = Span.newBuilder()
-        .traceId("a")
-        .id("b")
+    Span child = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .name("op_b")
-        .kind(Span.Kind.SERVER)
-        .timestamp(TODAY*1000)
-        .duration(2)
+        .timestamp(TODAY * 1000).duration(2)
         .build();
-
     List<Span> spans = Arrays.asList(parent, child);
+    // When: been published
     tracesProducer.send(new ProducerRecord<>(storage.tracesTopic.name, parent.traceId(), spans));
     tracesProducer.flush();
-
+    // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.tracesTopic.name, 1, 10000);
-
+    // When: and stores running
     SpanStore spanStore = storage.spanStore();
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
-
+    // Then: services names are searchable
     await().atMost(30, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces =
@@ -185,23 +158,29 @@ class KafkaStorageIT {
                   .limit(10)
                   .build())
                   .execute();
-          return traces.size() == 1 && traces.get(0).size() == 2;
+          return traces.size() == 1
+              && traces.get(0).size() == 2; // Trace is found and has two spans
         });
     await().atMost(5, TimeUnit.SECONDS)
-        .until(() -> serviceAndSpanNames.getServiceNames().execute().size() == 2);
+        .until(() -> serviceAndSpanNames.getServiceNames()
+            .execute().size() == 2); // There are two service names
     await().atMost(5, TimeUnit.SECONDS)
-        .until(() -> serviceAndSpanNames.getSpanNames("svc_a").execute().size() == 1);
+        .until(() -> serviceAndSpanNames.getSpanNames("svc_a")
+            .execute().size() == 1); // Service names have one span name
     await().atMost(5, TimeUnit.SECONDS)
-        .until(() -> serviceAndSpanNames.getRemoteServiceNames("svc_a").execute().size() == 1);
+        .until(() -> serviceAndSpanNames.getRemoteServiceNames("svc_a")
+            .execute().size() == 1); // And one remote service name
   }
 
   @Test void should_find_dependencies() throws Exception {
+    //Given: two related dependency links
     DependencyLink link1 = DependencyLink.newBuilder()
         .parent("svc_a")
         .child("svc_b")
         .callCount(1)
         .errorCount(0)
         .build();
+    // When: sent first one
     linkProducer.send(
         new ProducerRecord<>(storage.dependencyLinksTopic.name, "svc_a:svc_b", link1));
     DependencyLink link2 = DependencyLink.newBuilder()
@@ -210,20 +189,21 @@ class KafkaStorageIT {
         .callCount(1)
         .errorCount(0)
         .build();
+    // When: and another one
     linkProducer.send(
         new ProducerRecord<>(storage.dependencyLinksTopic.name, "svc_a:svc_b", link2));
     linkProducer.flush();
-
+    // Then: stored in topic
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.dependencyLinksTopic.name, 2, 10000);
-
+    // When: stores running
     SpanStore spanStore = storage.spanStore();
-
+    // Then:
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       List<DependencyLink> execute =
           spanStore.getDependencies(System.currentTimeMillis(), Duration.ofMinutes(1).toMillis())
               .execute();
-      return execute.size() == 1 && execute.get(0).callCount() == 2;
+      return execute.size() == 1 && execute.get(0).callCount() == 2; // link stored and call count aggregated.
     });
   }
 

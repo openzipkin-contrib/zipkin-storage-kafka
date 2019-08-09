@@ -55,7 +55,6 @@ public class TraceStoreSupplier implements Supplier<Topology> {
   public static final String DEPENDENCY_LINKS_STORE_NAME = "zipkin_dependency_links";
 
   static final Logger LOG = LoggerFactory.getLogger(TraceStoreSupplier.class);
-
   // Kafka topics
   final String tracesTopic;
   final String dependencyLinksTopic;
@@ -79,7 +78,6 @@ public class TraceStoreSupplier implements Supplier<Topology> {
     this.tracesRetentionPeriod = tracesRetentionPeriod;
     this.dependenciesRetentionPeriod = dependenciesRetentionPeriod;
     this.dependenciesWindowSize = dependenciesWindowSize;
-
     spansSerde = new SpansSerde();
     spanIdsSerde = new SpanIdsSerde();
     namesSerde = new NamesSerde();
@@ -116,14 +114,17 @@ public class TraceStoreSupplier implements Supplier<Topology> {
             namesSerde
         ));
 
+    // Traces stream
     KStream<String, List<Span>> stream = builder
         .stream(tracesTopic, Consumed.with(Serdes.String(), spansSerde));
-
+    // Store traces
     stream
         .process(() -> new Processor<String, List<Span>>() {
-          KeyValueStore<String, List<Span>> tracesStore;
-          KeyValueStore<Long, Set<String>> spanIdsByTsStore;
           ProcessorContext context;
+          // Actual traces store
+          KeyValueStore<String, List<Span>> tracesStore;
+          // timestamp index for trace IDs
+          KeyValueStore<Long, Set<String>> spanIdsByTsStore;
 
           @Override public void init(ProcessorContext context) {
             this.context = context;
@@ -131,22 +132,24 @@ public class TraceStoreSupplier implements Supplier<Topology> {
                 (KeyValueStore<String, List<Span>>) context.getStateStore(TRACES_STORE_NAME);
             spanIdsByTsStore =
                 (KeyValueStore<Long, Set<String>>) context.getStateStore(SPAN_IDS_BY_TS_STORE_NAME);
-
+            // Retention scheduling
             context.schedule(
                 tracesRetentionScanFrequency,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
+                  // preparing range filtering
                   long cutoff = tracesRetentionPeriod.toMillis();
                   long ttl = timestamp - cutoff;
                   long ttlMicro = ttl * 1000;
+                  // query traceIds active during period
                   try (final KeyValueIterator<Long, Set<String>> all =
                            spanIdsByTsStore.range(0L, ttlMicro)) {
-                    int deletions = 0;
+                    int deletions = 0; // logging purpose
                     while (all.hasNext()) {
                       final KeyValue<Long, Set<String>> record = all.next();
-                      spanIdsByTsStore.delete(record.key);
+                      spanIdsByTsStore.delete(record.key); // clean timestamp index
                       for (String traceId : record.value) {
-                        tracesStore.delete(traceId);
+                        tracesStore.delete(traceId); // clean traces store
                         deletions++;
                       }
                     }
@@ -181,7 +184,7 @@ public class TraceStoreSupplier implements Supplier<Topology> {
           @Override public void close() {
           }
         }, TRACES_STORE_NAME, SPAN_IDS_BY_TS_STORE_NAME);
-
+    // Store service, span and remote service names
     stream.process(() -> new Processor<String, List<Span>>() {
       KeyValueStore<String, String> serviceNameStore;
       KeyValueStore<String, Set<String>> spanNamesStore;
@@ -201,15 +204,16 @@ public class TraceStoreSupplier implements Supplier<Topology> {
       @Override
       public void process(String traceId, List<Span> spans) {
         for (Span span : spans) {
-          if (span.localServiceName() != null) {
-            serviceNameStore.putIfAbsent(span.localServiceName(), span.localServiceName());
-            if (span.name() != null) {
+          if (span.localServiceName() != null) { // if service name
+            serviceNameStore.putIfAbsent(span.localServiceName(),
+                span.localServiceName()); // store it
+            if (span.name() != null) { // store span names
               Set<String> spanNames = spanNamesStore.get(span.localServiceName());
               if (spanNames == null) spanNames = new HashSet<>();
               spanNames.add(span.name());
               spanNamesStore.put(span.localServiceName(), spanNames);
             }
-            if (span.remoteServiceName() != null) {
+            if (span.remoteServiceName() != null) { // store remote service names
               Set<String> remoteServiceNames = remoteServiceNamesStore.get(span.localServiceName());
               if (remoteServiceNames == null) remoteServiceNames = new HashSet<>();
               remoteServiceNames.add(span.remoteServiceName());
@@ -225,19 +229,18 @@ public class TraceStoreSupplier implements Supplier<Topology> {
       }
     }, SERVICE_NAMES_STORE_NAME, SPAN_NAMES_STORE_NAME, REMOTE_SERVICE_NAMES_STORE_NAME);
 
-    builder
-        // Add state stores
-        .addStateStore(Stores.windowStoreBuilder(
-            Stores.persistentWindowStore(
-                DEPENDENCY_LINKS_STORE_NAME,
-                dependenciesRetentionPeriod,
-                dependenciesWindowSize,
-                false),
-            Serdes.String(),
-            dependencyLinkSerde
-        ))
-        // Consume dependency links stream
-        .stream(dependencyLinksTopic, Consumed.with(Serdes.String(), dependencyLinkSerde))
+    // Dependency links window store
+    builder.addStateStore(Stores.windowStoreBuilder(
+        Stores.persistentWindowStore(
+            DEPENDENCY_LINKS_STORE_NAME,
+            dependenciesRetentionPeriod,
+            dependenciesWindowSize,
+            false),
+        Serdes.String(),
+        dependencyLinkSerde
+    ));
+    // Consume dependency links stream
+    builder.stream(dependencyLinksTopic, Consumed.with(Serdes.String(), dependencyLinkSerde))
         // Storage
         .process(() -> new Processor<String, DependencyLink>() {
           ProcessorContext context;
@@ -246,7 +249,6 @@ public class TraceStoreSupplier implements Supplier<Topology> {
           @Override
           public void init(ProcessorContext context) {
             this.context = context;
-
             dependencyLinksStore =
                 (WindowStore<String, DependencyLink>) context.getStateStore(
                     DEPENDENCY_LINKS_STORE_NAME);
@@ -254,14 +256,16 @@ public class TraceStoreSupplier implements Supplier<Topology> {
 
           @Override
           public void process(String linkKey, DependencyLink link) {
-            Instant instant = Instant.ofEpochMilli(context.timestamp());
+            // Event time
+            Instant now = Instant.ofEpochMilli(context.timestamp());
+            Instant from = now.minus(dependenciesWindowSize);
             WindowStoreIterator<DependencyLink> currentLinkWindow =
-                dependencyLinksStore.fetch(linkKey, instant.minus(dependenciesWindowSize), instant);
+                dependencyLinksStore.fetch(linkKey, from, now);
             // Get latest window. Only two are possible.
             KeyValue<Long, DependencyLink> windowAndValue = null;
             if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
             if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
-
+            // Persist dependency link per window
             if (windowAndValue != null) {
               DependencyLink currentLink = windowAndValue.value;
               DependencyLink build = currentLink.toBuilder()
@@ -281,7 +285,6 @@ public class TraceStoreSupplier implements Supplier<Topology> {
           public void close() {
           }
         }, DEPENDENCY_LINKS_STORE_NAME);
-
 
     return builder.build();
   }

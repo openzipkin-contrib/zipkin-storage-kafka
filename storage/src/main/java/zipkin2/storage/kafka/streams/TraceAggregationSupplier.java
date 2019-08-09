@@ -77,19 +77,21 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
     KStream<String, List<Span>> tracesStream =
         builder.stream(spansTopicName, Consumed.with(Serdes.String(), spanSerde))
             .groupByKey()
+            // how long to wait for another span
             .windowedBy(SessionWindows.with(traceInactivityGap).grace(Duration.ZERO))
             .aggregate(ArrayList::new, aggregateSpans(), joinAggregates(),
                 Materialized.with(Serdes.String(), spansSerde))
+            // hold until a new record tells that a window is closed and we can process it further
             .suppress(untilWindowCloses(unbounded()))
             .toStream()
             .selectKey((windowed, spans) -> windowed.key());
+    // Downstream to traces topic
     tracesStream.to(tracesTopicName, Produced.with(Serdes.String(), spansSerde));
-
+    // Map to dependency links
     tracesStream
         .flatMap(spansToDependencyLinks())
         .selectKey((key, value) -> key(value))
         .to(dependencyLinksTopicName, Produced.with(Serdes.String(), dependencyLinkSerde));
-
     return builder.build();
   }
 

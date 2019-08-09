@@ -100,7 +100,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
     @Override
     protected void doEnqueue(Callback<Void> callback) {
       ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
-      Future<RecordMetadata> ignored = kafkaProducer.send(producerRecord, (recordMetadata, e) -> {
+      kafkaProducer.send(producerRecord, (recordMetadata, e) -> {
         if (e == null) {
           callback.onSuccess(null);
         } else {

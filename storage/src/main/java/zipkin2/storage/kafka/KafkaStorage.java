@@ -52,10 +52,12 @@ import zipkin2.storage.kafka.streams.TraceAggregationSupplier;
 import zipkin2.storage.kafka.streams.TraceStoreSupplier;
 
 /**
- * Kafka Storage entry-point.
+ * Zipkin's Kafka Storage.
  *
- * Storage implementation based on Kafka Streams State Stores, supporting aggregation of spans,
- * indexing of traces and retention management.
+ * Storage implementation based on Kafka Streams, supporting:
+ * - repartitioning of spans,
+ * - trace aggregation,
+ * - indexing of traces and dependencies.
  */
 public class KafkaStorage extends StorageComponent {
   static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
@@ -71,15 +73,12 @@ public class KafkaStorage extends StorageComponent {
   final Properties adminConfig;
   final Properties producerConfig;
   // Kafka Streams topology configs
-  final Properties
-      traceAggregationStreamConfig, traceStoreStreamConfig;
-  final Topology
-      traceAggregationTopology, traceStoreTopology;
+  final Properties traceAggregationStreamConfig, traceStoreStreamConfig;
+  final Topology traceAggregationTopology, traceStoreTopology;
   // Resources
   volatile AdminClient adminClient;
   volatile Producer<String, byte[]> producer;
-  volatile KafkaStreams dependencyLinkMapperStream,
-      dependencyStoreStream, traceAggregationStream, traceStoreStream;
+  volatile KafkaStreams traceAggregationStream, traceStoreStream;
   volatile boolean closeCalled, topicsValidated;
 
   KafkaStorage(Builder builder) {
@@ -94,7 +93,7 @@ public class KafkaStorage extends StorageComponent {
     this.dependencyLinksTopic = builder.dependencyLinksTopic;
     // State store directories
     this.storageDirectory = builder.storeDirectory;
-    // Kafka Clients configuration
+    // Kafka Admin Client configuration
     adminConfig = new Properties();
     adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
     // Kafka Producer configuration
@@ -211,6 +210,11 @@ public class KafkaStorage extends StorageComponent {
     }
   }
 
+  /**
+   * Ensure topics are created before Kafka Streams applications start.
+   *
+   * It is recommended to created these topics manually though, before application is started.
+   */
   void ensureTopics() {
     if (!topicsValidated) {
       synchronized (this) {
@@ -243,6 +247,7 @@ public class KafkaStorage extends StorageComponent {
     try {
       KafkaFuture<String> maybeClusterId = getAdminClient().describeCluster().clusterId();
       maybeClusterId.get(1, TimeUnit.SECONDS);
+      // TODO add validation for Kafka Streams
       return CheckResult.OK;
     } catch (Exception e) {
       return CheckResult.failed(e);
@@ -271,12 +276,6 @@ public class KafkaStorage extends StorageComponent {
       }
       if (traceAggregationStream != null) {
         traceAggregationStream.close(Duration.ofSeconds(1));
-      }
-      if (dependencyLinkMapperStream != null) {
-        dependencyLinkMapperStream.close(Duration.ofSeconds(1));
-      }
-      if (dependencyStoreStream != null) {
-        dependencyStoreStream.close(Duration.ofSeconds(1));
       }
     } catch (Exception | Error e) {
       LOG.warn("error closing client {}", e.getMessage(), e);

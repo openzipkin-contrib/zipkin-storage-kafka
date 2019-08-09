@@ -14,15 +14,15 @@
 package zipkin2.storage.kafka;
 
 import java.util.Arrays;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
-public class KafkaStorageTest {
+// Testing builder
+class KafkaStorageTest {
 
-  @Test
-  public void notSupported() {
+  @Test void notSupported() {
     try {
       KafkaStorage.newBuilder().strictTraceId(false);
       fail();
@@ -48,8 +48,7 @@ public class KafkaStorageTest {
     }
   }
 
-  @Test
-  public void buildDefaultBuilder() {
+  @Test void buildDefaultBuilder() {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
     assertNotNull(builder.storeDirectory);
 
@@ -72,8 +71,7 @@ public class KafkaStorageTest {
     }
   }
 
-  @Test
-  public void topicDefault() {
+  @Test void topicDefault() {
     try {
       KafkaStorage.Topic.builder(null);
       fail();

@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import zipkin2.DependencyLink;
 import zipkin2.Endpoint;
 import zipkin2.Span;
-import zipkin2.storage.kafka.streams.TraceAggregationSupplier;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
@@ -41,29 +40,26 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class TraceAggregationSupplierTest {
 
   @Test void should_aggregate_spans_and_map_dependencies() {
-    // Given
+    // Given: configuration
     String spansTopicName = "spans";
     String tracesTopicName = "traces";
     String dependencyLinksTopicName = "dependency-links";
-
     Duration traceInactivityGap = Duration.ofSeconds(1);
+    SpanSerde spanSerde = new SpanSerde();
+    SpansSerde spansSerde = new SpansSerde();
+    DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
+    // When: topology built
     Topology topology = new TraceAggregationSupplier(
         spansTopicName, tracesTopicName, dependencyLinksTopicName, traceInactivityGap).get();
-
     TopologyDescription description = topology.describe();
     System.out.println("Topology: \n" + description);
-
+    // Then: single threaded topology
     assertEquals(1, description.subtopologies().size());
-
+    // Given: test driver
     Properties props = new Properties();
     props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
     props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
-
-    SpanSerde spanSerde = new SpanSerde();
-    SpansSerde spansSerde = new SpansSerde();
-    DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
-
     // When: two related spans coming on the same Session window
     ConsumerRecordFactory<String, Span> factory =
         new ConsumerRecordFactory<>(spansTopicName, new StringSerializer(), spanSerde.serializer());
@@ -75,27 +71,21 @@ class TraceAggregationSupplierTest {
         .build();
     testDriver.pipeInput(factory.create(spansTopicName, a.traceId(), a, 0L));
     testDriver.pipeInput(factory.create(spansTopicName, b.traceId(), b, 0L));
-
     // When: and new record arrive, moving the event clock further than inactivity gap
     Span c = Span.newBuilder().traceId("c").id("c").build();
     testDriver.pipeInput(factory.create(spansTopicName, c.traceId(), c, traceInactivityGap.toMillis() + 1));
-
     // Then: a trace is aggregated.
     ProducerRecord<String, List<Span>> trace =
         testDriver.readOutput(tracesTopicName, new StringDeserializer(), spansSerde.deserializer());
     assertNotNull(trace);
     OutputVerifier.compareKeyValue(trace, a.traceId(), Arrays.asList(a, b));
-
     // Then: a dependency link is created
     ProducerRecord<String, DependencyLink> linkRecord =
         testDriver.readOutput(dependencyLinksTopicName, new StringDeserializer(),
             dependencyLinkSerde.deserializer());
     assertNotNull(linkRecord);
     DependencyLink link = DependencyLink.newBuilder()
-        .parent("svc_a")
-        .child("svc_b")
-        .errorCount(0)
-        .callCount(1)
+        .parent("svc_a").child("svc_b").callCount(1).errorCount(0)
         .build();
     OutputVerifier.compareKeyValue(linkRecord, "svc_a:svc_b", link);
   }

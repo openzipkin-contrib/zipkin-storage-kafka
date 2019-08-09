@@ -44,17 +44,15 @@ import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SPAN_NAMES_STORE_
 import static zipkin2.storage.kafka.streams.TraceStoreSupplier.TRACES_STORE_NAME;
 
 /**
- * Span Store based on Kafka Streams.
+ * Span store backed by Kafka Stream State Stores.
  *
- * This store supports all searches (e.g. findTraces, getTrace, getServiceNames, getSpanNames, and
- * getDependencies).
+ * These stores are currently supporting only single instance as there is not mechanism implemented
+ * for scatter gather data from different instances.
  *
- * NOTE: Currently State Stores are based on global state stores (i.e., all data is replicated on
- * every Zipkin instance with spanStoreEnabled=true).
  */
 public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
-  private static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
-  // Kafka Streams
+  static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
+  // Kafka Streams Store provider
   final KafkaStreams traceStoreStream;
 
   KafkaSpanStore(KafkaStorage storage) {
@@ -148,7 +146,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       try {
         List<String> serviceNames = new ArrayList<>();
         serviceStore.all().forEachRemaining(keyValue -> serviceNames.add(keyValue.value));
-        Collections.sort(serviceNames);
+        Collections.sort(serviceNames); // comply with Zipkin API
         return serviceNames;
       } catch (Exception e) {
         LOG.error("Error looking up services", e);
@@ -179,7 +177,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
         Set<String> spanNamesSet = spanNamesStore.get(serviceName);
         if (spanNamesSet == null) return new ArrayList<>();
         List<String> spanNames = new ArrayList<>(spanNamesSet);
-        Collections.sort(spanNames);
+        Collections.sort(spanNames); // comply with Zipkin API
         return spanNames;
       } catch (Exception e) {
         LOG.error("Error looking up for span names for service {}", serviceName, e);
@@ -210,7 +208,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
         Set<String> remoteServiceNamesSet = remoteServiceNamesStore.get(serviceName);
         if (remoteServiceNamesSet == null) return new ArrayList<>();
         List<String> remoteServiceNames = new ArrayList<>(remoteServiceNamesSet);
-        Collections.sort(remoteServiceNames);
+        Collections.sort(remoteServiceNames); // Comply with Zipkin API
         return remoteServiceNames;
       } catch (Exception e) {
         LOG.error("Error looking up for remote service names for service {}", serviceName, e);
@@ -246,13 +244,14 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       // milliseconds to microseconds
       long from = (queryRequest.endTs() - queryRequest.lookback()) * 1000;
       long to = queryRequest.endTs() * 1000;
+      // first index
       KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to);
       spanIds.forEachRemaining(keyValue -> {
         for (String traceId : keyValue.value) {
           if (!traceIds.contains(traceId) && result.size() <= queryRequest.limit()) {
             List<Span> spans = tracesStore.get(traceId);
-            if (queryRequest.test(spans)) {
-              traceIds.add(traceId);
+            if (queryRequest.test(spans)) { // apply filters
+              traceIds.add(traceId); // adding to check if we have already add it later
               result.add(spans);
             }
           }
