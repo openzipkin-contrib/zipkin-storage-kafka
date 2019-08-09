@@ -79,7 +79,6 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
             .groupByKey()
             .windowedBy(SessionWindows.with(traceInactivityGap).grace(Duration.ZERO))
             .aggregate(ArrayList::new, aggregateSpans(), joinAggregates(),
-                // consider adding duration to materialized store
                 Materialized.with(Serdes.String(), spansSerde))
             .suppress(untilWindowCloses(unbounded()))
             .toStream()
