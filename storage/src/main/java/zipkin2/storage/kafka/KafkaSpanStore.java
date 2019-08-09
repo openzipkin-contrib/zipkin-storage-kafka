@@ -36,12 +36,12 @@ import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
 
-import static zipkin2.storage.kafka.streams.stores.DependencyStoreSupplier.DEPENDENCY_LINKS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SPAN_IDS_BY_TS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.stores.TraceStoreSupplier.TRACES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreSupplier.DEPENDENCY_LINKS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreSupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SPAN_IDS_BY_TS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreSupplier.TRACES_STORE_NAME;
 
 /**
  * Span Store based on Kafka Streams.
@@ -56,11 +56,9 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   private static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
   // Kafka Streams
   final KafkaStreams traceStoreStream;
-  final KafkaStreams dependencyStoreStream;
 
   KafkaSpanStore(KafkaStorage storage) {
     traceStoreStream = storage.getTraceStoreStream();
-    dependencyStoreStream = storage.getDependencyStoreStream();
   }
 
   @Override
@@ -129,7 +127,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
     try {
       ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore =
-          dependencyStoreStream.store(DEPENDENCY_LINKS_STORE_NAME,
+          traceStoreStream.store(DEPENDENCY_LINKS_STORE_NAME,
               QueryableStoreTypes.windowStore());
       return new GetDependenciesCall(endTs, lookback, dependenciesStore);
     } catch (Exception e) {

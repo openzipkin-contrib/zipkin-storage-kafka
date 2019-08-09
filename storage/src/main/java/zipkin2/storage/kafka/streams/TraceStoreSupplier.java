@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.streams.stores;
+package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -32,9 +32,13 @@ import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.Stores;
+import org.apache.kafka.streams.state.WindowStore;
+import org.apache.kafka.streams.state.WindowStoreIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import zipkin2.DependencyLink;
 import zipkin2.Span;
+import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.NamesSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanIdsSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
@@ -48,27 +52,38 @@ public class TraceStoreSupplier implements Supplier<Topology> {
   public static final String SERVICE_NAMES_STORE_NAME = "zipkin-service-names";
   public static final String SPAN_NAMES_STORE_NAME = "zipkin-span-names";
   public static final String REMOTE_SERVICE_NAMES_STORE_NAME = "zipkin-remote-service-names";
+  public static final String DEPENDENCY_LINKS_STORE_NAME = "zipkin_dependency_links";
 
   static final Logger LOG = LoggerFactory.getLogger(TraceStoreSupplier.class);
 
   // Kafka topics
   final String tracesTopic;
+  final String dependencyLinksTopic;
   // Limits
-  final Duration scanFrequency;
-  final Duration retentionPeriod;
+  final Duration tracesRetentionScanFrequency;
+  final Duration tracesRetentionPeriod;
+  final Duration dependenciesRetentionPeriod;
+  final Duration dependenciesWindowSize;
   // SerDes
   final SpansSerde spansSerde;
   final SpanIdsSerde spanIdsSerde;
   final NamesSerde namesSerde;
+  final DependencyLinkSerde dependencyLinkSerde;
 
-  public TraceStoreSupplier(String tracesTopic, Duration scanFrequency, Duration retentionPeriod) {
+  public TraceStoreSupplier(String tracesTopic, String dependencyLinksTopic,
+      Duration tracesRetentionScanFrequency, Duration tracesRetentionPeriod,
+      Duration dependenciesRetentionPeriod, Duration dependenciesWindowSize) {
     this.tracesTopic = tracesTopic;
-    this.scanFrequency = scanFrequency;
-    this.retentionPeriod = retentionPeriod;
+    this.dependencyLinksTopic = dependencyLinksTopic;
+    this.tracesRetentionScanFrequency = tracesRetentionScanFrequency;
+    this.tracesRetentionPeriod = tracesRetentionPeriod;
+    this.dependenciesRetentionPeriod = dependenciesRetentionPeriod;
+    this.dependenciesWindowSize = dependenciesWindowSize;
 
     spansSerde = new SpansSerde();
     spanIdsSerde = new SpanIdsSerde();
     namesSerde = new NamesSerde();
+    dependencyLinkSerde = new DependencyLinkSerde();
   }
 
   @Override public Topology get() {
@@ -118,10 +133,10 @@ public class TraceStoreSupplier implements Supplier<Topology> {
                 (KeyValueStore<Long, Set<String>>) context.getStateStore(SPAN_IDS_BY_TS_STORE_NAME);
 
             context.schedule(
-                scanFrequency,
+                tracesRetentionScanFrequency,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
-                  long cutoff = retentionPeriod.toMillis();
+                  long cutoff = tracesRetentionPeriod.toMillis();
                   long ttl = timestamp - cutoff;
                   long ttlMicro = ttl * 1000;
                   try (final KeyValueIterator<Long, Set<String>> all =
@@ -209,6 +224,64 @@ public class TraceStoreSupplier implements Supplier<Topology> {
 
       }
     }, SERVICE_NAMES_STORE_NAME, SPAN_NAMES_STORE_NAME, REMOTE_SERVICE_NAMES_STORE_NAME);
+
+    builder
+        // Add state stores
+        .addStateStore(Stores.windowStoreBuilder(
+            Stores.persistentWindowStore(
+                DEPENDENCY_LINKS_STORE_NAME,
+                dependenciesRetentionPeriod,
+                dependenciesWindowSize,
+                false),
+            Serdes.String(),
+            dependencyLinkSerde
+        ))
+        // Consume dependency links stream
+        .stream(dependencyLinksTopic, Consumed.with(Serdes.String(), dependencyLinkSerde))
+        // Storage
+        .process(() -> new Processor<String, DependencyLink>() {
+          ProcessorContext context;
+          WindowStore<String, DependencyLink> dependencyLinksStore;
+
+          @Override
+          public void init(ProcessorContext context) {
+            this.context = context;
+
+            dependencyLinksStore =
+                (WindowStore<String, DependencyLink>) context.getStateStore(
+                    DEPENDENCY_LINKS_STORE_NAME);
+          }
+
+          @Override
+          public void process(String linkKey, DependencyLink link) {
+            Instant instant = Instant.ofEpochMilli(context.timestamp());
+            WindowStoreIterator<DependencyLink> currentLinkWindow =
+                dependencyLinksStore.fetch(linkKey, instant.minus(dependenciesWindowSize), instant);
+            // Get latest window. Only two are possible.
+            KeyValue<Long, DependencyLink> windowAndValue = null;
+            if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
+            if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
+
+            if (windowAndValue != null) {
+              DependencyLink currentLink = windowAndValue.value;
+              DependencyLink build = currentLink.toBuilder()
+                  .callCount(currentLink.callCount() + link.callCount())
+                  .errorCount(currentLink.errorCount() + link.errorCount())
+                  .build();
+              dependencyLinksStore.put(
+                  linkKey,
+                  build,
+                  windowAndValue.key);
+            } else {
+              dependencyLinksStore.put(linkKey, link);
+            }
+          }
+
+          @Override
+          public void close() {
+          }
+        }, DEPENDENCY_LINKS_STORE_NAME);
+
 
     return builder.build();
   }

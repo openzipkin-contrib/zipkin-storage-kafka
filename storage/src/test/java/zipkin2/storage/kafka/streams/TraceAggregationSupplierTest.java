@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.storage.kafka.streams.aggregation;
+package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -27,7 +27,11 @@ import org.apache.kafka.streams.TopologyTestDriver;
 import org.apache.kafka.streams.test.ConsumerRecordFactory;
 import org.apache.kafka.streams.test.OutputVerifier;
 import org.junit.jupiter.api.Test;
+import zipkin2.DependencyLink;
+import zipkin2.Endpoint;
 import zipkin2.Span;
+import zipkin2.storage.kafka.streams.TraceAggregationSupplier;
+import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
@@ -36,14 +40,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class TraceAggregationSupplierTest {
 
-  @Test void should_aggregate_spans() {
+  @Test void should_aggregate_spans_and_map_dependencies() {
     // Given
     String spansTopicName = "spans";
     String tracesTopicName = "traces";
+    String dependencyLinksTopicName = "dependency-links";
 
     Duration traceInactivityGap = Duration.ofSeconds(1);
     Topology topology = new TraceAggregationSupplier(
-        spansTopicName, tracesTopicName, traceInactivityGap, Duration.ofSeconds(1)).get();
+        spansTopicName, tracesTopicName, dependencyLinksTopicName, traceInactivityGap).get();
 
     TopologyDescription description = topology.describe();
     System.out.println("Topology: \n" + description);
@@ -57,12 +62,17 @@ class TraceAggregationSupplierTest {
 
     SpanSerde spanSerde = new SpanSerde();
     SpansSerde spansSerde = new SpansSerde();
+    DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
 
     // When: two related spans coming on the same Session window
     ConsumerRecordFactory<String, Span> factory =
         new ConsumerRecordFactory<>(spansTopicName, new StringSerializer(), spanSerde.serializer());
-    Span a = Span.newBuilder().traceId("a").id("a").build();
-    Span b = Span.newBuilder().traceId("a").id("b").build();
+    Span a = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+        .build();
+    Span b = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+        .build();
     testDriver.pipeInput(factory.create(spansTopicName, a.traceId(), a, 0L));
     testDriver.pipeInput(factory.create(spansTopicName, b.traceId(), b, 0L));
 
@@ -75,5 +85,19 @@ class TraceAggregationSupplierTest {
         testDriver.readOutput(tracesTopicName, new StringDeserializer(), spansSerde.deserializer());
     assertNotNull(trace);
     OutputVerifier.compareKeyValue(trace, a.traceId(), Arrays.asList(a, b));
+
+    // Then: a dependency link is created
+    ProducerRecord<String, DependencyLink> linkRecord =
+        testDriver.readOutput(dependencyLinksTopicName, new StringDeserializer(),
+            dependencyLinkSerde.deserializer());
+    assertNotNull(linkRecord);
+    DependencyLink link = DependencyLink.newBuilder()
+        .parent("svc_a")
+        .child("svc_b")
+        .errorCount(0)
+        .callCount(1)
+        .build();
+    OutputVerifier.compareKeyValue(linkRecord, "svc_a:svc_b", link);
   }
+
 }
