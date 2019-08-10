@@ -63,7 +63,7 @@ public class KafkaStorage extends StorageComponent {
   static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
 
   // Kafka Storage modes
-  final boolean spanConsumerEnabled, spanStoreEnabled, aggregationEnabled;
+  final boolean spanConsumerEnabled, searchEnabled, aggregationEnabled;
   final boolean ensureTopics;
   // Autocomplete Tags
   final List<String> autocompleteKeys;
@@ -86,7 +86,7 @@ public class KafkaStorage extends StorageComponent {
   KafkaStorage(Builder builder) {
     // Kafka Storage modes
     this.spanConsumerEnabled = builder.spanConsumerEnabled;
-    this.spanStoreEnabled = builder.spanStoreEnabled;
+    this.searchEnabled = builder.searchEnabled;
     this.aggregationEnabled = builder.aggregationEnabled;
     // Autocomplete tags
     this.autocompleteKeys = builder.autocompleteKeys;
@@ -165,7 +165,7 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public ServiceAndSpanNames serviceAndSpanNames() {
-    if (spanStoreEnabled) {
+    if (searchEnabled) {
       return new KafkaSpanStore(this);
     } else { // NoopServiceAndSpanNames
       return new ServiceAndSpanNames() {
@@ -188,7 +188,7 @@ public class KafkaStorage extends StorageComponent {
   public SpanStore spanStore() {
     if (ensureTopics) ensureTopics();
     if (aggregationEnabled) getTraceAggregationStream();
-    if (spanStoreEnabled) {
+    if (searchEnabled) {
       return new KafkaSpanStore(this);
     } else { // NoopSpanStore
       return new SpanStore() {
@@ -218,7 +218,7 @@ public class KafkaStorage extends StorageComponent {
   @Override public AutocompleteTags autocompleteTags() {
     if (ensureTopics) ensureTopics();
     if (aggregationEnabled) getTraceAggregationStream();
-    if (spanStoreEnabled) {
+    if (searchEnabled) {
       return new KafkaAutocompleteTags(this);
     } else {
       return super.autocompleteTags();
@@ -268,7 +268,7 @@ public class KafkaStorage extends StorageComponent {
           return CheckResult.failed(new IllegalStateException("Aggregation stream not running. " + state));
         }
       }
-      if (spanStoreEnabled) {
+      if (searchEnabled) {
         KafkaStreams.State state = getTraceStoreStream().state();
         if (!state.isRunning()) {
           return CheckResult.failed(new IllegalStateException("Store stream not running. " + state));
@@ -357,7 +357,7 @@ public class KafkaStorage extends StorageComponent {
 
   public static class Builder extends StorageComponent.Builder {
     boolean spanConsumerEnabled = true;
-    boolean spanStoreEnabled = true;
+    boolean searchEnabled = true;
     boolean aggregationEnabled = true;
 
     List<String> autocompleteKeys = new ArrayList<>();
@@ -367,7 +367,7 @@ public class KafkaStorage extends StorageComponent {
     Duration dependenciesRetentionPeriod = Duration.ofDays(5);
     Duration dependenciesWindowSize = Duration.ofMinutes(1);
 
-    String bootstrapServers = "localhost:29092";
+    String bootstrapServers = "localhost:19092";
     CompressionType compressionType = CompressionType.NONE;
 
     Duration traceInactivityGap = Duration.ofSeconds(30);
@@ -375,7 +375,6 @@ public class KafkaStorage extends StorageComponent {
 
     String traceStoreStreamAppId = "zipkin-trace-store-v1";
     String traceAggregationStreamAppId = "zipkin-trace-aggregation-v1";
-
     String storeDirectory = "/tmp/zipkin";
 
     Topic spansTopic = Topic.builder("zipkin-spans-v1").build();
@@ -393,13 +392,13 @@ public class KafkaStorage extends StorageComponent {
 
     @Override
     public StorageComponent.Builder strictTraceId(boolean strictTraceId) {
-      if (!strictTraceId) throw new IllegalArgumentException("unstrict trace ID not supported");
+      if (!strictTraceId) throw new IllegalArgumentException("non-strict trace ID not supported");
       return this;
     }
 
     @Override
     public StorageComponent.Builder searchEnabled(boolean searchEnabled) {
-      this.spanStoreEnabled = searchEnabled;
+      this.searchEnabled = searchEnabled;
       return this;
     }
 
@@ -417,16 +416,6 @@ public class KafkaStorage extends StorageComponent {
      */
     public Builder spanConsumerEnabled(boolean spanConsumerEnabled) {
       this.spanConsumerEnabled = spanConsumerEnabled;
-      return this;
-    }
-
-    /**
-     * Enable storing spans to aggregate and index spans, traces, and dependencies.
-     * <p>
-     * When disabled, a NoopSpanStore is instantiated to return empty lists for all searches.
-     */
-    public Builder spanStoreEnabled(boolean spanStoreEnabled) {
-      this.spanConsumerEnabled = spanStoreEnabled;
       return this;
     }
 

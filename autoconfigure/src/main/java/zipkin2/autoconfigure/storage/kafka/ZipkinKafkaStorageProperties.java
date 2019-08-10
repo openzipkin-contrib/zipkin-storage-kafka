@@ -24,7 +24,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private Boolean spanConsumerEnabled;
   private Boolean aggregationEnabled;
-  private Boolean spanStoreEnabled;
   private Boolean ensureTopics;
 
   private String bootstrapServers;
@@ -32,10 +31,8 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private Long tracesRetentionScanFrequency;
   private Long tracesRetentionPeriod;
-
   private Long dependenciesRetentionPeriod;
   private Long dependenciesWindowSize;
-
   private Long traceInactivityGap;
 
   private String spansTopic = "zipkin-spans-v1";
@@ -56,7 +53,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
     if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
     if (aggregationEnabled != null) builder.aggregationEnabled(aggregationEnabled);
-    if (spanStoreEnabled != null) builder.spanStoreEnabled(spanStoreEnabled);
     if (ensureTopics != null) builder.ensureTopics(ensureTopics);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
     if (compressionType != null) builder.compressionType(compressionType);
@@ -95,10 +91,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setAggregationEnabled(boolean aggregationEnabled) {
     this.aggregationEnabled = aggregationEnabled;
-  }
-
-  public void setSpanStoreEnabled(boolean spanStoreEnabled) {
-    this.spanStoreEnabled = spanStoreEnabled;
   }
 
   public boolean isEnsureTopics() {
@@ -187,14 +179,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setAggregationEnabled(Boolean aggregationEnabled) {
     this.aggregationEnabled = aggregationEnabled;
-  }
-
-  public Boolean getSpanStoreEnabled() {
-    return spanStoreEnabled;
-  }
-
-  public void setSpanStoreEnabled(Boolean spanStoreEnabled) {
-    this.spanStoreEnabled = spanStoreEnabled;
   }
 
   public Boolean getEnsureTopics() {

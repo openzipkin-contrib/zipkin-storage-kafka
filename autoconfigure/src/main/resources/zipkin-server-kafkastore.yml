@@ -2,6 +2,8 @@
 zipkin:
   storage:
     kafka:
+      span-consumer-enabled: ${KAFKA_STORE_SPAN_CONSUMER_ENABLED:true}
+      aggregation-enabled: ${KAFKA_STORE_AGGREGATION_ENABLED:true}
       bootstrap-servers: ${KAFKA_STORE_BOOTSTRAP_SERVERS:localhost:9092}
       ensure-topics: ${KAFKA_STORE_ENSURE_TOPICS:true}
       store-directory: ${KAFKA_STORE_DIRECTORY:/tmp/zipkin}
@@ -14,15 +16,9 @@ zipkin:
       spans-topic: ${KAFKA_STORE_SPANS_TOPIC:zipkin-spans-v1}
       spans-topic-partitions: ${KAFKA_STORE_SPANS_TOPIC_PARTITIONS:1}
       spans-topic-replication-factor: ${KAFKA_STORE_SPANS_TOPIC_REPLICATION_FACTOR:1}
-      span-services-topic: ${KAFKA_STORE_SPAN_SERVICES_TOPIC:zipkin-span-services-v1}
-      span-services-topic-partitions: ${KAFKA_STORE_SPAN_SERVICES_TOPIC_PARTITIONS:1}
-      span-services-topic-replication-factor: ${KAFKA_STORE_SPAN_SERVICES_TOPIC_REPLICATION_FACTOR:1}
-      services-topic: ${KAFKA_STORE_SERVICES_TOPIC:zipkin-services-v1}
-      services-topic-partitions: ${KAFKA_STORE_SERVICES_TOPIC_PARTITIONS:1}
-      services-topic-replication-factor: ${KAFKA_STORE_SERVICES_TOPIC_REPLICATION_FACTOR:1}
-      span-dependencies-topic: ${KAFKA_STORE_SPAN_DEPENDENCIES_TOPIC:zipkin-span-dependencies-v1}
-      span-dependencies-topic-partitions: ${KAFKA_STORE_SPAN_DEPENDENCIES_TOPIC_PARTITIONS:1}
-      span-dependencies-topic-replication-factor: ${KAFKA_STORE_SPAN_DEPENDENCIES_TOPIC_REPLICATION_FACTOR:1}
+      traces-topic: ${KAFKA_STORE_TRACES_TOPIC:zipkin-span-dependencies-v1}
+      traces-topic-partitions: ${KAFKA_STORE_TRACES_TOPIC_PARTITIONS:1}
+      traces-topic-replication-factor: ${KAFKA_STORE_TRACES_TOPIC_REPLICATION_FACTOR:1}
       dependency-links-topic: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC:zipkin-dependencies-v1}
       dependency-links-topic-partitions: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC_PARTITIONS:1}
       dependency-links-topic-replication-factor: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC_REPLICATION_FACTOR:1}
