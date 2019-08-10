@@ -211,7 +211,6 @@
                         <exclude>src/main/resources/**</exclude>
                         <exclude>**/*.puml</exclude>
                         <exclude>Makefile</exclude>
-                        <exclude>**/.kafka_profile</exclude>
                     </excludes>
                     <strictCheck>true</strictCheck>
                 </configuration>

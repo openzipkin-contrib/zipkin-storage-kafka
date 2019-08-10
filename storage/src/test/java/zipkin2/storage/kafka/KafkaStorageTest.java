@@ -28,24 +28,6 @@ class KafkaStorageTest {
       fail();
     } catch (IllegalArgumentException ignored) {
     }
-
-    try {
-      KafkaStorage.newBuilder().searchEnabled(true);
-      fail();
-    } catch (IllegalArgumentException ignored) {
-    }
-
-    try {
-      KafkaStorage.newBuilder().autocompleteKeys(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    try {
-      KafkaStorage.newBuilder().autocompleteKeys(Arrays.asList("key1", "key2"));
-      fail();
-    } catch (IllegalArgumentException ignored) {
-    }
   }
 
   @Test void buildDefaultBuilder() {
