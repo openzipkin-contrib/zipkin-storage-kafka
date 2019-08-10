@@ -12,34 +12,47 @@
 # the License.
 #
 
-FROM openjdk:8
+FROM alpine
 
-ARG KAFKA_STORAGE_VERSION=0.1.1
+ENV ZIPKIN_REPO https://repo1.maven.org/maven2
+ENV ZIPKIN_VERSION 2.16.0
 
-ENV ZIPKIN_REPO https://jcenter.bintray.com
-ENV ZIPKIN_VERSION 2.12.6
-ENV ZIPKIN_LOGGING_LEVEL INFO
-
-# Use to set heap, trust store or other system properties.
-ENV JAVA_OPTS -Djava.security.egd=file:/dev/./urandom
 # Add environment settings for supported storage types
+COPY docker/ /zipkin/
+
 WORKDIR /zipkin
 
-RUN curl -SL $ZIPKIN_REPO/io/zipkin/java/zipkin-server/$ZIPKIN_VERSION/zipkin-server-${ZIPKIN_VERSION}-exec.jar > zipkin.jar
+
+RUN apk add unzip curl --no-cache && \
+    curl -SL $ZIPKIN_REPO/io/zipkin/zipkin-server/$ZIPKIN_VERSION/zipkin-server-$ZIPKIN_VERSION-exec.jar > zipkin-server.jar && \
+    # don't break when unzip finds an extra header https://github.com/openzipkin/zipkin/issues/1932
+    unzip zipkin-server.jar ; \
+    rm zipkin-server.jar && \
+    apk del unzip
+
+FROM gcr.io/distroless/java:11-debug
+
+ARG KAFKA_STORAGE_VERSION=0.4.1-SNAPSHOT
+ENV STORAGE_TYPE KAFKASTORE
+# Use to set heap, trust store or other system properties.
+ENV JAVA_OPTS -Djava.security.egd=file:/dev/./urandom
+# 3rd party modules like zipkin-aws will apply profile settings with this
+ENV MODULE_OPTS -Dloader.path='zipkin-autoconfigure-storage-kafka.jar,zipkin-autoconfigure-storage-kafka.jar!/lib' \
+                -Dspring.profiles.active=kafkastore
+
+RUN ["/busybox/sh", "-c", "adduser -g '' -D zipkin"]
+
+# Add environment settings for supported storage types
+COPY --from=0 /zipkin/ /zipkin/
+WORKDIR /zipkin
 
 ADD storage/target/zipkin-storage-kafka-${KAFKA_STORAGE_VERSION}.jar zipkin-storage-kafka.jar
 ADD autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKA_STORAGE_VERSION}-module.jar zipkin-autoconfigure-storage-kafka.jar
 
-ENV STORAGE_TYPE=kafkastore
+RUN ["/busybox/sh", "-c", "ln -s /busybox/* /bin"]
+
+USER zipkin
 
 EXPOSE 9410 9411
 
-CMD exec java \
-    ${JAVA_OPTS} \
-    -Dloader.path='zipkin-storage-kafka.jar,zipkin-autoconfigure-storage-kafka.jar' \
-    -Dspring.profiles.active=kafkastore \
-    -Dcom.linecorp.armeria.annotatedServiceExceptionVerbosity=all \
-    -Dcom.linecorp.armeria.verboseExceptions=true \
-    -cp zipkin.jar \
-    org.springframework.boot.loader.PropertiesLauncher \
-    --logging.level.zipkin2=${ZIPKIN_LOGGING_LEVEL}
+ENTRYPOINT ["/busybox/sh", "run.sh"]

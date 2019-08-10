@@ -140,7 +140,8 @@ public class KafkaStorage extends StorageComponent {
     traceStoreTopology = new TraceStoreSupplier(
         tracesTopic.name,
         dependencyLinksTopic.name,
-        autocompleteKeys, builder.tracesRetentionScanFrequency,
+        autocompleteKeys,
+        builder.tracesRetentionScanFrequency,
         builder.tracesRetentionMaxAge,
         builder.dependenciesRetentionPeriod,
         builder.dependenciesWindowSize).get();
