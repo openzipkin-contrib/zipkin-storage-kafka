@@ -40,10 +40,11 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static zipkin2.storage.kafka.streams.TraceStoreSupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreSupplier.DEPENDENCY_LINKS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SPAN_IDS_BY_TS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreSupplier.TRACES_STORE_NAME;
 
 class TraceStoreSupplierTest {
@@ -56,11 +57,13 @@ class TraceStoreSupplierTest {
     Duration tracesRetentionPeriod = Duration.ofMillis(5);
     Duration dependenciesRetentionPeriod = Duration.ofMinutes(1);
     Duration dependenciesWindowSize = Duration.ofMillis(100);
+    List<String> autocompleteKeys = Collections.singletonList("environment");
     SpansSerde spansSerde = new SpansSerde();
     // When: topology provided
     Topology topology = new TraceStoreSupplier(
         tracesTopicName,
         dependencyLinksTopicName,
+        autocompleteKeys,
         tracesRetentionScanFrequency,
         tracesRetentionPeriod,
         dependenciesRetentionPeriod,
@@ -83,6 +86,7 @@ class TraceStoreSupplierTest {
     Span a = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
         .timestamp(10000L).duration(11L)
+        .putTag("environment", "dev")
         .build();
     Span b = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
@@ -108,6 +112,9 @@ class TraceStoreSupplierTest {
         testDriver.getKeyValueStore(SPAN_NAMES_STORE_NAME);
     assertEquals(Collections.singleton("op_a"), spanNames.get("svc_a"));
     assertEquals(Collections.singleton("op_b"), spanNames.get("svc_b"));
+    KeyValueStore<String, Set<String>> autocompleteTags =
+        testDriver.getKeyValueStore(AUTOCOMPLETE_TAGS_STORE_NAME);
+    assertEquals(Collections.singleton("dev"), autocompleteTags.get("environment"));
     // When: clock moves forward
     Span c = Span.newBuilder()
         .traceId("c").id("c")
@@ -134,6 +141,7 @@ class TraceStoreSupplierTest {
     Topology topology = new TraceStoreSupplier(
         tracesTopicName,
         dependencyLinksTopicName,
+        Collections.EMPTY_LIST,
         tracesRetentionScanFrequency,
         tracesRetentionPeriod,
         dependenciesRetentionPeriod,

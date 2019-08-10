@@ -43,6 +43,7 @@ import zipkin2.Call;
 import zipkin2.CheckResult;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
+import zipkin2.storage.AutocompleteTags;
 import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanConsumer;
@@ -53,11 +54,9 @@ import zipkin2.storage.kafka.streams.TraceStoreSupplier;
 
 /**
  * Zipkin's Kafka Storage.
- *
- * Storage implementation based on Kafka Streams, supporting:
- * - repartitioning of spans,
- * - trace aggregation,
- * - indexing of traces and dependencies.
+ * <p>
+ * Storage implementation based on Kafka Streams, supporting: - repartitioning of spans, - trace
+ * aggregation, - indexing of traces and dependencies.
  */
 public class KafkaStorage extends StorageComponent {
   static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
@@ -65,6 +64,8 @@ public class KafkaStorage extends StorageComponent {
   // Kafka Storage modes
   final boolean spanConsumerEnabled, spanStoreEnabled, aggregationEnabled;
   final boolean ensureTopics;
+  // Autocomplete Tags
+  final List<String> autocompleteKeys;
   // Kafka Storage configs
   final String storageDirectory;
   // Kafka Topics
@@ -86,6 +87,8 @@ public class KafkaStorage extends StorageComponent {
     this.spanConsumerEnabled = builder.spanConsumerEnabled;
     this.spanStoreEnabled = builder.spanStoreEnabled;
     this.aggregationEnabled = builder.aggregationEnabled;
+    // Autocomplete tags
+    this.autocompleteKeys = builder.autocompleteKeys;
     // Kafka Topics config
     this.ensureTopics = builder.ensureTopics;
     this.spansTopic = builder.spansTopic;
@@ -137,7 +140,7 @@ public class KafkaStorage extends StorageComponent {
     traceStoreTopology = new TraceStoreSupplier(
         tracesTopic.name,
         dependencyLinksTopic.name,
-        builder.tracesRetentionScanFrequency,
+        autocompleteKeys, builder.tracesRetentionScanFrequency,
         builder.tracesRetentionMaxAge,
         builder.dependenciesRetentionPeriod,
         builder.dependenciesWindowSize).get();
@@ -210,9 +213,19 @@ public class KafkaStorage extends StorageComponent {
     }
   }
 
+  @Override public AutocompleteTags autocompleteTags() {
+    if (ensureTopics && !topicsValidated) ensureTopics();
+    if (aggregationEnabled) getTraceAggregationStream();
+    if (spanStoreEnabled) {
+      return new KafkaAutocompleteTags(this);
+    } else {
+      return super.autocompleteTags();
+    }
+  }
+
   /**
    * Ensure topics are created before Kafka Streams applications start.
-   *
+   * <p>
    * It is recommended to created these topics manually though, before application is started.
    */
   void ensureTopics() {
@@ -247,7 +260,18 @@ public class KafkaStorage extends StorageComponent {
     try {
       KafkaFuture<String> maybeClusterId = getAdminClient().describeCluster().clusterId();
       maybeClusterId.get(1, TimeUnit.SECONDS);
-      // TODO add validation for Kafka Streams
+      if (aggregationEnabled) {
+        KafkaStreams.State state = getTraceAggregationStream().state();
+        if (!state.isRunning()) {
+          return CheckResult.failed(new IllegalStateException("Aggregation stream not running. " + state));
+        }
+      }
+      if (spanStoreEnabled) {
+        KafkaStreams.State state = getTraceStoreStream().state();
+        if (!state.isRunning()) {
+          return CheckResult.failed(new IllegalStateException("Store stream not running. " + state));
+        }
+      }
       return CheckResult.OK;
     } catch (Exception e) {
       return CheckResult.failed(e);
@@ -334,6 +358,8 @@ public class KafkaStorage extends StorageComponent {
     boolean spanStoreEnabled = true;
     boolean aggregationEnabled = true;
 
+    List<String> autocompleteKeys;
+
     Duration tracesRetentionScanFrequency = Duration.ofMinutes(1);
     Duration tracesRetentionMaxAge = Duration.ofMinutes(2);
     Duration dependenciesRetentionPeriod = Duration.ofDays(5);
@@ -371,20 +397,20 @@ public class KafkaStorage extends StorageComponent {
 
     @Override
     public StorageComponent.Builder searchEnabled(boolean searchEnabled) {
-      if (searchEnabled) throw new IllegalArgumentException("search not supported");
+      this.spanStoreEnabled = searchEnabled;
       return this;
     }
 
     @Override
     public Builder autocompleteKeys(List<String> keys) {
       if (keys == null) throw new NullPointerException("keys == null");
-      if (!keys.isEmpty()) throw new IllegalArgumentException("autocomplete not supported");
+      this.autocompleteKeys = keys;
       return this;
     }
 
     /**
      * Enable consuming spans from collectors and store them in Kafka topics.
-     *
+     * <p>
      * When disabled, a NoopSpanConsumer is instantiated to do nothing with incoming spans.
      */
     public Builder spanConsumerEnabled(boolean spanConsumerEnabled) {
@@ -394,7 +420,7 @@ public class KafkaStorage extends StorageComponent {
 
     /**
      * Enable storing spans to aggregate and index spans, traces, and dependencies.
-     *
+     * <p>
      * When disabled, a NoopSpanStore is instantiated to return empty lists for all searches.
      */
     public Builder spanStoreEnabled(boolean spanStoreEnabled) {
@@ -404,7 +430,7 @@ public class KafkaStorage extends StorageComponent {
 
     /**
      * Enable aggregating spans into traces and traces into dependency links.
-     *
+     * <p>
      * When disabled, no aggregation for Traces or Dependency Links will run.
      */
     public Builder aggregationEnabled(boolean aggregationEnabled) {
@@ -419,7 +445,9 @@ public class KafkaStorage extends StorageComponent {
     }
 
     public Builder traceAggregationSuppressUntil(Duration traceAggregationSuppressUntil) {
-      if (traceAggregationSuppressUntil == null) throw new NullPointerException("traceAggregationSuppressUntil == null");
+      if (traceAggregationSuppressUntil == null) {
+        throw new NullPointerException("traceAggregationSuppressUntil == null");
+      }
       this.traceAggregationSuppressUntil = traceAggregationSuppressUntil;
       return this;
     }
@@ -435,7 +463,7 @@ public class KafkaStorage extends StorageComponent {
 
     /**
      * Kafka topic name where incoming spans are stored.
-     *
+     * <p>
      * A Span is received from Collectors that contains all metadata and is partitioned by Trace
      * Id.
      */
@@ -447,7 +475,7 @@ public class KafkaStorage extends StorageComponent {
 
     /**
      * Kafka topic name where incoming spans are stored.
-     *
+     * <p>
      * A Span is received from Collectors that contains all metadata and is partitioned by Trace
      * Id.
      */
@@ -461,7 +489,9 @@ public class KafkaStorage extends StorageComponent {
      * Kafka topic name where dependencies changelog are stored.
      */
     public Builder dependencyLinksTopic(Topic dependencyLinksTopic) {
-      if (dependencyLinksTopic == null) throw new NullPointerException("dependencyLinksTopic == null");
+      if (dependencyLinksTopic == null) {
+        throw new NullPointerException("dependencyLinksTopic == null");
+      }
       this.dependencyLinksTopic = dependencyLinksTopic;
       return this;
     }
