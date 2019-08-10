@@ -50,8 +50,10 @@ test: build
 .PHONY: zipkin-local
 zipkin-local:
 	STORAGE_TYPE=kafkastore \
+	KAFKA_BOOTSTRAP_SERVERS=localhost:19092 \
+	KAFKA_STORE_BOOTSTRAP_SERVERS=localhost:19092 \
 	java \
-	-Dloader.path='storage/target/zipkin-storage-kafka-${VERSION}.jar,autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar' \
+	-Dloader.path='autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar,autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar!/lib' \
 	-Dspring.profiles.active=kafkastore \
 	-cp zipkin.jar \
 	org.springframework.boot.loader.PropertiesLauncher
@@ -62,7 +64,7 @@ get-zipkin:
 
 .PHONY: zipkin-test
 zipkin-test:
-	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-ui/testdata/netflix.json | \
+	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/netflix.json | \
 	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
 	${OPEN} 'http://localhost:9411/zipkin/?lookback=custom&startTs=1'
 

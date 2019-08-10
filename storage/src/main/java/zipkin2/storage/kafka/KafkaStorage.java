@@ -14,6 +14,7 @@
 package zipkin2.storage.kafka;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -153,7 +154,7 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public SpanConsumer spanConsumer() {
-    if (ensureTopics && !topicsValidated) ensureTopics();
+    if (ensureTopics) ensureTopics();
     if (aggregationEnabled) getTraceAggregationStream();
     if (spanConsumerEnabled) {
       return new KafkaSpanConsumer(this);
@@ -185,7 +186,7 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public SpanStore spanStore() {
-    if (ensureTopics && !topicsValidated) ensureTopics();
+    if (ensureTopics) ensureTopics();
     if (aggregationEnabled) getTraceAggregationStream();
     if (spanStoreEnabled) {
       return new KafkaSpanStore(this);
@@ -215,7 +216,7 @@ public class KafkaStorage extends StorageComponent {
   }
 
   @Override public AutocompleteTags autocompleteTags() {
-    if (ensureTopics && !topicsValidated) ensureTopics();
+    if (ensureTopics) ensureTopics();
     if (aggregationEnabled) getTraceAggregationStream();
     if (spanStoreEnabled) {
       return new KafkaAutocompleteTags(this);
@@ -359,7 +360,7 @@ public class KafkaStorage extends StorageComponent {
     boolean spanStoreEnabled = true;
     boolean aggregationEnabled = true;
 
-    List<String> autocompleteKeys;
+    List<String> autocompleteKeys = new ArrayList<>();
 
     Duration tracesRetentionScanFrequency = Duration.ofMinutes(1);
     Duration tracesRetentionMaxAge = Duration.ofMinutes(2);

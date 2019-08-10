@@ -227,7 +227,6 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     @Override public List<List<Span>> query() {
       List<List<Span>> result = new ArrayList<>();
       List<String> traceIds = new ArrayList<>();
-      traceIdsByTsStore.all().forEachRemaining(System.out::println);
       // milliseconds to microseconds
       long from = (queryRequest.endTs() - queryRequest.lookback()) * 1000;
       long to = queryRequest.endTs() * 1000;
@@ -235,7 +234,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to);
       spanIds.forEachRemaining(keyValue -> {
         for (String traceId : keyValue.value) {
-          if (!traceIds.contains(traceId) && result.size() <= queryRequest.limit()) {
+          if (!traceIds.contains(traceId) && result.size() < queryRequest.limit()) {
             List<Span> spans = tracesStore.get(traceId);
             if (queryRequest.test(spans)) { // apply filters
               traceIds.add(traceId); // adding to check if we have already add it later
@@ -297,7 +296,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     @Override public List<DependencyLink> query() {
       try {
         long from = endTs - loopback;
-        List<DependencyLink> dependencyLinks = new LinkedList<>();
+        List<DependencyLink> dependencyLinks = new ArrayList<>();
         dependenciesStore.fetchAll(Instant.ofEpochMilli(from), Instant.ofEpochMilli(endTs))
             .forEachRemaining(keyValue -> dependencyLinks.add(keyValue.value));
 

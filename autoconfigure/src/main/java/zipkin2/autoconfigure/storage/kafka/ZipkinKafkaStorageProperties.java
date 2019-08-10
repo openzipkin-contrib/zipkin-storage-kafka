@@ -22,10 +22,10 @@ import zipkin2.storage.kafka.KafkaStorage;
 public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
 
-  private Boolean spanConsumerEnabled = true;
-  private Boolean aggregationEnabled = true;
-  private Boolean spanStoreEnabled = true;
-  private Boolean ensureTopics = true;
+  private Boolean spanConsumerEnabled;
+  private Boolean aggregationEnabled;
+  private Boolean spanStoreEnabled;
+  private Boolean ensureTopics;
 
   private String bootstrapServers;
   private String compressionType;
