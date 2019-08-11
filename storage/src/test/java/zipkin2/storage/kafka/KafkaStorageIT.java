@@ -14,7 +14,6 @@
 package zipkin2.storage.kafka;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -73,11 +72,10 @@ class KafkaStorageIT {
 
     if (!kafka.isRunning()) fail();
 
-    long epochMilli = Instant.now().toEpochMilli();
     traceInactivityGap = Duration.ofSeconds(5);
     storage = (KafkaStorage) new KafkaStorage.Builder().ensureTopics(true)
         .bootstrapServers(kafka.getBootstrapServers())
-        .storeDirectory("target/zipkin_" + epochMilli)
+        .storeDirectory("target/zipkin_" + System.currentTimeMillis())
         .traceInactivityGap(traceInactivityGap)
         .build();
 
