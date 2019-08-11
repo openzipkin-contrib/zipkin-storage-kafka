@@ -64,33 +64,15 @@ Zipkin instances.
 
 #### Trace Aggregation Stream Processor
 
-This is the main processors that take incoming spans and aggregate them into:
+This is the main processor that take incoming spans and aggregate them into:
 
 - Traces
 - Dependencies
 
-![service aggregation](docs/service-aggregation-stream.png)
+![trace aggregation](docs/trace-aggregation-topology.png)
 
-![dependency aggregation](docs/dependency-aggregation-stream.png)
+#### Store Stream Processor
 
-#### Store Stream Processors
+Kafka Stream store tables for traces, service names and dependencies to be available on local state.
 
-Global tables for traces, service names and dependencies to be available on local state.
-
-![trace store](docs/trace-store-stream.png)
-
-![service store](docs/service-store-stream.png)
-
-![dependency store](docs/dependency-store-stream.png)
-
-#### Index Stream Processor
-
-Custom processor to full-text indexing of traces using Lucene as back-end.
-
-![span index](docs/span-index-stream.png)
-
-#### Retention Stream Processor
-
-This is the processor that keeps track of trace timestamps for cleanup.
-
-![trace retention](docs/trace-retention-stream.png)
+![trace store](docs/trace-store-topology.png)
