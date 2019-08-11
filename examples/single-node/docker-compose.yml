@@ -15,33 +15,24 @@
 ---
 version: '3'
 services:
-  zookeeper:
-    image: confluentinc/cp-zookeeper:5.1.0
+  kafka-zookeeper:
+    image: openzipkin/zipkin-kafka
+    # If using docker machine, uncomment the below and set your bootstrap
+    # server list to 192.168.99.100:19092
+    # environment:
+    # - KAFKA_ADVERTISED_HOST_NAME=192.168.99.100
     ports:
       - 2181:2181
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-  kafka:
-    image: confluentinc/cp-kafka:5.1.0
-    ports:
       - 9092:9092
-      - 29092:29092
-    environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-    depends_on:
-      - zookeeper
+      # port 19092 is listening on localhost by default. In normal Docker,
+      # you can set your bootstrap server list to localhost:19092
+      - 19092:19092
   zipkin:
-    image: jeqo/zipkin-kafka:0.3.0
+    image: jeqo/zipkin-kafka:0.4.1-SNAPSHOT
     ports:
       - 9411:9411
     environment:
-      KAFKA_STORE_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_STORE_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
       KAFKA_STORE_DIRECTORY: /zipkin/data
       KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
     volumes:

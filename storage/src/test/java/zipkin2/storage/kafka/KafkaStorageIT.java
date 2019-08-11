@@ -239,7 +239,7 @@ class KafkaStorageIT {
       List<DependencyLink> links = new ArrayList<>();
       try {
         links =
-            spanStore.getDependencies(System.currentTimeMillis(), Duration.ofMinutes(1).toMillis())
+            spanStore.getDependencies(System.currentTimeMillis(), Duration.ofMinutes(3).toMillis())
                 .execute();
       } catch (InvalidStateStoreException e) { // ignoring state issues
       }
