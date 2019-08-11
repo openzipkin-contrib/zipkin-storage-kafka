@@ -161,14 +161,18 @@ class KafkaStorageIT {
     // Then: services names are searchable
     await().atMost(30, TimeUnit.SECONDS)
         .until(() -> {
-          List<List<Span>> traces =
-              spanStore.getTraces(QueryRequest.newBuilder()
-                  .endTs(TODAY + 1)
-                  .lookback(Duration.ofMinutes(1).toMillis())
-                  .serviceName("svc_a")
-                  .limit(10)
-                  .build())
-                  .execute();
+          List<List<Span>> traces = new ArrayList<>();
+          try {
+            traces =
+                spanStore.getTraces(QueryRequest.newBuilder()
+                    .endTs(TODAY + 1)
+                    .lookback(Duration.ofMinutes(1).toMillis())
+                    .serviceName("svc_a")
+                    .limit(10)
+                    .build())
+                    .execute();
+          } catch (InvalidStateStoreException e) { // ignoring state issues
+          }
           return traces.size() == 1
               && traces.get(0).size() == 2; // Trace is found and has two spans
         });
