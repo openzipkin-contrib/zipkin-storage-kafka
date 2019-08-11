@@ -239,9 +239,10 @@ class KafkaStorageIT {
       List<DependencyLink> links = new ArrayList<>();
       try {
         links =
-            spanStore.getDependencies(System.currentTimeMillis(), Duration.ofMinutes(3).toMillis())
+            spanStore.getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
                 .execute();
-      } catch (InvalidStateStoreException e) { // ignoring state issues
+      } catch (InvalidStateStoreException | IllegalStateException e) { // ignoring state issues
+        e.printStackTrace();
       }
       return links.size() == 1
           && links.get(0).callCount() == 2; // link stored and call count aggregated.
