@@ -31,7 +31,7 @@ public abstract class KafkaStreamsStoreCall<T> extends Call.Base<T> {
   }
 
   @Override protected void doEnqueue(Callback<T> callback) {
-    try {
+    try { // TODO check how to make queries async
       callback.onSuccess(query());
     } catch (Exception e) {
       callback.onError(e);
