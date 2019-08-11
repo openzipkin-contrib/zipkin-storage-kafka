@@ -35,6 +35,14 @@ A Zipkin Storage component has the following internal parts:
 
 ### Kafka Zipkin Storage
 
+#### `KafkaSpanConsumer`
+
+This component processes `spans` collected on different transports. Spans are received as batch
+containing spans from one instance.
+
+In order to support aggregation and post-processing `spans` are `flatmap`ing the spans into individual
+messages, keyed by `trace ID`.
+
 #### `KafkaSpanStore`
 
 Span Store is expecting Spans to be stored in topics partitioned by `TraceId`.

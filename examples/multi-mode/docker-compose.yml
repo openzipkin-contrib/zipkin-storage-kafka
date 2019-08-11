@@ -36,7 +36,7 @@ services:
       KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
       KAFKA_STORE_SPAN_CONSUMER_ENABLED: 'true'
       KAFKA_STORE_SPAN_STORE_ENABLED: 'false'
-  zipkin-store:
+  zipkin-storage:
     image: jeqo/zipkin-kafka:0.4.1-SNAPSHOT
     ports:
       - 9412:9411

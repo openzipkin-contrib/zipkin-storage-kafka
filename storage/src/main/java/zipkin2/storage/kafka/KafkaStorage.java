@@ -56,14 +56,18 @@ import zipkin2.storage.kafka.streams.TraceStoreSupplier;
 /**
  * Zipkin's Kafka Storage.
  * <p>
- * Storage implementation based on Kafka Streams, supporting: - repartitioning of spans, - trace
- * aggregation, - indexing of traces and dependencies.
+ * Storage implementation based on Kafka Streams, supporting:
+ * <ul>
+ *   <li>repartitioning of spans,</li>
+ *   <li>trace aggregation,</li>
+ *   <li>indexing of traces and dependencies.</li>
+ * </ul>
  */
 public class KafkaStorage extends StorageComponent {
   static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
 
   // Kafka Storage modes
-  final boolean spanConsumerEnabled, searchEnabled, aggregationEnabled;
+  final boolean spanConsumerEnabled, spanStoreEnabled, aggregationEnabled;
   final boolean ensureTopics;
   // Autocomplete Tags
   final List<String> autocompleteKeys;
@@ -86,7 +90,7 @@ public class KafkaStorage extends StorageComponent {
   KafkaStorage(Builder builder) {
     // Kafka Storage modes
     this.spanConsumerEnabled = builder.spanConsumerEnabled;
-    this.searchEnabled = builder.searchEnabled;
+    this.spanStoreEnabled = builder.spanStoreEnabled;
     this.aggregationEnabled = builder.aggregationEnabled;
     // Autocomplete tags
     this.autocompleteKeys = builder.autocompleteKeys;
@@ -107,6 +111,8 @@ public class KafkaStorage extends StorageComponent {
     producerConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
     producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
     producerConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, builder.compressionType.name);
+    producerConfig.put(ProducerConfig.BATCH_SIZE_CONFIG, 500_000);
+    producerConfig.put(ProducerConfig.LINGER_MS_CONFIG, 100);
     // Trace Aggregation topology
     traceAggregationStreamConfig = new Properties();
     traceAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -119,6 +125,9 @@ public class KafkaStorage extends StorageComponent {
         builder.traceAggregationStreamAppId);
     traceAggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.traceStoreDirectory());
     traceAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
+    // TODO check how to apply and make it testeable with exactly once guarantees.
+    // traceAggregationStreamConfig.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
+    //    StreamsConfig.EXACTLY_ONCE);
     traceAggregationStreamConfig.put(
         StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
@@ -165,7 +174,7 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public ServiceAndSpanNames serviceAndSpanNames() {
-    if (searchEnabled) {
+    if (spanStoreEnabled) {
       return new KafkaSpanStore(this);
     } else { // NoopServiceAndSpanNames
       return new ServiceAndSpanNames() {
@@ -188,7 +197,7 @@ public class KafkaStorage extends StorageComponent {
   public SpanStore spanStore() {
     if (ensureTopics) ensureTopics();
     if (aggregationEnabled) getTraceAggregationStream();
-    if (searchEnabled) {
+    if (spanStoreEnabled) {
       return new KafkaSpanStore(this);
     } else { // NoopSpanStore
       return new SpanStore() {
@@ -218,7 +227,7 @@ public class KafkaStorage extends StorageComponent {
   @Override public AutocompleteTags autocompleteTags() {
     if (ensureTopics) ensureTopics();
     if (aggregationEnabled) getTraceAggregationStream();
-    if (searchEnabled) {
+    if (spanStoreEnabled) {
       return new KafkaAutocompleteTags(this);
     } else {
       return super.autocompleteTags();
@@ -269,7 +278,7 @@ public class KafkaStorage extends StorageComponent {
               new IllegalStateException("Aggregation stream not running. " + state));
         }
       }
-      if (searchEnabled) {
+      if (spanStoreEnabled) {
         KafkaStreams.State state = getTraceStoreStream().state();
         if (!state.isRunning()) {
           return CheckResult.failed(
@@ -359,7 +368,7 @@ public class KafkaStorage extends StorageComponent {
 
   public static class Builder extends StorageComponent.Builder {
     boolean spanConsumerEnabled = true;
-    boolean searchEnabled = true;
+    boolean spanStoreEnabled = true;
     boolean aggregationEnabled = true;
 
     List<String> autocompleteKeys = new ArrayList<>();
@@ -392,14 +401,15 @@ public class KafkaStorage extends StorageComponent {
     }
 
     @Override
-    public StorageComponent.Builder strictTraceId(boolean strictTraceId) {
+    public Builder strictTraceId(boolean strictTraceId) {
       if (!strictTraceId) throw new IllegalArgumentException("non-strict trace ID not supported");
       return this;
     }
 
     @Override
-    public StorageComponent.Builder searchEnabled(boolean searchEnabled) {
-      this.searchEnabled = searchEnabled;
+    public Builder searchEnabled(boolean searchEnabled) {
+      if (!searchEnabled) throw new IllegalArgumentException("disabling search is not supported, "
+          + "only disabling complete storage support");
       return this;
     }
 
@@ -421,6 +431,16 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
+     * Enable all storage support (traces, services, dependencies)
+     * <p/>
+     * When disabled, a NoopSpanStore is instantiated to return empty lists for all searches.
+     */
+    public Builder spanStoreEnabled(Boolean spanStoreEnabled) {
+      this.spanStoreEnabled = spanStoreEnabled;
+      return this;
+    }
+
+    /**
      * Enable aggregating spans into traces and traces into dependency links.
      * <p>
      * When disabled, no aggregation for Traces or Dependency Links will run.
@@ -430,6 +450,9 @@ public class KafkaStorage extends StorageComponent {
       return this;
     }
 
+    /**
+     * How long to wait for a span in order to trigger a trace as completed.
+     */
     public Builder traceInactivityGap(Duration traceInactivityGap) {
       if (traceInactivityGap == null) throw new NullPointerException("traceInactivityGap == null");
       this.traceInactivityGap = traceInactivityGap;

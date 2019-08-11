@@ -24,6 +24,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private Boolean spanConsumerEnabled;
   private Boolean aggregationEnabled;
+  private Boolean spanStoreEnabled;
   private Boolean ensureTopics;
 
   private String bootstrapServers;
@@ -52,6 +53,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   KafkaStorage.Builder toBuilder() {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
     if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
+    if (spanStoreEnabled != null) builder.spanStoreEnabled(spanStoreEnabled);
     if (aggregationEnabled != null) builder.aggregationEnabled(aggregationEnabled);
     if (ensureTopics != null) builder.ensureTopics(ensureTopics);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
@@ -259,5 +261,13 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setDependenciesWindowSize(Long dependenciesWindowSize) {
     this.dependenciesWindowSize = dependenciesWindowSize;
+  }
+
+  public Boolean getSpanStoreEnabled() {
+    return spanStoreEnabled;
+  }
+
+  public void setSpanStoreEnabled(Boolean spanStoreEnabled) {
+    this.spanStoreEnabled = spanStoreEnabled;
   }
 }
