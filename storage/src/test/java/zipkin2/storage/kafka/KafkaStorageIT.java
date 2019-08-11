@@ -94,6 +94,8 @@ class KafkaStorageIT {
   }
 
   @AfterEach void closeStorageReleaseLock() {
+    linkProducer.close(Duration.ofSeconds(1));
+    linkProducer = null;
     tracesProducer.close(Duration.ofSeconds(1));
     tracesProducer = null;
     storage.close();
@@ -131,7 +133,7 @@ class KafkaStorageIT {
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopic.name, 1, 1000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopic.name, 1, 20000);
+        testConsumerConfig, storage.tracesTopic.name, 1, 30000);
     // Then: and a dependency link created
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.dependencyLinksTopic.name, 1, 1000);
