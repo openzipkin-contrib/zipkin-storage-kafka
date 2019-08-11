@@ -79,7 +79,10 @@ class KafkaStorageIT {
         .traceInactivityGap(traceInactivityGap)
         .build();
 
-    storage.ensureTopics();
+    await().atMost(10, TimeUnit.SECONDS).until(() -> {
+      storage.ensureTopics();
+      return storage.topicsValidated;
+    });
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> storage.check().ok());
 
@@ -91,7 +94,7 @@ class KafkaStorageIT {
         new DependencyLinkSerde().serializer());
   }
 
-  @AfterEach void closeStorageReleaseLock() {
+  @AfterEach void close() {
     linkProducer.close(Duration.ofSeconds(1));
     linkProducer = null;
     tracesProducer.close(Duration.ofSeconds(1));
