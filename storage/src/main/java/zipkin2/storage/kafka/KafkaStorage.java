@@ -265,13 +265,15 @@ public class KafkaStorage extends StorageComponent {
       if (aggregationEnabled) {
         KafkaStreams.State state = getTraceAggregationStream().state();
         if (!state.isRunning()) {
-          return CheckResult.failed(new IllegalStateException("Aggregation stream not running. " + state));
+          return CheckResult.failed(
+              new IllegalStateException("Aggregation stream not running. " + state));
         }
       }
       if (searchEnabled) {
         KafkaStreams.State state = getTraceStoreStream().state();
         if (!state.isRunning()) {
-          return CheckResult.failed(new IllegalStateException("Store stream not running. " + state));
+          return CheckResult.failed(
+              new IllegalStateException("Store stream not running. " + state));
         }
       }
       return CheckResult.OK;
@@ -371,7 +373,6 @@ public class KafkaStorage extends StorageComponent {
     CompressionType compressionType = CompressionType.NONE;
 
     Duration traceInactivityGap = Duration.ofSeconds(30);
-    Duration traceAggregationSuppressUntil = Duration.ofSeconds(30);
 
     String traceStoreStreamAppId = "zipkin-trace-store-v1";
     String traceAggregationStreamAppId = "zipkin-trace-aggregation-v1";
@@ -432,14 +433,6 @@ public class KafkaStorage extends StorageComponent {
     public Builder traceInactivityGap(Duration traceInactivityGap) {
       if (traceInactivityGap == null) throw new NullPointerException("traceInactivityGap == null");
       this.traceInactivityGap = traceInactivityGap;
-      return this;
-    }
-
-    public Builder traceAggregationSuppressUntil(Duration traceAggregationSuppressUntil) {
-      if (traceAggregationSuppressUntil == null) {
-        throw new NullPointerException("traceAggregationSuppressUntil == null");
-      }
-      this.traceAggregationSuppressUntil = traceAggregationSuppressUntil;
       return this;
     }
 

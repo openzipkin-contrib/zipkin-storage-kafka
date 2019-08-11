@@ -16,17 +16,15 @@ package zipkin2.storage.kafka;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Future;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.Span;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.AggregateCall;
+import zipkin2.reporter.AwaitableCallback;
 import zipkin2.storage.SpanConsumer;
 
 /**
@@ -59,8 +57,6 @@ public class KafkaSpanConsumer implements SpanConsumer {
   }
 
   static class KafkaProducerCall extends Call.Base<Void> {
-    static final Logger LOG = LoggerFactory.getLogger(KafkaProducerCall.class);
-
     final Producer<String, byte[]> kafkaProducer;
     final String topic;
     final String key;
@@ -79,39 +75,47 @@ public class KafkaSpanConsumer implements SpanConsumer {
 
     static Call<Void> create(
         Producer<String, byte[]> producer,
-        String topicName,
+        String topic,
         String key,
         byte[] value) {
-      return new KafkaProducerCall(producer, topicName, key, value);
+      return new KafkaProducerCall(producer, topic, key, value);
     }
 
     @Override
     protected Void doExecute() throws IOException {
-      try {
-        ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
-        kafkaProducer.send(producerRecord).get();
-        return null;
-      } catch (Exception e) {
-        LOG.error("Error sending span to Kafka", e);
-        throw new IOException(e);
-      }
+      AwaitableCallback callback = new AwaitableCallback();
+      kafkaProducer.send(new ProducerRecord<>(topic, key, value), new CallbackAdapter(callback));
+      callback.await();
+      return null;
     }
 
     @Override
     protected void doEnqueue(Callback<Void> callback) {
-      ProducerRecord<String, byte[]> producerRecord = new ProducerRecord<>(topic, key, value);
-      Future<RecordMetadata> ignored = kafkaProducer.send(producerRecord, (recordMetadata, e) -> {
-        if (e == null) {
-          callback.onSuccess(null);
-        } else {
-          LOG.error("Error sending span to Kafka", e);
-          callback.onError(e);
-        }
-      });
+      kafkaProducer.send(new ProducerRecord<>(topic, key, value), new CallbackAdapter(callback));
     }
 
     @Override public Call<Void> clone() {
       return new KafkaProducerCall(kafkaProducer, topic, key, value);
+    }
+
+    static final class CallbackAdapter implements org.apache.kafka.clients.producer.Callback {
+      final Callback<Void> delegate;
+
+      CallbackAdapter(Callback<Void> delegate) {
+        this.delegate = delegate;
+      }
+
+      @Override public void onCompletion(RecordMetadata metadata, Exception exception) {
+        if (exception == null) {
+          delegate.onSuccess(null);
+        } else {
+          delegate.onError(exception);
+        }
+      }
+
+      @Override public String toString() {
+        return delegate.toString();
+      }
     }
   }
 }

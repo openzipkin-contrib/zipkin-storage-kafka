@@ -48,6 +48,7 @@
         <zipkin.version>2.16.0</zipkin.version>
         <spring-boot.version>2.1.7.RELEASE</spring-boot.version>
         <log4j.version>2.11.1</log4j.version>
+        <zipkin-sender-kafka.version>2.10.1</zipkin-sender-kafka.version>
 
         <!-- override to set exclusions per-project -->
         <errorprone.args/>

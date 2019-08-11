@@ -14,7 +14,6 @@
 package zipkin2.storage.kafka;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import org.apache.kafka.streams.KafkaStreams;
@@ -39,19 +38,17 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
   }
 
   @Override public Call<List<String>> getKeys() {
-    try {
-      ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-          traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
-              QueryableStoreTypes.keyValueStore());
-      return new GetKeysCall(autocompleteTagsStore);
-    } catch (Exception e) {
-      LOG.error("Error getting autocomplete keys", e);
-      return Call.emptyList();
-    }
+    ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
+        traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
+            QueryableStoreTypes.keyValueStore());
+    return new GetKeysCall(autocompleteTagsStore);
   }
 
   @Override public Call<List<String>> getValues(String key) {
-    return null;
+    ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
+        traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
+            QueryableStoreTypes.keyValueStore());
+    return new GetValuesCall(autocompleteTagsStore, key);
   }
 
   static class GetKeysCall extends KafkaStreamsStoreCall<List<String>> {
@@ -65,7 +62,6 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
       try {
         List<String> keys = new ArrayList<>();
         autocompleteTagsStore.all().forEachRemaining(keyValue -> keys.add(keyValue.key));
-        Collections.sort(keys); // comply with Zipkin API
         return keys;
       } catch (Exception e) {
         LOG.error("Error looking up autocomplete tag keys", e);
@@ -90,9 +86,9 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
 
     @Override protected List<String> query() {
       try {
-        List<String> values = new ArrayList<>(autocompleteTagsStore.get(key));
-        Collections.sort(values); // comply with Zipkin API
-        return values;
+        Set<String> valuesSet = autocompleteTagsStore.get(key);
+        if (valuesSet == null) return new ArrayList<>();
+        return new ArrayList<>(valuesSet);
       } catch (Exception e) {
         LOG.error("Error looking up autocomplete tag values for key {}", key, e);
         return new ArrayList<>();
@@ -100,7 +96,7 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
     }
 
     @Override public Call<List<String>> clone() {
-      return null;
+      return new GetValuesCall(autocompleteTagsStore, key);
     }
   }
 }
