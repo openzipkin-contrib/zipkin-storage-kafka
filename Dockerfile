@@ -46,6 +46,7 @@ WORKDIR /zipkin
 
 #COPY autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKASTORE_VERSION}-module.jar kafkastore-module.jar
 
+# TODO haven't found a better way to mount libs from custom storage as L31
 #ENV MODULE_OPTS -Dloader.path='BOOT-INF/lib/kafkastore-module.jar,BOOT-INF/lib/kafkastore-module.jar!/lib' -Dspring.profiles.active=kafkastore
 ENV MODULE_OPTS -Dspring.profiles.active=kafkastore
 
