@@ -200,7 +200,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           }
         }
       });
-      LOG.info("Traces found from query {}: {}", queryRequest, traces.size());
+      LOG.debug("Traces found from query {}: {}", queryRequest, traces.size());
       return traces;
     }
 
