@@ -198,9 +198,6 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           }
         }
       });
-
-      LOG.info("Traces found from query {}: {}", queryRequest, traces.size());
-
       return traces;
     }
 
@@ -250,7 +247,6 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       dependenciesStore.fetchAll(from, to)
           .forEachRemaining(keyValue -> links.add(keyValue.value));
       List<DependencyLink> mergedLinks = DependencyLinker.merge(links);
-      LOG.info("Dependencies found from={}-to={}: {}", from, to, mergedLinks.size());
       return mergedLinks;
     }
 
