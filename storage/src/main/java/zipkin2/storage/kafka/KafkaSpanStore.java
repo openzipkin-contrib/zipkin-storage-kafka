@@ -180,7 +180,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public List<List<Span>> query() {
-      List<List<Span>> result = new ArrayList<>();
+      List<List<Span>> traces = new ArrayList<>();
       List<String> traceIds = new ArrayList<>();
       // milliseconds to microseconds
       long from = (queryRequest.endTs() - queryRequest.lookback()) * 1000;
@@ -189,19 +189,19 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to);
       spanIds.forEachRemaining(keyValue -> {
         for (String traceId : keyValue.value) {
-          if (!traceIds.contains(traceId) && result.size() < queryRequest.limit()) {
+          if (!traceIds.contains(traceId) && traces.size() < queryRequest.limit()) {
             List<Span> spans = tracesStore.get(traceId);
             if (spans != null && queryRequest.test(spans)) { // apply filters
               traceIds.add(traceId); // adding to check if we have already add it later
-              result.add(spans);
+              traces.add(spans);
             }
           }
         }
       });
 
-      LOG.info("Total results of query {}: {}", queryRequest, result.size());
+      LOG.info("Traces found from query {}: {}", queryRequest, traces.size());
 
-      return result;
+      return traces;
     }
 
     @Override
@@ -244,14 +244,14 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public List<DependencyLink> query() {
-      long from = endTs - loopback;
-      List<DependencyLink> dependencyLinks = new ArrayList<>();
-      dependenciesStore.fetchAll(Instant.ofEpochMilli(from), Instant.ofEpochMilli(endTs))
-          .forEachRemaining(keyValue -> dependencyLinks.add(keyValue.value));
-
-      LOG.info("Dependencies found from={}-to={}: {}", from, endTs, dependencyLinks.size());
-
-      return DependencyLinker.merge(dependencyLinks);
+      List<DependencyLink> links = new ArrayList<>();
+      Instant from = Instant.ofEpochMilli(endTs - loopback);
+      Instant to = Instant.ofEpochMilli(endTs);
+      dependenciesStore.fetchAll(from, to)
+          .forEachRemaining(keyValue -> links.add(keyValue.value));
+      List<DependencyLink> mergedLinks = DependencyLinker.merge(links);
+      LOG.info("Dependencies found from={}-to={}: {}", from, to, mergedLinks.size());
+      return mergedLinks;
     }
 
     @Override public Call<List<DependencyLink>> clone() {
