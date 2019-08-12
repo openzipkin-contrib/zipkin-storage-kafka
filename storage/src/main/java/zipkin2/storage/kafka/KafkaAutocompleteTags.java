@@ -19,18 +19,13 @@ import java.util.Set;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.storage.AutocompleteTags;
 import zipkin2.storage.kafka.internal.KafkaStreamsStoreCall;
-import zipkin2.storage.kafka.streams.TraceStoreSupplier;
 
 import static zipkin2.storage.kafka.streams.TraceStoreSupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
 
 public class KafkaAutocompleteTags implements AutocompleteTags {
-  static final Logger LOG = LoggerFactory.getLogger(TraceStoreSupplier.class);
-
   final KafkaStreams traceStoreStream;
 
   KafkaAutocompleteTags(KafkaStorage storage) {
@@ -59,14 +54,9 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
     }
 
     @Override protected List<String> query() {
-      try {
-        List<String> keys = new ArrayList<>();
-        autocompleteTagsStore.all().forEachRemaining(keyValue -> keys.add(keyValue.key));
-        return keys;
-      } catch (Exception e) {
-        LOG.error("Error looking up autocomplete tag keys", e);
-        return new ArrayList<>();
-      }
+      List<String> keys = new ArrayList<>();
+      autocompleteTagsStore.all().forEachRemaining(keyValue -> keys.add(keyValue.key));
+      return keys;
     }
 
     @Override public Call<List<String>> clone() {
@@ -85,14 +75,9 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
     }
 
     @Override protected List<String> query() {
-      try {
-        Set<String> valuesSet = autocompleteTagsStore.get(key);
-        if (valuesSet == null) return new ArrayList<>();
-        return new ArrayList<>(valuesSet);
-      } catch (Exception e) {
-        LOG.error("Error looking up autocomplete tag values for key {}", key, e);
-        return new ArrayList<>();
-      }
+      Set<String> valuesSet = autocompleteTagsStore.get(key);
+      if (valuesSet == null) return new ArrayList<>();
+      return new ArrayList<>(valuesSet);
     }
 
     @Override public Call<List<String>> clone() {

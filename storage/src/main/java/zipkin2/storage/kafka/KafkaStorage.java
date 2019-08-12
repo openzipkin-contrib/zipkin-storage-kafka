@@ -407,8 +407,7 @@ public class KafkaStorage extends StorageComponent {
 
     @Override
     public Builder searchEnabled(boolean searchEnabled) {
-      if (!searchEnabled) throw new IllegalArgumentException("disabling search is not supported, "
-          + "only disabling complete storage support");
+      this.spanStoreEnabled = searchEnabled;
       return this;
     }
 
