@@ -167,7 +167,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).dependencyLinksTopic.name).isEqualTo(
+    assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.name).isEqualTo(
         "zipkin-dependencies-1");
   }
 
@@ -181,7 +181,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).dependencyLinksTopic.partitions).isEqualTo(2);
+    assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.partitions).isEqualTo(2);
   }
 
   @Test
@@ -195,7 +195,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     context.refresh();
 
     assertThat(
-        context.getBean(KafkaStorage.class).dependencyLinksTopic.replicationFactor).isEqualTo(
+        context.getBean(KafkaStorage.class).dependenciesTopic.replicationFactor).isEqualTo(
         (short) 2);
   }
 }

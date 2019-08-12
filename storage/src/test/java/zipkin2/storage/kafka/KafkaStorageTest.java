@@ -13,7 +13,6 @@
  */
 package zipkin2.storage.kafka;
 
-import java.util.Arrays;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.Assert.assertNotNull;
@@ -41,7 +40,7 @@ class KafkaStorageTest {
     }
 
     try {
-      builder.dependencyLinksTopic(null);
+      builder.dependenciesTopic(null);
       fail();
     } catch (NullPointerException ignored) {
     }

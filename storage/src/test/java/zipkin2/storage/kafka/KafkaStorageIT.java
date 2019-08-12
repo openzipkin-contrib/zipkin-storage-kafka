@@ -137,7 +137,7 @@ class KafkaStorageIT {
         testConsumerConfig, storage.tracesTopic.name, 1, 30000);
     // Then: and a dependency link created
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.dependencyLinksTopic.name, 1, 1000);
+        testConsumerConfig, storage.dependenciesTopic.name, 1, 1000);
   }
 
   @Test void should_return_traces_query() throws Exception {
@@ -219,7 +219,7 @@ class KafkaStorageIT {
         .build();
     // When: sent first one
     linkProducer.send(
-        new ProducerRecord<>(storage.dependencyLinksTopic.name, "svc_a:svc_b", link1));
+        new ProducerRecord<>(storage.dependenciesTopic.name, "svc_a:svc_b", link1));
     DependencyLink link2 = DependencyLink.newBuilder()
         .parent("svc_a")
         .child("svc_b")
@@ -228,11 +228,11 @@ class KafkaStorageIT {
         .build();
     // When: and another one
     linkProducer.send(
-        new ProducerRecord<>(storage.dependencyLinksTopic.name, "svc_a:svc_b", link2));
+        new ProducerRecord<>(storage.dependenciesTopic.name, "svc_a:svc_b", link2));
     linkProducer.flush();
     // Then: stored in topic
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.dependencyLinksTopic.name, 2, 10000);
+        testConsumerConfig, storage.dependenciesTopic.name, 2, 10000);
     // When: stores running
     SpanStore spanStore = storage.spanStore();
     // Then:

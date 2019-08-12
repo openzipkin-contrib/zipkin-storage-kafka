@@ -28,14 +28,14 @@ services:
       # you can set your bootstrap server list to localhost:19092
       - 19092:19092
   zipkin:
-    image: jeqo/zipkin-kafka:0.4.1-SNAPSHOT
+    image: jeqo/zipkin-kafka
     ports:
       - 9411:9411
     environment:
       KAFKA_STORE_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
-      KAFKA_STORE_DIRECTORY: /zipkin/data
+      KAFKA_STORE_DIRECTORY: /data
       KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
     volumes:
-      - zipkin:/zipkin/data
+      - zipkin:/data
 volumes:
   zipkin:

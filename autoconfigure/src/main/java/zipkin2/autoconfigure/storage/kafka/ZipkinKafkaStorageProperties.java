@@ -44,9 +44,9 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private Integer tracesTopicPartitions = 1;
   private Short tracesTopicReplicationFactor = 1;
 
-  private String dependencyLinksTopic = "zipkin-dependency-links-v1";
-  private Integer dependencyLinksTopicPartitions = 1;
-  private Short dependencyLinksTopicReplicationFactor = 1;
+  private String dependenciesTopic = "zipkin-dependencies-v1";
+  private Integer dependenciesTopicPartitions = 1;
+  private Short dependenciesTopicReplicationFactor = 1;
 
   private String storeDirectory = "/tmp/zipkin";
 
@@ -80,9 +80,9 @@ public class ZipkinKafkaStorageProperties implements Serializable {
             .partitions(tracesTopicPartitions)
             .replicationFactor(tracesTopicReplicationFactor)
             .build())
-        .dependencyLinksTopic(KafkaStorage.Topic.builder(dependencyLinksTopic)
-            .partitions(dependencyLinksTopicPartitions)
-            .replicationFactor(dependencyLinksTopicReplicationFactor)
+        .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic)
+            .partitions(dependenciesTopicPartitions)
+            .replicationFactor(dependenciesTopicReplicationFactor)
             .build())
         .storeDirectory(storeDirectory);
   }
@@ -215,28 +215,28 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.tracesTopicReplicationFactor = tracesTopicReplicationFactor;
   }
 
-  public String getDependencyLinksTopic() {
-    return dependencyLinksTopic;
+  public String getDependenciesTopic() {
+    return dependenciesTopic;
   }
 
-  public void setDependencyLinksTopic(String dependencyLinksTopic) {
-    this.dependencyLinksTopic = dependencyLinksTopic;
+  public void setDependenciesTopic(String dependenciesTopic) {
+    this.dependenciesTopic = dependenciesTopic;
   }
 
-  public Integer getDependencyLinksTopicPartitions() {
-    return dependencyLinksTopicPartitions;
+  public Integer getDependenciesTopicPartitions() {
+    return dependenciesTopicPartitions;
   }
 
-  public void setDependencyLinksTopicPartitions(Integer dependencyLinksTopicPartitions) {
-    this.dependencyLinksTopicPartitions = dependencyLinksTopicPartitions;
+  public void setDependenciesTopicPartitions(Integer dependenciesTopicPartitions) {
+    this.dependenciesTopicPartitions = dependenciesTopicPartitions;
   }
 
-  public Short getDependencyLinksTopicReplicationFactor() {
-    return dependencyLinksTopicReplicationFactor;
+  public Short getDependenciesTopicReplicationFactor() {
+    return dependenciesTopicReplicationFactor;
   }
 
-  public void setDependencyLinksTopicReplicationFactor(Short dependencyLinksTopicReplicationFactor) {
-    this.dependencyLinksTopicReplicationFactor = dependencyLinksTopicReplicationFactor;
+  public void setDependenciesTopicReplicationFactor(Short dependenciesTopicReplicationFactor) {
+    this.dependenciesTopicReplicationFactor = dependenciesTopicReplicationFactor;
   }
 
   public String getStoreDirectory() {

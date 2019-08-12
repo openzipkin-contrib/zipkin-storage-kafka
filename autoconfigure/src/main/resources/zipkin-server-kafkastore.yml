@@ -9,10 +9,10 @@ zipkin:
       ensure-topics: ${KAFKA_STORE_ENSURE_TOPICS:true}
       store-directory: ${KAFKA_STORE_DIRECTORY:/tmp/zipkin}
       compression-type: ${KAFKA_STORE_COMPRESSION_TYPE:NONE}
-      traces-retention-scan-frequency: ${KAFKA_STORE_TRACES_RETENTION_SCAN_FREQUENCY:86400000}
+      traces-retention-scan-frequency: ${KAFKA_STORE_TRACES_RETENTION_SCAN_FREQUENCY:3600000}
       traces-retention-period: ${KAFKA_STORE_TRACES_RETENTION_PERIOD:604800000}
-      trace-inactivity-gap: ${KAFKA_STORE_TRACE_INACTIVITY_GAP:60000}
-      dependencies-retention-period: ${KAFKA_STORE_DEPENDENCIES_RETENTION_PERIOD:432000000}
+      trace-inactivity-gap: ${KAFKA_STORE_TRACE_INACTIVITY_GAP:30000}
+      dependencies-retention-period: ${KAFKA_STORE_DEPENDENCIES_RETENTION_PERIOD:604800000}
       dependencies-window-size: ${KAFKA_STORE_DEPENDENCIES_WINDOW_SIZE:60000}
       spans-topic: ${KAFKA_STORE_SPANS_TOPIC:zipkin-spans-v1}
       spans-topic-partitions: ${KAFKA_STORE_SPANS_TOPIC_PARTITIONS:1}
@@ -20,6 +20,6 @@ zipkin:
       traces-topic: ${KAFKA_STORE_TRACES_TOPIC:zipkin-span-dependencies-v1}
       traces-topic-partitions: ${KAFKA_STORE_TRACES_TOPIC_PARTITIONS:1}
       traces-topic-replication-factor: ${KAFKA_STORE_TRACES_TOPIC_REPLICATION_FACTOR:1}
-      dependency-links-topic: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC:zipkin-dependencies-v1}
-      dependency-links-topic-partitions: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC_PARTITIONS:1}
-      dependency-links-topic-replication-factor: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC_REPLICATION_FACTOR:1}
+      dependencies-topic: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC:zipkin-dependencies-v1}
+      dependencies-topic-partitions: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC_PARTITIONS:1}
+      dependencies-topic-replication-factor: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC_REPLICATION_FACTOR:1}

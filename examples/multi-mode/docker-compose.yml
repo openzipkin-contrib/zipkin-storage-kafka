@@ -27,26 +27,29 @@ services:
       # port 19092 is listening on localhost by default. In normal Docker,
       # you can set your bootstrap server list to localhost:19092
       - 19092:19092
-  zipkin-ingestion:
-    image: jeqo/zipkin-kafka:0.4.1-SNAPSHOT
+  zipkin-collection-aggregation:
+    image: jeqo/zipkin-kafka
     ports:
       - 9411:9411
     environment:
-      KAFKA_STORE_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_STORE_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
       KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
       KAFKA_STORE_SPAN_CONSUMER_ENABLED: 'true'
+      KAFKA_STORE_AGGREGATION_ENABLED: 'true'
       KAFKA_STORE_SPAN_STORE_ENABLED: 'false'
+      QUERY_ENABLED: 'false'
   zipkin-storage:
-    image: jeqo/zipkin-kafka:0.4.1-SNAPSHOT
+    image: jeqo/zipkin-kafka
     ports:
       - 9412:9411
     environment:
       KAFKA_STORE_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
       KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
       KAFKA_STORE_SPAN_CONSUMER_ENABLED: 'false'
+      KAFKA_STORE_AGGREGATION_ENABLED: 'false'
       KAFKA_STORE_SPAN_STORE_ENABLED: 'true'
-      KAFKA_STORE_DIRECTORY: /zipkin/data
+      KAFKA_STORE_DIRECTORY: /data
     volumes:
-      - zipkin:/zipkin/data
+      - zipkin:/data
 volumes:
   zipkin:

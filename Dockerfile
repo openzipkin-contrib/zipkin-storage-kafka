@@ -46,10 +46,13 @@ WORKDIR /zipkin
 
 #COPY autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKASTORE_VERSION}-module.jar kafkastore-module.jar
 
-#ENV MODULE_OPTS -Dloader.path='kafkastore-module.jar,kafkastore-module.jar!/lib' -Dspring.profiles.active=kafkastore
+#ENV MODULE_OPTS -Dloader.path='BOOT-INF/lib/kafkastore-module.jar,BOOT-INF/lib/kafkastore-module.jar!/lib' -Dspring.profiles.active=kafkastore
 ENV MODULE_OPTS -Dspring.profiles.active=kafkastore
 
 RUN ["/busybox/sh", "-c", "ln -s /busybox/* /bin"]
+
+RUN mkdir /data  && chown zipkin /data
+VOLUME /data
 
 USER zipkin
 

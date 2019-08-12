@@ -15,6 +15,7 @@ package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -147,12 +148,12 @@ public class TraceStoreSupplier implements Supplier<Topology> {
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
                   // preparing range filtering
-                  long cutoff = tracesRetentionPeriod.toMillis();
-                  long ttl = timestamp - cutoff;
-                  long ttlMicro = ttl * 1000;
+                  long from = 0L;
+                  long to = timestamp - tracesRetentionPeriod.toMillis();
+                  long toMicro = to * 1000;
                   // query traceIds active during period
                   try (final KeyValueIterator<Long, Set<String>> all =
-                           spanIdsByTsStore.range(0L, ttlMicro)) {
+                           spanIdsByTsStore.range(from, toMicro)) {
                     int deletions = 0; // logging purpose
                     while (all.hasNext()) {
                       final KeyValue<Long, Set<String>> record = all.next();
@@ -164,7 +165,8 @@ public class TraceStoreSupplier implements Supplier<Topology> {
                     }
                     if (deletions > 0) {
                       LOG.info("Traces deletion emitted: {}, older than {}",
-                          deletions, Instant.ofEpochMilli(ttl));
+                          deletions,
+                          Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()));
                     }
                   }
                 });

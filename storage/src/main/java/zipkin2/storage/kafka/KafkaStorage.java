@@ -74,7 +74,7 @@ public class KafkaStorage extends StorageComponent {
   // Kafka Storage configs
   final String storageDirectory;
   // Kafka Topics
-  final Topic spansTopic, tracesTopic, dependencyLinksTopic;
+  final Topic spansTopic, tracesTopic, dependenciesTopic;
   // Kafka Clients config
   final Properties adminConfig;
   final Properties producerConfig;
@@ -98,7 +98,7 @@ public class KafkaStorage extends StorageComponent {
     this.ensureTopics = builder.ensureTopics;
     this.spansTopic = builder.spansTopic;
     this.tracesTopic = builder.tracesTopic;
-    this.dependencyLinksTopic = builder.dependencyLinksTopic;
+    this.dependenciesTopic = builder.dependenciesTopic;
     // State store directories
     this.storageDirectory = builder.storeDirectory;
     // Kafka Admin Client configuration
@@ -132,7 +132,7 @@ public class KafkaStorage extends StorageComponent {
         StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
     traceAggregationTopology = new TraceAggregationSupplier(spansTopic.name, tracesTopic.name,
-        dependencyLinksTopic.name, builder.traceInactivityGap).get();
+        dependenciesTopic.name, builder.traceInactivityGap).get();
     // Trace Store Stream Topology configuration
     traceStoreStreamConfig = new Properties();
     traceStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -149,10 +149,10 @@ public class KafkaStorage extends StorageComponent {
     traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
     traceStoreTopology = new TraceStoreSupplier(
         tracesTopic.name,
-        dependencyLinksTopic.name,
+        dependenciesTopic.name,
         autocompleteKeys,
         builder.tracesRetentionScanFrequency,
-        builder.tracesRetentionMaxAge,
+        builder.tracesRetentionPeriod,
         builder.dependenciesRetentionPeriod,
         builder.dependenciesWindowSize).get();
   }
@@ -246,7 +246,7 @@ public class KafkaStorage extends StorageComponent {
           try {
             Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
             List<Topic> requiredTopics =
-                Arrays.asList(spansTopic, dependencyLinksTopic, tracesTopic);
+                Arrays.asList(spansTopic, dependenciesTopic, tracesTopic);
             Set<NewTopic> newTopics = new HashSet<>();
             for (Topic requiredTopic : requiredTopics) {
               if (!topics.contains(requiredTopic.name)) {
@@ -373,15 +373,14 @@ public class KafkaStorage extends StorageComponent {
 
     List<String> autocompleteKeys = new ArrayList<>();
 
-    Duration tracesRetentionScanFrequency = Duration.ofMinutes(1);
-    Duration tracesRetentionMaxAge = Duration.ofMinutes(2);
-    Duration dependenciesRetentionPeriod = Duration.ofDays(5);
+    Duration tracesRetentionPeriod = Duration.ofDays(7);
+    Duration tracesRetentionScanFrequency = Duration.ofHours(1);
+    Duration traceInactivityGap = Duration.ofSeconds(30);
+    Duration dependenciesRetentionPeriod = Duration.ofDays(7);
     Duration dependenciesWindowSize = Duration.ofMinutes(1);
 
     String bootstrapServers = "localhost:19092";
     CompressionType compressionType = CompressionType.NONE;
-
-    Duration traceInactivityGap = Duration.ofSeconds(30);
 
     String traceStoreStreamAppId = "zipkin-trace-store-v1";
     String traceAggregationStreamAppId = "zipkin-trace-aggregation-v1";
@@ -391,7 +390,7 @@ public class KafkaStorage extends StorageComponent {
     Topic tracesTopic = Topic.builder("zipkin-traces-v1")
         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
         .build();
-    Topic dependencyLinksTopic = Topic.builder("zipkin-dependency-links-v1")
+    Topic dependenciesTopic = Topic.builder("zipkin-dependencies-v1")
         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
         .build();
 
@@ -495,11 +494,11 @@ public class KafkaStorage extends StorageComponent {
     /**
      * Kafka topic name where dependencies changelog are stored.
      */
-    public Builder dependencyLinksTopic(Topic dependencyLinksTopic) {
-      if (dependencyLinksTopic == null) {
-        throw new NullPointerException("dependencyLinksTopic == null");
+    public Builder dependenciesTopic(Topic dependenciesTopic) {
+      if (dependenciesTopic == null) {
+        throw new NullPointerException("dependenciesTopic == null");
       }
-      this.dependencyLinksTopic = dependencyLinksTopic;
+      this.dependenciesTopic = dependenciesTopic;
       return this;
     }
 
@@ -524,7 +523,7 @@ public class KafkaStorage extends StorageComponent {
      * Maximum age for traces and spans to be retained on State Stores.
      */
     public Builder tracesRetentionMaxAge(Duration tracesRetentionMaxAge) {
-      this.tracesRetentionMaxAge = tracesRetentionMaxAge;
+      this.tracesRetentionPeriod = tracesRetentionMaxAge;
       return this;
     }
 
@@ -560,10 +559,6 @@ public class KafkaStorage extends StorageComponent {
 
     String traceStoreDirectory() {
       return storeDirectory + "/streams/traces";
-    }
-
-    String dependencyStoreDirectory() {
-      return storeDirectory + "/streams/dependencies";
     }
 
     @Override
