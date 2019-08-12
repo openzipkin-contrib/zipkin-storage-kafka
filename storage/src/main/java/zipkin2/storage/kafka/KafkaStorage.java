@@ -252,8 +252,6 @@ public class KafkaStorage extends StorageComponent {
               if (!topics.contains(requiredTopic.name)) {
                 NewTopic newTopic = requiredTopic.newTopic();
                 newTopics.add(newTopic);
-              } else {
-                LOG.info("Topic {} already exists.", requiredTopic.name);
               }
             }
 
@@ -521,7 +519,7 @@ public class KafkaStorage extends StorageComponent {
     /**
      * Maximum age for traces and spans to be retained on State Stores.
      */
-    public Builder tracesRetentionMaxAge(Duration tracesRetentionMaxAge) {
+    public Builder tracesRetentionRetention(Duration tracesRetentionMaxAge) {
       this.tracesRetentionPeriod = tracesRetentionMaxAge;
       return this;
     }

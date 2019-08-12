@@ -74,8 +74,8 @@ public class TraceStoreSupplier implements Supplier<Topology> {
 
   public TraceStoreSupplier(String tracesTopic, String dependencyLinksTopic,
       List<String> autocompleteKeys, Duration tracesRetentionScanFrequency,
-      Duration tracesRetentionPeriod,
-      Duration dependenciesRetentionPeriod, Duration dependenciesWindowSize) {
+      Duration tracesRetentionPeriod, Duration dependenciesRetentionPeriod,
+      Duration dependenciesWindowSize) {
     this.tracesTopic = tracesTopic;
     this.dependencyLinksTopic = dependencyLinksTopic;
     this.autocompleteKeys = autocompleteKeys;
@@ -147,26 +147,28 @@ public class TraceStoreSupplier implements Supplier<Topology> {
                 tracesRetentionScanFrequency,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
-                  // preparing range filtering
-                  long from = 0L;
-                  long to = timestamp - tracesRetentionPeriod.toMillis();
-                  long toMicro = to * 1000;
-                  // query traceIds active during period
-                  try (final KeyValueIterator<Long, Set<String>> all =
-                           spanIdsByTsStore.range(from, toMicro)) {
-                    int deletions = 0; // logging purpose
-                    while (all.hasNext()) {
-                      final KeyValue<Long, Set<String>> record = all.next();
-                      spanIdsByTsStore.delete(record.key); // clean timestamp index
-                      for (String traceId : record.value) {
-                        tracesStore.delete(traceId); // clean traces store
-                        deletions++;
+                  if (tracesRetentionPeriod.toMillis() > 0) {
+                    // preparing range filtering
+                    long from = 0L;
+                    long to = timestamp - tracesRetentionPeriod.toMillis();
+                    long toMicro = to * 1000;
+                    // query traceIds active during period
+                    try (final KeyValueIterator<Long, Set<String>> all =
+                             spanIdsByTsStore.range(from, toMicro)) {
+                      int deletions = 0; // logging purpose
+                      while (all.hasNext()) {
+                        final KeyValue<Long, Set<String>> record = all.next();
+                        spanIdsByTsStore.delete(record.key); // clean timestamp index
+                        for (String traceId : record.value) {
+                          tracesStore.delete(traceId); // clean traces store
+                          deletions++;
+                        }
                       }
-                    }
-                    if (deletions > 0) {
-                      LOG.info("Traces deletion emitted: {}, older than {}",
-                          deletions,
-                          Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()));
+                      if (deletions > 0) {
+                        LOG.info("Traces deletion emitted: {}, older than {}",
+                            deletions,
+                            Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()));
+                      }
                     }
                   }
                 });

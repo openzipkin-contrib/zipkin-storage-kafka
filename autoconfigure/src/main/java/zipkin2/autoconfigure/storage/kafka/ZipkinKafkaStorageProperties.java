@@ -64,6 +64,9 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       builder.tracesRetentionScanFrequency(Duration.ofMillis(tracesRetentionScanFrequency));
     }
     if (tracesRetentionPeriod != null) {
+      builder.tracesRetentionRetention(Duration.ofMillis(tracesRetentionPeriod));
+    }
+    if (dependenciesRetentionPeriod != null) {
       builder.dependenciesRetentionPeriod(Duration.ofMillis(dependenciesRetentionPeriod));
     }
 

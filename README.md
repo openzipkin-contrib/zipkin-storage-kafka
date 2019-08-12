@@ -34,7 +34,18 @@ To build the project you will need Java 8+.
 
 ```bash
 make build
+```
+
+And testing:
+
+```bash
 make test
+```
+
+If you want to build a docker image:
+
+```bash
+make docker-build
 ```
 
 ### Run locally
@@ -45,7 +56,7 @@ To run locally, first you need to get Zipkin binaries:
 make get-zipkin
 ```
 
-By default Zipkin will be waiting for a Kafka broker to be running on `localhost:29092`. If you don't have one, 
+By default Zipkin will be waiting for a Kafka broker to be running on `localhost:19092`. If you don't have one, 
 this service is available via Docker Compose:
 
 ```bash
@@ -60,13 +71,20 @@ make run
 
 ### Run with Docker
 
-Run:
+If you have Docker available, run:
 
 ```bash
-make run-docker
+make run-docker 
 ```
 
 And Docker image will be built and Docker compose will start.
+
+#### Examples
+
+There are two examples, running Zipkin with kafka as storage:
+
++ [Single-node](examples/single-node)
++ [Multi-mode](examples/multi-mode)
 
 ### Testing
 
@@ -78,12 +96,18 @@ make zipkin-test
 
 This will start a browser and check a traces has been registered.
 
-### Examples
+If running multi-node docker example, run:
 
-There are two examples, running zipkin with kafka as storage:
+```bash
+make zipkin-test-multi
+```
 
-+ Single-node: `examples/single-node`
-+ Multi-mode: `examples/multi-mode`
+> Remember results won't be immediately available as traces require some buffering before 
+> emitting completed traces.
+
+![traces](docs/traces.png)
+
+![dependencies](docs/dependencie.png)
 
 ## Acknowledgments
 
