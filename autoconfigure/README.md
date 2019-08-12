@@ -4,14 +4,22 @@
 
 | Configuration | Description | Default |
 |---------------|-------------|---------|
-| `KAFKA_STORE_SPAN_CONSUMER_ENABLED` | Process spans collected by Zipkin server | `true` |
-| `KAFKA_STORE_AGGREGATION_ENABLED` | Aggregate and store Zipkin data | `true` |
-| `KAFKA_STORE_BOOTSTRAP_SERVERS` | Kafka bootstrap servers, format: `host:port` | `localhost:9092` |
-| `KAFKA_STORE_ENSURE_TOPICS` | Ensure topics are created if don't exist | `true` |
-| `KAFKA_STORE_DIRECTORY` | Root path where Zipkin stores tracing data | `/tmp/zipkin` |
+| `KAFKA_STORE_SPAN_CONSUMER_ENABLED` | Enable partitioning of incoming span batches into individual spans keyed by trace ID. | `true` |
+| `KAFKA_STORE_AGGREGATION_ENABLED` | Enable aggregation spans into traces and then into dependency links. Currently this has to be initiated with span consumer or storage, or initiate manually via `curl /health` | `true` |
+| `KAFKA_STORE_SPAN_STORE_ENABLED` | Enable storage for spans, traces, dependencies, tags, and service names. | `true` |
+| `KAFKA_STORE_BOOTSTRAP_SERVERS` | Kafka bootstrap servers | `localhost:9092` |
+| `KAFKA_STORE_ENSURE_TOPICS` | Ensure topics are created if don't exist. Is recommended to create them manually, to define partition and replication according to your environment. | `true` |
 | `KAFKA_STORE_COMPRESSION_TYPE` | Compression type used to store data in Kafka topics | `NONE` |
-| `KAFKA_STORE_RETENTION_SCAN_FREQUENCY` | Frequency to scan old records, in milliseconds. | `86400000` (1 day) |
-| `KAFKA_STORE_RETENTION_MAX_AGE` | Max age of a trace, to recognize old one for retention policies. | `604800000` (7 day) |
+| `KAFKA_STORE_DIRECTORY` | Root path where Zipkin stores tracing data | `/tmp/zipkin` |
+
+## Storage durations and timeouts
+
+| Configuration | Description | Default |
+|---------------|-------------|---------|
+| `KAFKA_STORE_TRACES_RETENTION_SCAN_FREQUENCY` | How often to validate traces retention. This will be evaluated at the time events are received. (ms) | `3600000` (1 hour) |
+| `KAFKA_STORE_TRACES_RETENTION_PERIOD` | How long to keep traces stored. | `604800000` (1 week) |
+| `KAFKA_STORE_TRACE_INACTIVITY_GAP` | How long to wait until a trace is marked as done (ms). This affects dependency links and traces indexed, but query join traces part to complete results. | `30000` (30 seconds) |
+| `KAFKA_STORE_DEPENDENCIES_RETENTION_PERIOD` | How long to keep dependencies stored. | `604800000` (1 week) |
 
 ## Topics configuration
 
@@ -26,5 +34,3 @@
 | `KAFKA_STORE_DEPENDENCIES_TOPIC_PARTITIONS` | Services topic number of partitions. | `1` |
 | `KAFKA_STORE_DEPENDENCIES_TOPIC_REPLICATION_FACTOR` | Services topic replication factor. | `1` |
 
-> Use partitions and replication factor when Topics are created by Zipkin. If topics are created manually
-those options are not used.

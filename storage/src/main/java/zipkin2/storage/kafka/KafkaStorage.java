@@ -382,15 +382,15 @@ public class KafkaStorage extends StorageComponent {
     String bootstrapServers = "localhost:19092";
     CompressionType compressionType = CompressionType.NONE;
 
-    String traceStoreStreamAppId = "zipkin-trace-store-v1";
-    String traceAggregationStreamAppId = "zipkin-trace-aggregation-v1";
+    String traceStoreStreamAppId = "zipkin-trace-store";
+    String traceAggregationStreamAppId = "zipkin-trace-aggregation";
     String storeDirectory = "/tmp/zipkin";
 
-    Topic spansTopic = Topic.builder("zipkin-spans-v1").build();
-    Topic tracesTopic = Topic.builder("zipkin-traces-v1")
+    Topic spansTopic = Topic.builder("zipkin-spans").build();
+    Topic tracesTopic = Topic.builder("zipkin-traces")
         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
         .build();
-    Topic dependenciesTopic = Topic.builder("zipkin-dependencies-v1")
+    Topic dependenciesTopic = Topic.builder("zipkin-dependencies")
         .config(TopicConfig.CLEANUP_POLICY_CONFIG, TopicConfig.CLEANUP_POLICY_COMPACT)
         .build();
 

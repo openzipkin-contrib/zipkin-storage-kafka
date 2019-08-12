@@ -33,18 +33,17 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private Long tracesRetentionScanFrequency;
   private Long tracesRetentionPeriod;
   private Long dependenciesRetentionPeriod;
-  private Long dependenciesWindowSize;
   private Long traceInactivityGap;
 
-  private String spansTopic = "zipkin-spans-v1";
+  private String spansTopic = "zipkin-spans";
   private Integer spansTopicPartitions = 1;
   private Short spansTopicReplicationFactor = 1;
 
-  private String tracesTopic = "zipkin-traces-v1";
+  private String tracesTopic = "zipkin-traces";
   private Integer tracesTopicPartitions = 1;
   private Short tracesTopicReplicationFactor = 1;
 
-  private String dependenciesTopic = "zipkin-dependencies-v1";
+  private String dependenciesTopic = "zipkin-dependencies";
   private Integer dependenciesTopicPartitions = 1;
   private Short dependenciesTopicReplicationFactor = 1;
 
@@ -66,9 +65,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     }
     if (tracesRetentionPeriod != null) {
       builder.dependenciesRetentionPeriod(Duration.ofMillis(dependenciesRetentionPeriod));
-    }
-    if (dependenciesWindowSize != null) {
-      builder.dependenciesWindowSize(Duration.ofMillis(dependenciesWindowSize));
     }
 
     return builder
@@ -253,14 +249,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setDependenciesRetentionPeriod(Long dependenciesRetentionPeriod) {
     this.dependenciesRetentionPeriod = dependenciesRetentionPeriod;
-  }
-
-  public Long getDependenciesWindowSize() {
-    return dependenciesWindowSize;
-  }
-
-  public void setDependenciesWindowSize(Long dependenciesWindowSize) {
-    this.dependenciesWindowSize = dependenciesWindowSize;
   }
 
   public Boolean getSpanStoreEnabled() {
