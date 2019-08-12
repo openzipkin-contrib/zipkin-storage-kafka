@@ -162,7 +162,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.dependency-links-topic:zipkin-dependencies-1"
+        "zipkin.storage.kafka.dependencies-topic:zipkin-dependencies-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -176,7 +176,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.dependency-links-topic-partitions:2"
+        "zipkin.storage.kafka.dependencies-topic-partitions:2"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -189,7 +189,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.dependency-links-topic-replication-factor:2"
+        "zipkin.storage.kafka.dependencies-topic-replication-factor:2"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
