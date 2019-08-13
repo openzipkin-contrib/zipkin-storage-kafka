@@ -17,19 +17,17 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.Aggregator;
 import org.apache.kafka.streams.kstream.Consumed;
 import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KeyValueMapper;
 import org.apache.kafka.streams.kstream.Materialized;
 import org.apache.kafka.streams.kstream.Merger;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.kstream.SessionWindows;
+import org.apache.kafka.streams.kstream.ValueMapper;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.internal.DependencyLinker;
@@ -40,7 +38,7 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static org.apache.kafka.streams.kstream.Suppressed.BufferConfig.unbounded;
 import static org.apache.kafka.streams.kstream.Suppressed.untilWindowCloses;
-import static zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde.key;
+import static zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde.linkKey;
 
 /**
  *
@@ -88,9 +86,8 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
     // Downstream to traces topic
     tracesStream.to(tracesTopicName, Produced.with(Serdes.String(), spansSerde));
     // Map to dependency links
-    tracesStream
-        .flatMap(spansToDependencyLinks())
-        .selectKey((key, value) -> key(value))
+    tracesStream.flatMapValues(spansToDependencyLinks())
+        .selectKey((key, value) -> linkKey(value))
         .to(dependencyLinksTopicName, Produced.with(Serdes.String(), dependencyLinkSerde));
     return builder.build();
   }
@@ -109,13 +106,11 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
     };
   }
 
-  KeyValueMapper<String, List<Span>, List<KeyValue<String, DependencyLink>>> spansToDependencyLinks() {
-    return (windowed, spans) -> {
+  ValueMapper<List<Span>, List<DependencyLink>> spansToDependencyLinks() {
+    return (spans) -> {
       if (spans == null) return new ArrayList<>();
       DependencyLinker linker = new DependencyLinker();
-      return linker.putTrace(spans).link().stream()
-          .map(link -> KeyValue.pair(key(link), link))
-          .collect(Collectors.toList());
+      return linker.putTrace(spans).link();
     };
   }
 }

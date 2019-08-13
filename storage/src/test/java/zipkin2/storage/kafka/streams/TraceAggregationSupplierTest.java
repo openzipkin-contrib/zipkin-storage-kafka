@@ -43,7 +43,7 @@ class TraceAggregationSupplierTest {
     // Given: configuration
     String spansTopicName = "spans";
     String tracesTopicName = "traces";
-    String dependencyLinksTopicName = "dependency-links";
+    String dependencyLinksTopicName = "dependencies";
     Duration traceInactivityGap = Duration.ofSeconds(1);
     SpanSerde spanSerde = new SpanSerde();
     SpansSerde spansSerde = new SpansSerde();

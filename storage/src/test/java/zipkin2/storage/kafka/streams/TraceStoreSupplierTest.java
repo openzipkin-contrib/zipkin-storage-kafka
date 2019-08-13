@@ -52,7 +52,7 @@ class TraceStoreSupplierTest {
   @Test void should_persist_stores() {
     // Given: configs
     String tracesTopicName = "traces";
-    String dependencyLinksTopicName = "dependency-links";
+    String dependencyLinksTopicName = "dependencies";
     Duration tracesRetentionScanFrequency = Duration.ofMinutes(1);
     Duration tracesRetentionPeriod = Duration.ofMillis(5);
     Duration dependenciesRetentionPeriod = Duration.ofMinutes(1);
@@ -141,7 +141,7 @@ class TraceStoreSupplierTest {
     Topology topology = new TraceStoreSupplier(
         tracesTopicName,
         dependencyLinksTopicName,
-        Collections.EMPTY_LIST,
+        Collections.emptyList(),
         tracesRetentionScanFrequency,
         tracesRetentionPeriod,
         dependenciesRetentionPeriod,

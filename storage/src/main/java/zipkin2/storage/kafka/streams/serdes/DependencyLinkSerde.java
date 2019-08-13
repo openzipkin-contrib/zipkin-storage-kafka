@@ -24,7 +24,7 @@ import zipkin2.codec.DependencyLinkBytesEncoder;
 public class DependencyLinkSerde implements Serde<DependencyLink> {
   static final String KEY_PATTERN = "%s:%s";
 
-  public static String key(DependencyLink link) {
+  public static String linkKey(DependencyLink link) {
     return String.format(KEY_PATTERN, link.parent(), link.child());
   }
 
