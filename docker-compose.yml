@@ -38,5 +38,6 @@ services:
       KAFKA_STORE_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
       KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
       KAFKA_STORE_TRACES_RETENTION_PERIOD: -1
+      KAFKA_STORE_TRACES_INACTIVITY_GAP: 5000
     depends_on:
       - kafka-zookeeper

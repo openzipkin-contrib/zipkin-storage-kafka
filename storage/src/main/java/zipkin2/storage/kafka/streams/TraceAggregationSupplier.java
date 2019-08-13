@@ -54,18 +54,18 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
   final SpanSerde spanSerde;
   final SpansSerde spansSerde;
   // Config
-  final Duration traceInactivityGap;
+  final Duration tracesInactivityGap;
   final DependencyLinkSerde dependencyLinkSerde;
 
   public TraceAggregationSupplier(
       String spansTopicName,
       String tracesTopicName,
       String dependencyLinksTopicName,
-      Duration traceInactivityGap) {
+      Duration tracesInactivityGap) {
     this.spansTopicName = spansTopicName;
     this.tracesTopicName = tracesTopicName;
     this.dependencyLinksTopicName = dependencyLinksTopicName;
-    this.traceInactivityGap = traceInactivityGap;
+    this.tracesInactivityGap = tracesInactivityGap;
     spanSerde = new SpanSerde();
     spansSerde = new SpansSerde();
     dependencyLinkSerde = new DependencyLinkSerde();
@@ -78,7 +78,7 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
         builder.stream(spansTopicName, Consumed.with(Serdes.String(), spanSerde))
             .groupByKey()
             // how long to wait for another span
-            .windowedBy(SessionWindows.with(traceInactivityGap).grace(Duration.ZERO))
+            .windowedBy(SessionWindows.with(tracesInactivityGap).grace(Duration.ZERO))
             .aggregate(ArrayList::new, aggregateSpans(), joinAggregates(),
                 Materialized.with(Serdes.String(), spansSerde))
             // hold until a new record tells that a window is closed and we can process it further

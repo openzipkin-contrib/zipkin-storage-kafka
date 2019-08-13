@@ -76,7 +76,7 @@ class KafkaStorageIT {
     storage = (KafkaStorage) new KafkaStorage.Builder().ensureTopics(true)
         .bootstrapServers(kafka.getBootstrapServers())
         .storeDirectory("target/zipkin_" + System.currentTimeMillis())
-        .traceInactivityGap(traceInactivityGap)
+        .tracesInactivityGap(traceInactivityGap)
         .build();
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> {

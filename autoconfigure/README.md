@@ -18,7 +18,7 @@
 |---------------|-------------|---------|
 | `KAFKA_STORE_TRACES_RETENTION_SCAN_FREQUENCY` | How often to validate traces retention. This will be evaluated at the time events are received. (ms) | `3600000` (1 hour) |
 | `KAFKA_STORE_TRACES_RETENTION_PERIOD` | How long to keep traces stored. | `604800000` (1 week) |
-| `KAFKA_STORE_TRACE_INACTIVITY_GAP` | How long to wait until a trace is marked as done (ms). This affects dependency links and traces indexed, but query join traces part to complete results. | `30000` (30 seconds) |
+| `KAFKA_STORE_TRACES_INACTIVITY_GAP` | How long to wait until a trace is marked as done (ms). This affects dependency links and traces indexed, but query join traces part to complete results. | `30000` (30 seconds) |
 | `KAFKA_STORE_DEPENDENCIES_RETENTION_PERIOD` | How long to keep dependencies stored. | `604800000` (1 week) |
 
 ## Topics configuration

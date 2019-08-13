@@ -107,7 +107,7 @@ make zipkin-test-multi
 
 ![traces](docs/traces.png)
 
-![dependencies](docs/dependencie.png)
+![dependencies](docs/dependencies.png)
 
 ## Acknowledgments
 

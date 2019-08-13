@@ -11,7 +11,7 @@ zipkin:
       compression-type: ${KAFKA_STORE_COMPRESSION_TYPE:NONE}
       traces-retention-scan-frequency: ${KAFKA_STORE_TRACES_RETENTION_SCAN_FREQUENCY:3600000}
       traces-retention-period: ${KAFKA_STORE_TRACES_RETENTION_PERIOD:604800000}
-      trace-inactivity-gap: ${KAFKA_STORE_TRACE_INACTIVITY_GAP:30000}
+      traces-inactivity-gap: ${KAFKA_STORE_TRACES_INACTIVITY_GAP:30000}
       dependencies-retention-period: ${KAFKA_STORE_DEPENDENCIES_RETENTION_PERIOD:604800000}
       spans-topic: ${KAFKA_STORE_SPANS_TOPIC:zipkin-spans}
       spans-topic-partitions: ${KAFKA_STORE_SPANS_TOPIC_PARTITIONS:1}

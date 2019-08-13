@@ -33,7 +33,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private Long tracesRetentionScanFrequency;
   private Long tracesRetentionPeriod;
   private Long dependenciesRetentionPeriod;
-  private Long traceInactivityGap;
+  private Long tracesInactivityGap;
 
   private String spansTopic = "zipkin-spans";
   private Integer spansTopicPartitions = 1;
@@ -57,8 +57,8 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     if (ensureTopics != null) builder.ensureTopics(ensureTopics);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
     if (compressionType != null) builder.compressionType(compressionType);
-    if (traceInactivityGap != null) {
-      builder.traceInactivityGap(Duration.ofMillis(traceInactivityGap));
+    if (tracesInactivityGap != null) {
+      builder.tracesInactivityGap(Duration.ofMillis(tracesInactivityGap));
     }
     if (tracesRetentionScanFrequency != null) {
       builder.tracesRetentionScanFrequency(Duration.ofMillis(tracesRetentionScanFrequency));
@@ -134,12 +134,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.tracesRetentionPeriod = tracesRetentionPeriod;
   }
 
-  public Long getTraceInactivityGap() {
-    return traceInactivityGap;
+  public Long getTracesInactivityGap() {
+    return tracesInactivityGap;
   }
 
-  public void setTraceInactivityGap(Long traceInactivityGap) {
-    this.traceInactivityGap = traceInactivityGap;
+  public void setTracesInactivityGap(Long tracesInactivityGap) {
+    this.tracesInactivityGap = tracesInactivityGap;
   }
 
   public String getSpansTopic() {

@@ -132,7 +132,7 @@ public class KafkaStorage extends StorageComponent {
         StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
         builder.compressionType.name);
     traceAggregationTopology = new TraceAggregationSupplier(spansTopic.name, tracesTopic.name,
-        dependenciesTopic.name, builder.traceInactivityGap).get();
+        dependenciesTopic.name, builder.tracesInactivityGap).get();
     // Trace Store Stream Topology configuration
     traceStoreStreamConfig = new Properties();
     traceStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
@@ -373,7 +373,7 @@ public class KafkaStorage extends StorageComponent {
 
     Duration tracesRetentionPeriod = Duration.ofDays(7);
     Duration tracesRetentionScanFrequency = Duration.ofHours(1);
-    Duration traceInactivityGap = Duration.ofSeconds(30);
+    Duration tracesInactivityGap = Duration.ofSeconds(30);
     Duration dependenciesRetentionPeriod = Duration.ofDays(7);
     Duration dependenciesWindowSize = Duration.ofMinutes(1);
 
@@ -449,9 +449,9 @@ public class KafkaStorage extends StorageComponent {
     /**
      * How long to wait for a span in order to trigger a trace as completed.
      */
-    public Builder traceInactivityGap(Duration traceInactivityGap) {
-      if (traceInactivityGap == null) throw new NullPointerException("traceInactivityGap == null");
-      this.traceInactivityGap = traceInactivityGap;
+    public Builder tracesInactivityGap(Duration tracesInactivityGap) {
+      if (tracesInactivityGap == null) throw new NullPointerException("tracesInactivityGap == null");
+      this.tracesInactivityGap = tracesInactivityGap;
       return this;
     }
 
