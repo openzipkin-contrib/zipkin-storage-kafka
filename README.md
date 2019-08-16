@@ -83,8 +83,8 @@ And Docker image will be built and Docker compose will start.
 
 There are two examples, running Zipkin with kafka as storage:
 
-+ [Single-node](examples/single-node)
-+ [Multi-mode](examples/multi-mode)
++ [Single-node](docker-compose.yml)
++ [Multi-mode](docker-compose-distributed.yml)
 
 ### Testing
 

@@ -4,6 +4,7 @@ all: build
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
 VERSION := '0.4.1-SNAPSHOT'
+IMAGE_NAME := 'jeqo/zipkin-kafka'
 
 .PHONY: run
 run: build zipkin-local
@@ -11,15 +12,21 @@ run: build zipkin-local
 .PHONY: run-docker
 run-docker: build docker-build docker-up
 
+.PHONY: kafka-topics
+kafka-topics:
+	docker-compose exec kafka-zookeeper /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper localhost:2181 --create --topic zipkin-spans --partitions 1 --replication-factor 1 --if-not-exists
+	docker-compose exec kafka-zookeeper /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper localhost:2181 --create --topic zipkin-traces --partitions 1 --replication-factor 1 --if-not-exists
+	docker-compose exec kafka-zookeeper /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper localhost:2181 --create --topic zipkin-dependencies --partitions 1 --replication-factor 1 --if-not-exists
+
 .PHONY: docker-build
 docker-build:
-	TAG=${VERSION} \
-	docker-compose build
+	docker build -t ${IMAGE_NAME}:latest .
+	docker build -t ${IMAGE_NAME}:${VERSION} .
 
 .PHONY: docker-push
 docker-push: docker-build
-	TAG=${VERSION} \
-	docker-compose push
+	docker push ${IMAGE_NAME}:latest
+	docker push ${IMAGE_NAME}:${VERSION}
 
 .PHONY: docker-up
 docker-up:
@@ -33,7 +40,7 @@ docker-down:
 
 .PHONY: docker-kafka-up
 docker-kafka-up:
-	docker-compose up -d kafka zookeeper
+	docker-compose up -d kafka-zookeeper
 
 .PHONY: license-header
 license-header:
