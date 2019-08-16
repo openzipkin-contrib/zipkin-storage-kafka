@@ -2,23 +2,19 @@
 zipkin:
   storage:
     kafka:
-      span-consumer-enabled: ${KAFKA_STORE_SPAN_CONSUMER_ENABLED:true}
-      span-store-enabled: ${KAFKA_STORE_SPAN_STORE_ENABLED:true}
-      aggregation-enabled: ${KAFKA_STORE_AGGREGATION_ENABLED:true}
-      bootstrap-servers: ${KAFKA_STORE_BOOTSTRAP_SERVERS:localhost:9092}
-      ensure-topics: ${KAFKA_STORE_ENSURE_TOPICS:true}
-      store-directory: ${KAFKA_STORE_DIRECTORY:/tmp/zipkin}
-      compression-type: ${KAFKA_STORE_COMPRESSION_TYPE:NONE}
-      traces-retention-scan-frequency: ${KAFKA_STORE_TRACES_RETENTION_SCAN_FREQUENCY:3600000}
-      traces-retention-period: ${KAFKA_STORE_TRACES_RETENTION_PERIOD:604800000}
-      traces-inactivity-gap: ${KAFKA_STORE_TRACES_INACTIVITY_GAP:30000}
-      dependencies-retention-period: ${KAFKA_STORE_DEPENDENCIES_RETENTION_PERIOD:604800000}
-      spans-topic: ${KAFKA_STORE_SPANS_TOPIC:zipkin-spans}
-      spans-topic-partitions: ${KAFKA_STORE_SPANS_TOPIC_PARTITIONS:1}
-      spans-topic-replication-factor: ${KAFKA_STORE_SPANS_TOPIC_REPLICATION_FACTOR:1}
-      traces-topic: ${KAFKA_STORE_TRACES_TOPIC:zipkin-traces}
-      traces-topic-partitions: ${KAFKA_STORE_TRACES_TOPIC_PARTITIONS:1}
-      traces-topic-replication-factor: ${KAFKA_STORE_TRACES_TOPIC_REPLICATION_FACTOR:1}
-      dependencies-topic: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC:zipkin-dependencies}
-      dependencies-topic-partitions: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC_PARTITIONS:1}
-      dependencies-topic-replication-factor: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC_REPLICATION_FACTOR:1}
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+
+      store-directory: ${KAFKA_STORAGE_DIRECTORY:/tmp/zipkin}
+
+      span-consumer-enabled: ${KAFKA_STORAGE_SPAN_CONSUMER_ENABLED:true}
+      span-store-enabled: ${KAFKA_STORAGE_SPAN_STORE_ENABLED:true}
+      aggregation-enabled: ${KAFKA_STORAGE_AGGREGATION_ENABLED:true}
+
+      traces-retention-scan-frequency: ${KAFKA_STORAGE_TRACES_RETENTION_SCAN_FREQUENCY:3600000}
+      traces-retention-period: ${KAFKA_STORAGE_TRACES_RETENTION_PERIOD:604800000}
+      traces-inactivity-gap: ${KAFKA_STORAGE_TRACES_INACTIVITY_GAP:30000}
+      dependencies-retention-period: ${KAFKA_STORAGE_DEPENDENCIES_RETENTION_PERIOD:604800000}
+
+      spans-topic: ${KAFKA_STORAGE_SPANS_TOPIC:zipkin-spans}
+      traces-topic: ${KAFKA_STORAGE_TRACES_TOPIC:zipkin-traces}
+      dependencies-topic: ${KAFKA_STORAGE_DEPENDENCIES_TOPIC:zipkin-dependencies}

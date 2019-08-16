@@ -78,33 +78,6 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   }
 
   @Test
-  public void canOverridesProperty_ensureTopics() {
-    context = new AnnotationConfigApplicationContext();
-    TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.ensure-topics:false"
-    ).applyTo(context);
-    Access.registerKafka(context);
-    context.refresh();
-
-    assertThat(context.getBean(KafkaStorage.class).ensureTopics).isEqualTo(false);
-  }
-
-  @Test
-  public void canOverridesProperty_compressionType() {
-    context = new AnnotationConfigApplicationContext();
-    TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.compression-type:SNAPPY"
-    ).applyTo(context);
-    Access.registerKafka(context);
-    context.refresh();
-
-    assertThat(context.getBean(KafkaStorage.class).producerConfig.get(
-        ProducerConfig.COMPRESSION_TYPE_CONFIG)).isEqualTo(CompressionType.SNAPPY.name);
-  }
-
-  @Test
   public void canOverridesProperty_storeDirectory() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
@@ -127,35 +100,22 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).spansTopic.name).isEqualTo("zipkin-spans-1");
+    assertThat(context.getBean(KafkaStorage.class).spansTopicName).isEqualTo("zipkin-spans-1");
   }
 
   @Test
-  public void canOverridesProperty_spansTopicPartitions() {
+  public void canOverridesProperty_tracesTopicName() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.spans-topic-partitions:2"
+        "zipkin.storage.kafka.traces-topic:zipkin-traces-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).spansTopic.partitions).isEqualTo(2);
+    assertThat(context.getBean(KafkaStorage.class).tracesTopicName).isEqualTo("zipkin-traces-1");
   }
 
-  @Test
-  public void canOverridesProperty_spansTopicReplicationFactor() {
-    context = new AnnotationConfigApplicationContext();
-    TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.spans-topic-replication-factor:2"
-    ).applyTo(context);
-    Access.registerKafka(context);
-    context.refresh();
-
-    assertThat(context.getBean(KafkaStorage.class).spansTopic.replicationFactor).isEqualTo(
-        (short) 2);
-  }
 
   @Test
   public void canOverridesProperty_dependenciesTopicName() {
@@ -167,35 +127,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.name).isEqualTo(
+    assertThat(context.getBean(KafkaStorage.class).dependenciesTopicName).isEqualTo(
         "zipkin-dependencies-1");
-  }
-
-  @Test
-  public void canOverridesProperty_dependenciesTopicPartitions() {
-    context = new AnnotationConfigApplicationContext();
-    TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.dependencies-topic-partitions:2"
-    ).applyTo(context);
-    Access.registerKafka(context);
-    context.refresh();
-
-    assertThat(context.getBean(KafkaStorage.class).dependenciesTopic.partitions).isEqualTo(2);
-  }
-
-  @Test
-  public void canOverridesProperty_dependenciesTopicReplicationFactor() {
-    context = new AnnotationConfigApplicationContext();
-    TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.dependencies-topic-replication-factor:2"
-    ).applyTo(context);
-    Access.registerKafka(context);
-    context.refresh();
-
-    assertThat(
-        context.getBean(KafkaStorage.class).dependenciesTopic.replicationFactor).isEqualTo(
-        (short) 2);
   }
 }

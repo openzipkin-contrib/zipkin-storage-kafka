@@ -16,10 +16,12 @@ package zipkin2.storage.kafka;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -73,14 +75,19 @@ class KafkaStorageIT {
     if (!kafka.isRunning()) fail();
 
     traceInactivityGap = Duration.ofSeconds(5);
-    storage = (KafkaStorage) new KafkaStorage.Builder().ensureTopics(true)
+    storage = (KafkaStorage) new KafkaStorage.Builder()
         .bootstrapServers(kafka.getBootstrapServers())
         .storeDirectory("target/zipkin_" + System.currentTimeMillis())
         .tracesInactivityGap(traceInactivityGap)
         .build();
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
-      storage.ensureTopics();
+      Collection<NewTopic> newTopics = new ArrayList<>();
+      newTopics.add(new NewTopic(storage.spansTopicName, 1, (short)1));
+      newTopics.add(new NewTopic(storage.tracesTopicName, 1, (short)1));
+      newTopics.add(new NewTopic(storage.dependenciesTopicName, 1, (short)1));
+      storage.getAdminClient().createTopics(newTopics).all().get();
+      storage.checkTopics();
       return storage.topicsValidated;
     });
 
@@ -119,7 +126,7 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: they are partitioned
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopic.name, 2, 10000);
+        testConsumerConfig, storage.spansTopicName, 2, 10000);
     // Given: some time for stream processes to kick in
     Thread.sleep(traceInactivityGap.toMillis() * 2);
     // Given: another span to move 'event time' forward
@@ -132,12 +139,12 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: a trace is published
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopic.name, 1, 1000);
+        testConsumerConfig, storage.spansTopicName, 1, 1000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopic.name, 1, 30000);
+        testConsumerConfig, storage.tracesTopicName, 1, 30000);
     // Then: and a dependency link created
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.dependenciesTopic.name, 1, 1000);
+        testConsumerConfig, storage.dependenciesTopicName, 1, 1000);
   }
 
   @Test void should_return_traces_query() throws Exception {
@@ -153,11 +160,11 @@ class KafkaStorageIT {
         .build();
     List<Span> spans = Arrays.asList(parent, child);
     // When: been published
-    tracesProducer.send(new ProducerRecord<>(storage.tracesTopic.name, parent.traceId(), spans));
+    tracesProducer.send(new ProducerRecord<>(storage.tracesTopicName, parent.traceId(), spans));
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopic.name, 1, 10000);
+        testConsumerConfig, storage.tracesTopicName, 1, 10000);
     // When: and stores running
     SpanStore spanStore = storage.spanStore();
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
@@ -219,7 +226,7 @@ class KafkaStorageIT {
         .build();
     // When: sent first one
     linkProducer.send(
-        new ProducerRecord<>(storage.dependenciesTopic.name, "svc_a:svc_b", link1));
+        new ProducerRecord<>(storage.dependenciesTopicName, "svc_a:svc_b", link1));
     DependencyLink link2 = DependencyLink.newBuilder()
         .parent("svc_a")
         .child("svc_b")
@@ -228,11 +235,11 @@ class KafkaStorageIT {
         .build();
     // When: and another one
     linkProducer.send(
-        new ProducerRecord<>(storage.dependenciesTopic.name, "svc_a:svc_b", link2));
+        new ProducerRecord<>(storage.dependenciesTopicName, "svc_a:svc_b", link2));
     linkProducer.flush();
     // Then: stored in topic
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.dependenciesTopic.name, 2, 10000);
+        testConsumerConfig, storage.dependenciesTopicName, 2, 10000);
     // When: stores running
     SpanStore spanStore = storage.spanStore();
     // Then:

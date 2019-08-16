@@ -34,13 +34,13 @@ class KafkaStorageTest {
     assertNotNull(builder.storeDirectory);
 
     try {
-      builder.spansTopic(null);
+      builder.spansTopicName(null);
       fail();
     } catch (NullPointerException ignored) {
     }
 
     try {
-      builder.dependenciesTopic(null);
+      builder.dependenciesTopicName(null);
       fail();
     } catch (NullPointerException ignored) {
     }
@@ -49,46 +49,6 @@ class KafkaStorageTest {
       builder.storeDirectory(null);
       fail();
     } catch (NullPointerException ignored) {
-    }
-  }
-
-  @Test void topicDefault() {
-    try {
-      KafkaStorage.Topic.builder(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    KafkaStorage.Topic.Builder topicBuilder = KafkaStorage.Topic.builder("topic-1");
-
-    try {
-      topicBuilder.partitions(0);
-      fail();
-    } catch (IllegalArgumentException ignored) {
-    }
-
-    try {
-      topicBuilder.partitions(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    try {
-      topicBuilder.partitions(-1);
-      fail();
-    } catch (IllegalArgumentException ignored) {
-    }
-
-    try {
-      topicBuilder.replicationFactor(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    try {
-      topicBuilder.replicationFactor((short) 0);
-      fail();
-    } catch (IllegalArgumentException ignored) {
     }
   }
 }
