@@ -82,7 +82,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafkastore",
-        "zipkin.storage.kafka.store-directory:/zipkin"
+        "zipkin.storage.kafka.store-dir:/zipkin"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
