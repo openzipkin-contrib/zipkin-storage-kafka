@@ -53,7 +53,7 @@ public class KafkaStorage extends StorageComponent {
   static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
 
   // Kafka Storage modes
-  final boolean spanConsumerEnabled, spanStoreEnabled, aggregationEnabled;
+  final boolean spanConsumerEnabled, searchEnabled;
   // Autocomplete Tags
   final List<String> autocompleteKeys;
   // Kafka Storage configs
@@ -75,8 +75,7 @@ public class KafkaStorage extends StorageComponent {
   KafkaStorage(Builder builder) {
     // Kafka Storage modes
     this.spanConsumerEnabled = builder.spanConsumerEnabled;
-    this.spanStoreEnabled = builder.spanStoreEnabled;
-    this.aggregationEnabled = builder.aggregationEnabled;
+    this.searchEnabled = builder.searchEnabled;
     // Autocomplete tags
     this.autocompleteKeys = builder.autocompleteKeys;
     // Kafka Topics config
@@ -149,8 +148,8 @@ public class KafkaStorage extends StorageComponent {
   @Override
   public SpanConsumer spanConsumer() {
     checkTopics();
-    if (aggregationEnabled) getTraceAggregationStream();
     if (spanConsumerEnabled) {
+      getTraceAggregationStream();
       return new KafkaSpanConsumer(this);
     } else { // NoopSpanConsumer
       return list -> Call.create(null);
@@ -159,7 +158,7 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public ServiceAndSpanNames serviceAndSpanNames() {
-    if (spanStoreEnabled) {
+    if (searchEnabled) {
       return new KafkaSpanStore(this);
     } else { // NoopServiceAndSpanNames
       return new ServiceAndSpanNames() {
@@ -181,8 +180,7 @@ public class KafkaStorage extends StorageComponent {
   @Override
   public SpanStore spanStore() {
     checkTopics();
-    if (aggregationEnabled) getTraceAggregationStream();
-    if (spanStoreEnabled) {
+    if (searchEnabled) {
       return new KafkaSpanStore(this);
     } else { // NoopSpanStore
       return new SpanStore() {
@@ -211,8 +209,7 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public AutocompleteTags autocompleteTags() {
     checkTopics();
-    if (aggregationEnabled) getTraceAggregationStream();
-    if (spanStoreEnabled) {
+    if (searchEnabled) {
       return new KafkaAutocompleteTags(this);
     } else {
       return super.autocompleteTags();
@@ -250,14 +247,14 @@ public class KafkaStorage extends StorageComponent {
     try {
       KafkaFuture<String> maybeClusterId = getAdminClient().describeCluster().clusterId();
       maybeClusterId.get(1, TimeUnit.SECONDS);
-      if (aggregationEnabled) {
+      if (spanConsumerEnabled) {
         KafkaStreams.State state = getTraceAggregationStream().state();
         if (!state.isRunning()) {
           return CheckResult.failed(
               new IllegalStateException("Aggregation stream not running. " + state));
         }
       }
-      if (spanStoreEnabled) {
+      if (searchEnabled) {
         KafkaStreams.State state = getTraceStoreStream().state();
         if (!state.isRunning()) {
           return CheckResult.failed(
@@ -347,8 +344,7 @@ public class KafkaStorage extends StorageComponent {
 
   public static class Builder extends StorageComponent.Builder {
     boolean spanConsumerEnabled = true;
-    boolean spanStoreEnabled = true;
-    boolean aggregationEnabled = true;
+    boolean searchEnabled = true;
 
     List<String> autocompleteKeys = new ArrayList<>();
 
@@ -379,7 +375,7 @@ public class KafkaStorage extends StorageComponent {
 
     @Override
     public Builder searchEnabled(boolean searchEnabled) {
-      this.spanStoreEnabled = searchEnabled;
+      this.searchEnabled = searchEnabled;
       return this;
     }
 
@@ -391,32 +387,12 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * Enable consuming spans from collectors and store them in Kafka topics.
+     * Enable consuming spans from collectors, aggregation, and store them in Kafka topics.
      * <p>
      * When disabled, a NoopSpanConsumer is instantiated to do nothing with incoming spans.
      */
     public Builder spanConsumerEnabled(boolean spanConsumerEnabled) {
       this.spanConsumerEnabled = spanConsumerEnabled;
-      return this;
-    }
-
-    /**
-     * Enable all storage support (traces, services, dependencies)
-     * <p/>
-     * When disabled, a NoopSpanStore is instantiated to return empty lists for all searches.
-     */
-    public Builder spanStoreEnabled(Boolean spanStoreEnabled) {
-      this.spanStoreEnabled = spanStoreEnabled;
-      return this;
-    }
-
-    /**
-     * Enable aggregating spans into traces and traces into dependency links.
-     * <p>
-     * When disabled, no aggregation for Traces or Dependency Links will run.
-     */
-    public Builder aggregationEnabled(boolean aggregationEnabled) {
-      this.aggregationEnabled = aggregationEnabled;
       return this;
     }
 
