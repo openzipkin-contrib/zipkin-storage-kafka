@@ -16,7 +16,7 @@ zipkin:
       spans-topic: ${KAFKA_STORE_SPANS_TOPIC:zipkin-spans}
       spans-topic-partitions: ${KAFKA_STORE_SPANS_TOPIC_PARTITIONS:1}
       spans-topic-replication-factor: ${KAFKA_STORE_SPANS_TOPIC_REPLICATION_FACTOR:1}
-      traces-topic: ${KAFKA_STORE_TRACES_TOPIC:zipkin-span-dependencies}
+      traces-topic: ${KAFKA_STORE_TRACES_TOPIC:zipkin-traces}
       traces-topic-partitions: ${KAFKA_STORE_TRACES_TOPIC_PARTITIONS:1}
       traces-topic-replication-factor: ${KAFKA_STORE_TRACES_TOPIC_REPLICATION_FACTOR:1}
       dependencies-topic: ${KAFKA_STORE_DEPENDENCY_LINKS_TOPIC:zipkin-dependencies}
