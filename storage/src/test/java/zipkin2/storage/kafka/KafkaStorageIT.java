@@ -83,9 +83,9 @@ class KafkaStorageIT {
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       Collection<NewTopic> newTopics = new ArrayList<>();
-      newTopics.add(new NewTopic(storage.spansTopicName, 1, (short)1));
-      newTopics.add(new NewTopic(storage.tracesTopicName, 1, (short)1));
-      newTopics.add(new NewTopic(storage.dependenciesTopicName, 1, (short)1));
+      newTopics.add(new NewTopic(storage.spansTopicName, 1, (short) 1));
+      newTopics.add(new NewTopic(storage.tracesTopicName, 1, (short) 1));
+      newTopics.add(new NewTopic(storage.dependenciesTopicName, 1, (short) 1));
       storage.getAdminClient().createTopics(newTopics).all().get();
       storage.checkTopics();
       return storage.topicsValidated;

@@ -37,7 +37,7 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-class TraceAggregationSupplierTest {
+class AggregationTopologySupplierTest {
 
   @Test void should_aggregate_spans_and_map_dependencies() {
     // Given: configuration
@@ -49,7 +49,7 @@ class TraceAggregationSupplierTest {
     SpansSerde spansSerde = new SpansSerde();
     DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
     // When: topology built
-    Topology topology = new TraceAggregationSupplier(
+    Topology topology = new AggregationTopologySupplier(
         spansTopicName, tracesTopicName, dependencyLinksTopicName, traceInactivityGap).get();
     TopologyDescription description = topology.describe();
     System.out.println("Topology: \n" + description);

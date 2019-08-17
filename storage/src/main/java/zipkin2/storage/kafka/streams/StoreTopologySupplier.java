@@ -47,7 +47,7 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 /**
  * Aggregation and storage of spans into traces.
  */
-public class TraceStoreSupplier implements Supplier<Topology> {
+public class StoreTopologySupplier implements Supplier<Topology> {
   public static final String TRACES_STORE_NAME = "zipkin-traces";
   public static final String SPAN_IDS_BY_TS_STORE_NAME = "zipkin-traces-by-timestamp";
   public static final String SERVICE_NAMES_STORE_NAME = "zipkin-service-names";
@@ -56,7 +56,7 @@ public class TraceStoreSupplier implements Supplier<Topology> {
   public static final String DEPENDENCY_LINKS_STORE_NAME = "zipkin_dependency_links";
   public static final String AUTOCOMPLETE_TAGS_STORE_NAME = "zipkin-autocomplete-tags";
 
-  static final Logger LOG = LoggerFactory.getLogger(TraceStoreSupplier.class);
+  static final Logger LOG = LoggerFactory.getLogger(StoreTopologySupplier.class);
   // Kafka topics
   final String tracesTopic;
   final String dependencyLinksTopic;
@@ -72,7 +72,7 @@ public class TraceStoreSupplier implements Supplier<Topology> {
   final NamesSerde namesSerde;
   final DependencyLinkSerde dependencyLinkSerde;
 
-  public TraceStoreSupplier(String tracesTopic, String dependencyLinksTopic,
+  public StoreTopologySupplier(String tracesTopic, String dependencyLinksTopic,
       List<String> autocompleteKeys, Duration tracesRetentionScanFrequency,
       Duration tracesRetentionPeriod, Duration dependenciesRetentionPeriod,
       Duration dependenciesWindowSize) {
@@ -96,34 +96,27 @@ public class TraceStoreSupplier implements Supplier<Topology> {
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(TRACES_STORE_NAME),
             Serdes.String(),
-            spansSerde
-        ))
+            spansSerde))
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(SPAN_IDS_BY_TS_STORE_NAME),
             Serdes.Long(),
-            spanIdsSerde
-        ))
+            spanIdsSerde))
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(SERVICE_NAMES_STORE_NAME),
             Serdes.String(),
-            Serdes.String()
-        ))
+            Serdes.String()))
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(SPAN_NAMES_STORE_NAME),
             Serdes.String(),
-            namesSerde
-        ))
+            namesSerde))
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(REMOTE_SERVICE_NAMES_STORE_NAME),
             Serdes.String(),
-            namesSerde
-        ))
+            namesSerde))
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(AUTOCOMPLETE_TAGS_STORE_NAME),
             Serdes.String(),
-            namesSerde
-        ));
-
+            namesSerde));
     // Traces stream
     KStream<String, List<Span>> stream = builder
         .stream(tracesTopic, Consumed.with(Serdes.String(), spansSerde));

@@ -19,6 +19,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -32,8 +33,8 @@ import zipkin2.CheckResult;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.storage.*;
-import zipkin2.storage.kafka.streams.TraceAggregationSupplier;
-import zipkin2.storage.kafka.streams.TraceStoreSupplier;
+import zipkin2.storage.kafka.streams.AggregationTopologySupplier;
+import zipkin2.storage.kafka.streams.StoreTopologySupplier;
 
 import java.time.Duration;
 import java.util.*;
@@ -64,8 +65,8 @@ public class KafkaStorage extends StorageComponent {
   final Properties adminConfig;
   final Properties producerConfig;
   // Kafka Streams topology configs
-  final Properties traceAggregationStreamConfig, traceStoreStreamConfig;
-  final Topology traceAggregationTopology, traceStoreTopology;
+  final Properties aggregationStreamConfig, storeStreamConfig;
+  final Topology aggregationTopology, storeTopology;
   // Resources
   volatile AdminClient adminClient;
   volatile Producer<String, byte[]> producer;
@@ -84,54 +85,15 @@ public class KafkaStorage extends StorageComponent {
     this.dependenciesTopicName = builder.dependenciesTopicName;
     // State store directories
     this.storageDirectory = builder.storeDirectory;
-    // Kafka Admin Client configuration
-    adminConfig = new Properties();
-    adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
-    // Kafka Producer configuration
-    producerConfig = new Properties();
-    producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
-    producerConfig.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-    producerConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
-    producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-    //    producerConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, builder.compressionType.name);
-    producerConfig.put(ProducerConfig.BATCH_SIZE_CONFIG, 500_000);
-    producerConfig.put(ProducerConfig.LINGER_MS_CONFIG, 100);
-    // TODO add option to pass producer configs as overrides
-    // Trace Aggregation topology
-    traceAggregationStreamConfig = new Properties();
-    traceAggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG,
-        builder.bootstrapServers);
-    traceAggregationStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
-        Serdes.StringSerde.class);
-    traceAggregationStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
-        Serdes.ByteArraySerde.class);
-    traceAggregationStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
-        builder.traceAggregationStreamAppId);
-    traceAggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, builder.traceStoreDirectory());
-    traceAggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    // TODO check how to apply and make it testeable with exactly once guarantees.
-    // traceAggregationStreamConfig.put(StreamsConfig.PROCESSING_GUARANTEE_CONFIG,
-    //    StreamsConfig.EXACTLY_ONCE);
-    //    traceAggregationStreamConfig.put(
-    //        StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
-    //        builder.compressionType.name);
-    traceAggregationTopology = new TraceAggregationSupplier(spansTopicName, tracesTopicName,
+    // Kafka Configs
+    this.adminConfig = builder.adminConfig;
+    this.producerConfig = builder.producerConfig;
+    this.aggregationStreamConfig = builder.aggregationStreamConfig;
+    this.storeStreamConfig = builder.storeStreamConfig;
+
+    aggregationTopology = new AggregationTopologySupplier(spansTopicName, tracesTopicName,
         dependenciesTopicName, builder.tracesInactivityGap).get();
-    // Trace Store Stream Topology configuration
-    traceStoreStreamConfig = new Properties();
-    traceStoreStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, builder.bootstrapServers);
-    traceStoreStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
-        Serdes.StringSerde.class);
-    traceStoreStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
-        Serdes.ByteArraySerde.class);
-    traceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
-        builder.traceStoreStreamAppId);
-    traceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
-        builder.traceStoreDirectory());
-    //    traceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
-    //        builder.compressionType.name);
-    traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-    traceStoreTopology = new TraceStoreSupplier(
+    storeTopology = new StoreTopologySupplier(
         tracesTopicName,
         dependenciesTopicName,
         autocompleteKeys,
@@ -149,7 +111,7 @@ public class KafkaStorage extends StorageComponent {
   public SpanConsumer spanConsumer() {
     checkTopics();
     if (spanConsumerEnabled) {
-      getTraceAggregationStream();
+      getAggregationStream();
       return new KafkaSpanConsumer(this);
     } else { // NoopSpanConsumer
       return list -> Call.create(null);
@@ -248,14 +210,14 @@ public class KafkaStorage extends StorageComponent {
       KafkaFuture<String> maybeClusterId = getAdminClient().describeCluster().clusterId();
       maybeClusterId.get(1, TimeUnit.SECONDS);
       if (spanConsumerEnabled) {
-        KafkaStreams.State state = getTraceAggregationStream().state();
+        KafkaStreams.State state = getAggregationStream().state();
         if (!state.isRunning()) {
           return CheckResult.failed(
               new IllegalStateException("Aggregation stream not running. " + state));
         }
       }
       if (searchEnabled) {
-        KafkaStreams.State state = getTraceStoreStream().state();
+        KafkaStreams.State state = getStoreStream().state();
         if (!state.isRunning()) {
           return CheckResult.failed(
               new IllegalStateException("Store stream not running. " + state));
@@ -317,11 +279,11 @@ public class KafkaStorage extends StorageComponent {
     return adminClient;
   }
 
-  KafkaStreams getTraceStoreStream() {
+  KafkaStreams getStoreStream() {
     if (traceStoreStream == null) {
       synchronized (this) {
         if (traceStoreStream == null) {
-          traceStoreStream = new KafkaStreams(traceStoreTopology, traceStoreStreamConfig);
+          traceStoreStream = new KafkaStreams(storeTopology, storeStreamConfig);
           traceStoreStream.start();
         }
       }
@@ -329,12 +291,12 @@ public class KafkaStorage extends StorageComponent {
     return traceStoreStream;
   }
 
-  KafkaStreams getTraceAggregationStream() {
+  KafkaStreams getAggregationStream() {
     if (traceAggregationStream == null) {
       synchronized (this) {
         if (traceAggregationStream == null) {
           traceAggregationStream =
-              new KafkaStreams(traceAggregationTopology, traceAggregationStreamConfig);
+              new KafkaStreams(aggregationTopology, aggregationStreamConfig);
           traceAggregationStream.start();
         }
       }
@@ -357,14 +319,49 @@ public class KafkaStorage extends StorageComponent {
     String bootstrapServers = "localhost:19092";
     String storeDirectory = "/tmp/zipkin";
 
+    Properties adminConfig = new Properties();
+    Properties producerConfig = new Properties();
+    Properties aggregationStreamConfig = new Properties();
+    Properties storeStreamConfig = new Properties();
+
     String traceStoreStreamAppId = "zipkin-trace-store";
-    String traceAggregationStreamAppId = "zipkin-trace-aggregation";
+    String aggregationStreamAppId = "zipkin-trace-aggregation";
 
     String spansTopicName = "zipkin-spans";
     String tracesTopicName = "zipkin-traces";
     String dependenciesTopicName = "zipkin-dependencies";
 
     Builder() {
+      // Kafka Admin Client configuration
+      adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+      // Kafka Producer configuration
+      producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+      producerConfig.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+      producerConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
+      producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+      producerConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.SNAPPY.name);
+      producerConfig.put(ProducerConfig.BATCH_SIZE_CONFIG, 500_000);
+      producerConfig.put(ProducerConfig.LINGER_MS_CONFIG, 100);
+      aggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+      aggregationStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
+          Serdes.StringSerde.class);
+      aggregationStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+          Serdes.ByteArraySerde.class);
+      aggregationStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, aggregationStreamAppId);
+      aggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
+      aggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
+      aggregationStreamConfig.put(
+          StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
+          CompressionType.SNAPPY.name);
+      // Trace Store Stream Topology configuration
+      storeStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+      storeStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
+      storeStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
+          Serdes.ByteArraySerde.class);
+      storeStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, traceStoreStreamAppId);
+      storeStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
+      storeStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.SNAPPY.name);
+      storeStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
     }
 
     @Override
@@ -494,6 +491,90 @@ public class KafkaStorage extends StorageComponent {
 
     String traceStoreDirectory() {
       return storeDirectory + "/streams/traces";
+    }
+
+    /**
+     * By default, a consumer will be built from properties derived from builder defaults, as well
+     * as "auto.offset.reset" -> "earliest". Any properties set here will override the consumer
+     * config.
+     *
+     * <p>For example: Only consume spans since you connected by setting the below.
+     *
+     * <pre>{@code
+     * Map<String, String> overrides = new LinkedHashMap<>();
+     * overrides.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+     * builder.overrides(overrides);
+     * }</pre>
+     *
+     * @see org.apache.kafka.clients.consumer.ConsumerConfig
+     */
+    public final Builder adminOverrides(Map<String, ?> overrides) {
+      if (overrides == null) throw new NullPointerException("overrides == null");
+      adminConfig.putAll(overrides);
+      return this;
+    }
+
+    /**
+     * By default, a consumer will be built from properties derived from builder defaults, as well
+     * as "auto.offset.reset" -> "earliest". Any properties set here will override the consumer
+     * config.
+     *
+     * <p>For example: Only consume spans since you connected by setting the below.
+     *
+     * <pre>{@code
+     * Map<String, String> overrides = new LinkedHashMap<>();
+     * overrides.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+     * builder.overrides(overrides);
+     * }</pre>
+     *
+     * @see org.apache.kafka.clients.consumer.ConsumerConfig
+     */
+    public final Builder producerOverrides(Map<String, ?> overrides) {
+      if (overrides == null) throw new NullPointerException("overrides == null");
+      producerConfig.putAll(overrides);
+      return this;
+    }
+
+    /**
+     * By default, a consumer will be built from properties derived from builder defaults, as well
+     * as "auto.offset.reset" -> "earliest". Any properties set here will override the consumer
+     * config.
+     *
+     * <p>For example: Only consume spans since you connected by setting the below.
+     *
+     * <pre>{@code
+     * Map<String, String> overrides = new LinkedHashMap<>();
+     * overrides.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+     * builder.overrides(overrides);
+     * }</pre>
+     *
+     * @see org.apache.kafka.clients.consumer.ConsumerConfig
+     */
+    public final Builder aggregationStreamOverrides(Map<String, ?> overrides) {
+      if (overrides == null) throw new NullPointerException("overrides == null");
+      aggregationStreamConfig.putAll(overrides);
+      return this;
+    }
+
+    /**
+     * By default, a consumer will be built from properties derived from builder defaults, as well
+     * as "auto.offset.reset" -> "earliest". Any properties set here will override the consumer
+     * config.
+     *
+     * <p>For example: Only consume spans since you connected by setting the below.
+     *
+     * <pre>{@code
+     * Map<String, String> overrides = new LinkedHashMap<>();
+     * overrides.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+     * builder.overrides(overrides);
+     * }</pre>
+     *
+     * @see org.apache.kafka.clients.consumer.ConsumerConfig
+     */
+    public final Builder storeStreamOverrides(Map<String, ?> overrides) {
+      if (overrides == null) throw new NullPointerException("overrides == null");
+      storeStreamConfig.putAll(overrides);
+      return this;
     }
 
     @Override

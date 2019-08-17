@@ -34,12 +34,12 @@ import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.kafka.internal.KafkaStreamsStoreCall;
 
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.DEPENDENCY_LINKS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SPAN_IDS_BY_TS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.TRACES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.DEPENDENCY_LINKS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.SPAN_IDS_BY_TS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.SPAN_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.TRACES_STORE_NAME;
 
 /**
  * Span store backed by Kafka Stream State Stores.
@@ -50,49 +50,49 @@ import static zipkin2.storage.kafka.streams.TraceStoreSupplier.TRACES_STORE_NAME
 public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
   // Kafka Streams Store provider
-  final KafkaStreams traceStoreStream;
+  final KafkaStreams storeStream;
 
   KafkaSpanStore(KafkaStorage storage) {
-    traceStoreStream = storage.getTraceStoreStream();
+    storeStream = storage.getStoreStream();
   }
 
   @Override public Call<List<List<Span>>> getTraces(QueryRequest request) {
     ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
-        traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+        storeStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
     ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore =
-        traceStoreStream.store(SPAN_IDS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
+        storeStream.store(SPAN_IDS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
     return new GetTracesCall(tracesStore, traceIdsByTsStore, request);
   }
 
   @Override
   public Call<List<Span>> getTrace(String traceId) {
     ReadOnlyKeyValueStore<String, List<Span>> traceStore =
-        traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+        storeStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
     return new GetTraceCall(traceStore, traceId);
   }
 
   @Deprecated @Override public Call<List<String>> getServiceNames() {
     ReadOnlyKeyValueStore<String, String> serviceStore =
-        traceStoreStream.store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+        storeStream.store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
     return new GetServiceNamesCall(serviceStore);
   }
 
   @Deprecated @Override public Call<List<String>> getSpanNames(String serviceName) {
     ReadOnlyKeyValueStore<String, Set<String>> spanNamesStore =
-        traceStoreStream.store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+        storeStream.store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
     return new GetSpanNamesCall(spanNamesStore, serviceName);
   }
 
   @Override public Call<List<String>> getRemoteServiceNames(String serviceName) {
     ReadOnlyKeyValueStore<String, Set<String>> remoteServiceNamesStore =
-        traceStoreStream.store(REMOTE_SERVICE_NAMES_STORE_NAME,
+        storeStream.store(REMOTE_SERVICE_NAMES_STORE_NAME,
             QueryableStoreTypes.keyValueStore());
     return new GetRemoteServiceNamesCall(remoteServiceNamesStore, serviceName);
   }
 
   @Override public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
     ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore =
-        traceStoreStream.store(DEPENDENCY_LINKS_STORE_NAME,
+        storeStream.store(DEPENDENCY_LINKS_STORE_NAME,
             QueryableStoreTypes.windowStore());
     return new GetDependenciesCall(endTs, lookback, dependenciesStore);
   }

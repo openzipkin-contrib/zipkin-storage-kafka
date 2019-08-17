@@ -13,8 +13,9 @@
  */
 package zipkin2.storage.kafka;
 
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
-import org.apache.kafka.common.record.CompressionType;
+import org.apache.kafka.streams.StreamsConfig;
 import org.junit.After;
 import org.junit.Rule;
 import org.junit.Test;
@@ -78,6 +79,61 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   }
 
   @Test
+  public void canOverridesProperty_adminConfigs() {
+    context = new AnnotationConfigApplicationContext();
+    TestPropertyValues.of(
+        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.kafka.admin-overrides.bootstrap.servers:host1:19092"
+    ).applyTo(context);
+    Access.registerKafka(context);
+    context.refresh();
+
+    assertThat(context.getBean(KafkaStorage.class).adminConfig.get(
+        AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG)).isEqualTo("host1:19092");
+  }
+
+  @Test
+  public void canOverridesProperty_producerConfigs() {
+    context = new AnnotationConfigApplicationContext();
+    TestPropertyValues.of(
+        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.kafka.producer-overrides.acks:1"
+    ).applyTo(context);
+    Access.registerKafka(context);
+    context.refresh();
+
+    assertThat(context.getBean(KafkaStorage.class).producerConfig.get(
+        ProducerConfig.ACKS_CONFIG)).isEqualTo("1");
+  }
+  @Test
+  public void canOverridesProperty_aggregationStreamConfigs() {
+    context = new AnnotationConfigApplicationContext();
+    TestPropertyValues.of(
+        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.kafka.aggregation-stream-overrides.application.id:agg1"
+    ).applyTo(context);
+    Access.registerKafka(context);
+    context.refresh();
+
+    assertThat(context.getBean(KafkaStorage.class).aggregationStreamConfig.get(
+        StreamsConfig.APPLICATION_ID_CONFIG)).isEqualTo("agg1");
+  }
+
+  @Test
+  public void canOverridesProperty_storeStreamConfigs() {
+    context = new AnnotationConfigApplicationContext();
+    TestPropertyValues.of(
+        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.kafka.store-stream-overrides.application.id:store1"
+    ).applyTo(context);
+    Access.registerKafka(context);
+    context.refresh();
+
+    assertThat(context.getBean(KafkaStorage.class).storeStreamConfig.get(
+        StreamsConfig.APPLICATION_ID_CONFIG)).isEqualTo("store1");
+  }
+
+  @Test
   public void canOverridesProperty_storeDirectory() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
@@ -115,7 +171,6 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
 
     assertThat(context.getBean(KafkaStorage.class).tracesTopicName).isEqualTo("zipkin-traces-1");
   }
-
 
   @Test
   public void canOverridesProperty_dependenciesTopicName() {

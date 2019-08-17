@@ -15,6 +15,8 @@ package zipkin2.autoconfigure.storage.kafka;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import zipkin2.storage.kafka.KafkaStorage;
 
@@ -37,6 +39,14 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private String storeDir;
 
+  /**
+   * Additional Kafka configuration.
+   */
+  private Map<String, String> adminOverrides = new LinkedHashMap<>();
+  private Map<String, String> producerOverrides = new LinkedHashMap<>();
+  private Map<String, String> aggregationStreamOverrides = new LinkedHashMap<>();
+  private Map<String, String> storeStreamOverrides = new LinkedHashMap<>();
+
   KafkaStorage.Builder toBuilder() {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
     if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
@@ -57,6 +67,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     if (spansTopic != null) builder.spansTopicName(spansTopic);
     if (tracesTopic != null) builder.tracesTopicName(tracesTopic);
     if (dependenciesTopic != null) builder.dependenciesTopicName(dependenciesTopic);
+    if (adminOverrides != null) builder.adminOverrides(adminOverrides);
+    if (producerOverrides != null) builder.producerOverrides(producerOverrides);
+    if (aggregationStreamOverrides != null) {
+      builder.aggregationStreamOverrides(aggregationStreamOverrides);
+    }
+    if (storeStreamOverrides != null) builder.storeStreamOverrides(storeStreamOverrides);
 
     return builder;
   }
@@ -143,5 +159,39 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setDependenciesRetentionPeriod(Long dependenciesRetentionPeriod) {
     this.dependenciesRetentionPeriod = dependenciesRetentionPeriod;
+  }
+
+  public Map<String, String> getAdminOverrides() {
+    return adminOverrides;
+  }
+
+  public void setAdminOverrides(Map<String, String> adminOverrides) {
+    this.adminOverrides = adminOverrides;
+  }
+
+  public Map<String, String> getProducerOverrides() {
+    return producerOverrides;
+  }
+
+  public void setProducerOverrides(Map<String, String> producerOverrides) {
+    this.producerOverrides = producerOverrides;
+  }
+
+  public Map<String, String> getAggregationStreamOverrides() {
+    return aggregationStreamOverrides;
+  }
+
+  public void setAggregationStreamOverrides(
+      Map<String, String> aggregationStreamOverrides) {
+    this.aggregationStreamOverrides = aggregationStreamOverrides;
+  }
+
+  public Map<String, String> getStoreStreamOverrides() {
+    return storeStreamOverrides;
+  }
+
+  public void setStoreStreamOverrides(
+      Map<String, String> storeStreamOverrides) {
+    this.storeStreamOverrides = storeStreamOverrides;
   }
 }

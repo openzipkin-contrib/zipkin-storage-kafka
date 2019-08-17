@@ -40,14 +40,14 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.DEPENDENCY_LINKS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SPAN_IDS_BY_TS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.SPAN_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreSupplier.TRACES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.DEPENDENCY_LINKS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.SPAN_IDS_BY_TS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.SPAN_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.StoreTopologySupplier.TRACES_STORE_NAME;
 
-class TraceStoreSupplierTest {
+class StoreTopologySupplierTest {
 
   @Test void should_persist_stores() {
     // Given: configs
@@ -60,7 +60,7 @@ class TraceStoreSupplierTest {
     List<String> autocompleteKeys = Collections.singletonList("environment");
     SpansSerde spansSerde = new SpansSerde();
     // When: topology provided
-    Topology topology = new TraceStoreSupplier(
+    Topology topology = new StoreTopologySupplier(
         tracesTopicName,
         dependencyLinksTopicName,
         autocompleteKeys,
@@ -138,7 +138,7 @@ class TraceStoreSupplierTest {
     Duration dependenciesRetentionPeriod = Duration.ofMinutes(1);
     Duration dependenciesWindowSize = Duration.ofMillis(100);
     // When: topology created
-    Topology topology = new TraceStoreSupplier(
+    Topology topology = new StoreTopologySupplier(
         tracesTopicName,
         dependencyLinksTopicName,
         Collections.emptyList(),

@@ -43,7 +43,7 @@ import static zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde.linkKey;
 /**
  *
  */
-public class TraceAggregationSupplier implements Supplier<Topology> {
+public class AggregationTopologySupplier implements Supplier<Topology> {
   // Kafka topics
   final String spansTopicName;
   final String tracesTopicName;
@@ -55,7 +55,7 @@ public class TraceAggregationSupplier implements Supplier<Topology> {
   final Duration tracesInactivityGap;
   final DependencyLinkSerde dependencyLinkSerde;
 
-  public TraceAggregationSupplier(
+  public AggregationTopologySupplier(
       String spansTopicName,
       String tracesTopicName,
       String dependencyLinksTopicName,
