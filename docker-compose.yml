@@ -28,11 +28,10 @@ services:
     ports:
       - 9411:9411
     environment:
-      KAFKA_STORE_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
-      KAFKA_STORE_DIRECTORY: /data
-      KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
-      KAFKA_STORE_TRACES_RETENTION_PERIOD: -1
-      KAFKA_STORE_TRACES_INACTIVITY_GAP: 5000
+      KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
+      KAFKA_STORAGE_DIR: /data
+      KAFKA_STORAGE_TRACES_RETENTION_PERIOD: -1
+      KAFKA_STORAGE_TRACES_INACTIVITY_GAP: 5000
     volumes:
       - zipkin:/data
 volumes:

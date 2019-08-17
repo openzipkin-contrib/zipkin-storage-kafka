@@ -28,11 +28,8 @@ services:
     ports:
       - 9411:9411
     environment:
-      KAFKA_STORE_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
-      KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
-      KAFKA_STORE_SPAN_CONSUMER_ENABLED: 'true'
-      KAFKA_STORE_AGGREGATION_ENABLED: 'true'
-      KAFKA_STORE_SPAN_STORE_ENABLED: 'false'
+      KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
+      KAFKA_STORAGE_SPAN_CONSUMER_ENABLED: 'true'
       QUERY_ENABLED: 'false'
   zipkin-storage:
     image: jeqo/zipkin-kafka
@@ -40,14 +37,10 @@ services:
     ports:
       - 9412:9411
     environment:
-      KAFKA_STORE_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
-      KAFKA_STORE_COMPRESSION_TYPE: SNAPPY
-      KAFKA_STORE_SPAN_CONSUMER_ENABLED: 'false'
-      KAFKA_STORE_AGGREGATION_ENABLED: 'false'
-      KAFKA_STORE_SPAN_STORE_ENABLED: 'true'
-      KAFKA_STORE_DIRECTORY: /data
-      KAFKA_STORE_TRACES_RETENTION_PERIOD: -1
-      KAFKA_STORE_TRACES_INACTIVITY_GAP: 5000
+      KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
+      KAFKA_STORAGE_SPAN_CONSUMER_ENABLED: 'false'
+      KAFKA_STORAGE_TRACES_RETENTION_PERIOD: -1
+      KAFKA_STORAGE_TRACES_INACTIVITY_GAP: 5000
     volumes:
       - zipkin:/data
 volumes:

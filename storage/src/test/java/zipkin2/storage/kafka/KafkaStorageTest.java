@@ -31,7 +31,7 @@ class KafkaStorageTest {
 
   @Test void buildDefaultBuilder() {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
-    assertNotNull(builder.storeDirectory);
+    assertNotNull(builder.storeDir);
 
     try {
       builder.spansTopicName(null);

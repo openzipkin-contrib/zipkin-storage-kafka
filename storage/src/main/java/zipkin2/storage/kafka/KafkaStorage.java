@@ -84,7 +84,7 @@ public class KafkaStorage extends StorageComponent {
     this.tracesTopicName = builder.tracesTopicName;
     this.dependenciesTopicName = builder.dependenciesTopicName;
     // State store directories
-    this.storageDirectory = builder.storeDirectory;
+    this.storageDirectory = builder.storeDir;
     // Kafka Configs
     this.adminConfig = builder.adminConfig;
     this.producerConfig = builder.producerConfig;
@@ -316,14 +316,14 @@ public class KafkaStorage extends StorageComponent {
     Duration dependenciesRetentionPeriod = Duration.ofDays(7);
     Duration dependenciesWindowSize = Duration.ofMinutes(1);
 
-    String bootstrapServers = "localhost:19092";
-    String storeDirectory = "/tmp/zipkin";
+    String storeDir = "/tmp/zipkin";
 
     Properties adminConfig = new Properties();
     Properties producerConfig = new Properties();
     Properties aggregationStreamConfig = new Properties();
     Properties storeStreamConfig = new Properties();
 
+    //TODO expose as configs
     String traceStoreStreamAppId = "zipkin-trace-store";
     String aggregationStreamAppId = "zipkin-trace-aggregation";
 
@@ -332,17 +332,13 @@ public class KafkaStorage extends StorageComponent {
     String dependenciesTopicName = "zipkin-dependencies";
 
     Builder() {
-      // Kafka Admin Client configuration
-      adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
       // Kafka Producer configuration
-      producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
       producerConfig.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
       producerConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
       producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
       producerConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.SNAPPY.name);
       producerConfig.put(ProducerConfig.BATCH_SIZE_CONFIG, 500_000);
       producerConfig.put(ProducerConfig.LINGER_MS_CONFIG, 100);
-      aggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
       aggregationStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
           Serdes.StringSerde.class);
       aggregationStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
@@ -354,7 +350,6 @@ public class KafkaStorage extends StorageComponent {
           StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
           CompressionType.SNAPPY.name);
       // Trace Store Stream Topology configuration
-      storeStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
       storeStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.StringSerde.class);
       storeStreamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
           Serdes.ByteArraySerde.class);
@@ -409,7 +404,10 @@ public class KafkaStorage extends StorageComponent {
      */
     public Builder bootstrapServers(String bootstrapServers) {
       if (bootstrapServers == null) throw new NullPointerException("bootstrapServers == null");
-      this.bootstrapServers = bootstrapServers;
+      adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+      producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+      aggregationStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+      storeStreamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
       return this;
     }
 
@@ -453,7 +451,7 @@ public class KafkaStorage extends StorageComponent {
      */
     public Builder storeDirectory(String storeDirectory) {
       if (storeDirectory == null) throw new NullPointerException("storageDirectory == null");
-      this.storeDirectory = storeDirectory;
+      this.storeDir = storeDirectory;
       return this;
     }
 
@@ -490,7 +488,7 @@ public class KafkaStorage extends StorageComponent {
     }
 
     String traceStoreDirectory() {
-      return storeDirectory + "/streams/traces";
+      return storeDir + "/streams/traces";
     }
 
     /**
