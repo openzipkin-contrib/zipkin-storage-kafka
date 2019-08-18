@@ -6,9 +6,9 @@
 |---------------|-------------|---------|
 | `KAFKA_BOOTSTRAP_SERVERS` | Kafka bootstrap servers | `localhost:9092` |
 | `KAFKA_STORAGE_DIR` | Root path where Zipkin stores tracing data | `/data` |
-| `KAFKA_STORAGE_SPANS_TOPIC` | Topic where incoming spans are stored. | `zipkin-spans` |
-| `KAFKA_STORAGE_TRACES_TOPIC` | Topic where aggregated traces are stored. | `zipkin-traces` |
-| `KAFKA_STORAGE_DEPENDENCIES_TOPIC` | Topic where aggregated service dependencies names are stored. | `zipkin-dependencies` |
+| `KAFKA_SPANS_TOPIC` | Topic where incoming spans are stored. | `zipkin-spans` |
+| `KAFKA_TRACES_TOPIC` | Topic where aggregated traces are stored. | `zipkin-traces` |
+| `KAFKA_DEPENDENCIES_TOPIC` | Topic where aggregated service dependencies names are stored. | `zipkin-dependencies` |
 
 ## Storage durations and timeouts
 

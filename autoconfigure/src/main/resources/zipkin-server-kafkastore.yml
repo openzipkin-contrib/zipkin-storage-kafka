@@ -4,9 +4,9 @@ zipkin:
     kafka:
       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
-      spans-topic: ${KAFKA_STORAGE_SPANS_TOPIC:zipkin-spans}
-      traces-topic: ${KAFKA_STORAGE_TRACES_TOPIC:zipkin-traces}
-      dependencies-topic: ${KAFKA_STORAGE_DEPENDENCIES_TOPIC:zipkin-dependencies}
+      spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
+      traces-topic: ${KAFKA_TRACES_TOPIC:zipkin-traces}
+      dependencies-topic: ${KAFKA_DEPENDENCIES_TOPIC:zipkin-dependencies}
 
       store-dir: ${KAFKA_STORAGE_DIR:/data}
 
@@ -17,4 +17,3 @@ zipkin:
       traces-inactivity-gap: ${KAFKA_STORAGE_TRACES_INACTIVITY_GAP:30000}
 
       dependencies-retention-period: ${KAFKA_STORAGE_DEPENDENCIES_RETENTION_PERIOD:604800000}
-
