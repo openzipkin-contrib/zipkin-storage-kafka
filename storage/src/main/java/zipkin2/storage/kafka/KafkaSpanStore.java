@@ -128,7 +128,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public List<String> query() {
-      if (serviceName == null || serviceName.equals("all")) return new ArrayList<>();
+      if (serviceName == null) return new ArrayList<>();
       Set<String> spanNamesSet = spanNamesStore.get(serviceName);
       if (spanNamesSet == null) return new ArrayList<>();
       List<String> spanNames = new ArrayList<>(spanNamesSet);
@@ -153,11 +153,12 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public List<String> query() {
-      if (serviceName == null || serviceName.equals("all")) return new ArrayList<>();
+      if (serviceName == null) return new ArrayList<>();
       Set<String> remoteServiceNamesSet = remoteServiceNamesStore.get(serviceName);
       if (remoteServiceNamesSet == null) return new ArrayList<>();
       List<String> remoteServiceNames = new ArrayList<>(remoteServiceNamesSet);
-      Collections.sort(remoteServiceNames); // Comply with Zipkin API
+      // comply with Zipkin API as service names are required to be ordered lexicographically
+      Collections.sort(remoteServiceNames);
       return remoteServiceNames;
     }
 
