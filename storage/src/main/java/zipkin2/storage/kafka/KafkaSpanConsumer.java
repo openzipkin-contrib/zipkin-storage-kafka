@@ -83,19 +83,18 @@ public class KafkaSpanConsumer implements SpanConsumer {
     }
 
     @Override
+    @SuppressWarnings("FutureReturnValueIgnored")
     protected Void doExecute() throws IOException {
       AwaitableCallback callback = new AwaitableCallback();
-      Future<RecordMetadata> ignored = kafkaProducer.send(new ProducerRecord<>(topic, key, value),
-          new CallbackAdapter(callback));
+      kafkaProducer.send(new ProducerRecord<>(topic, key, value), new CallbackAdapter(callback));
       callback.await();
       return null;
     }
 
     @Override
+    @SuppressWarnings("FutureReturnValueIgnored")
     protected void doEnqueue(Callback<Void> callback) {
-      Future<RecordMetadata> ignored =
-          kafkaProducer.send(new ProducerRecord<>(topic, key, value),
-              new CallbackAdapter(callback));
+      kafkaProducer.send(new ProducerRecord<>(topic, key, value), new CallbackAdapter(callback));
     }
 
     @Override public Call<Void> clone() {
