@@ -33,13 +33,9 @@ import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.Stores;
-import org.apache.kafka.streams.state.WindowStore;
-import org.apache.kafka.streams.state.WindowStoreIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import zipkin2.DependencyLink;
 import zipkin2.Span;
-import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.NamesSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanIdsSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
@@ -47,46 +43,36 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 /**
  * Aggregation and storage of spans into traces.
  */
-public class StoreTopologySupplier implements Supplier<Topology> {
+public class TraceStoreTopologySupplier implements Supplier<Topology> {
   public static final String TRACES_STORE_NAME = "zipkin-traces";
   public static final String SPAN_IDS_BY_TS_STORE_NAME = "zipkin-traces-by-timestamp";
   public static final String SERVICE_NAMES_STORE_NAME = "zipkin-service-names";
   public static final String SPAN_NAMES_STORE_NAME = "zipkin-span-names";
   public static final String REMOTE_SERVICE_NAMES_STORE_NAME = "zipkin-remote-service-names";
-  public static final String DEPENDENCY_LINKS_STORE_NAME = "zipkin_dependency_links";
   public static final String AUTOCOMPLETE_TAGS_STORE_NAME = "zipkin-autocomplete-tags";
 
-  static final Logger LOG = LoggerFactory.getLogger(StoreTopologySupplier.class);
+  static final Logger LOG = LoggerFactory.getLogger(TraceStoreTopologySupplier.class);
   // Kafka topics
-  final String tracesTopic;
-  final String dependencyLinksTopic;
+  final String spanTopicName;
   // Limits
   final List<String> autocompleteKeys;
   final Duration tracesRetentionScanFrequency;
   final Duration tracesRetentionPeriod;
-  final Duration dependenciesRetentionPeriod;
-  final Duration dependenciesWindowSize;
   // SerDes
   final SpansSerde spansSerde;
   final SpanIdsSerde spanIdsSerde;
   final NamesSerde namesSerde;
-  final DependencyLinkSerde dependencyLinkSerde;
 
-  public StoreTopologySupplier(String tracesTopic, String dependencyLinksTopic,
+  public TraceStoreTopologySupplier(String spanTopicName,
       List<String> autocompleteKeys, Duration tracesRetentionScanFrequency,
-      Duration tracesRetentionPeriod, Duration dependenciesRetentionPeriod,
-      Duration dependenciesWindowSize) {
-    this.tracesTopic = tracesTopic;
-    this.dependencyLinksTopic = dependencyLinksTopic;
+      Duration tracesRetentionPeriod) {
+    this.spanTopicName = spanTopicName;
     this.autocompleteKeys = autocompleteKeys;
     this.tracesRetentionScanFrequency = tracesRetentionScanFrequency;
     this.tracesRetentionPeriod = tracesRetentionPeriod;
-    this.dependenciesRetentionPeriod = dependenciesRetentionPeriod;
-    this.dependenciesWindowSize = dependenciesWindowSize;
     spansSerde = new SpansSerde();
     spanIdsSerde = new SpanIdsSerde();
     namesSerde = new NamesSerde();
-    dependencyLinkSerde = new DependencyLinkSerde();
   }
 
   @Override public Topology get() {
@@ -118,10 +104,10 @@ public class StoreTopologySupplier implements Supplier<Topology> {
             Serdes.String(),
             namesSerde));
     // Traces stream
-    KStream<String, List<Span>> stream = builder
-        .stream(tracesTopic, Consumed.with(Serdes.String(), spansSerde));
+    KStream<String, List<Span>> traceStream = builder
+        .stream(spanTopicName, Consumed.with(Serdes.String(), spansSerde));
     // Store traces
-    stream
+    traceStream
         .process(() -> new Processor<String, List<Span>>() {
           ProcessorContext context;
           // Actual traces store
@@ -171,17 +157,13 @@ public class StoreTopologySupplier implements Supplier<Topology> {
             if (!spans.isEmpty()) {
               // Persist traces
               List<Span> currentSpans = tracesStore.get(traceId);
-              if (currentSpans == null) {
-                currentSpans = new ArrayList<>();
-              }
+              if (currentSpans == null) currentSpans = new ArrayList<>();
               currentSpans.addAll(spans);
               tracesStore.put(traceId, currentSpans);
               // Persist timestamp indexed span ids
               long timestamp = spans.get(0).timestamp();
               Set<String> currentSpanIds = spanIdsByTsStore.get(timestamp);
-              if (currentSpanIds == null) {
-                currentSpanIds = new HashSet<>();
-              }
+              if (currentSpanIds == null) currentSpanIds = new HashSet<>();
               currentSpanIds.add(traceId);
               spanIdsByTsStore.put(timestamp, currentSpanIds);
             }
@@ -191,7 +173,7 @@ public class StoreTopologySupplier implements Supplier<Topology> {
           }
         }, TRACES_STORE_NAME, SPAN_IDS_BY_TS_STORE_NAME);
     // Store service, span and remote service names
-    stream.process(() -> new Processor<String, List<Span>>() {
+    traceStream.process(() -> new Processor<String, List<Span>>() {
           KeyValueStore<String, String> serviceNameStore;
           KeyValueStore<String, Set<String>> spanNamesStore;
           KeyValueStore<String, Set<String>> remoteServiceNamesStore;
@@ -250,63 +232,6 @@ public class StoreTopologySupplier implements Supplier<Topology> {
         SPAN_NAMES_STORE_NAME,
         REMOTE_SERVICE_NAMES_STORE_NAME,
         AUTOCOMPLETE_TAGS_STORE_NAME);
-
-    // Dependency links window store
-    builder.addStateStore(Stores.windowStoreBuilder(
-        Stores.persistentWindowStore(
-            DEPENDENCY_LINKS_STORE_NAME,
-            dependenciesRetentionPeriod,
-            dependenciesWindowSize,
-            false),
-        Serdes.String(),
-        dependencyLinkSerde
-    ));
-    // Consume dependency links stream
-    builder.stream(dependencyLinksTopic, Consumed.with(Serdes.String(), dependencyLinkSerde))
-        // Storage
-        .process(() -> new Processor<String, DependencyLink>() {
-          ProcessorContext context;
-          WindowStore<String, DependencyLink> dependencyLinksStore;
-
-          @Override
-          public void init(ProcessorContext context) {
-            this.context = context;
-            dependencyLinksStore =
-                (WindowStore<String, DependencyLink>) context.getStateStore(
-                    DEPENDENCY_LINKS_STORE_NAME);
-          }
-
-          @Override
-          public void process(String linkKey, DependencyLink link) {
-            // Event time
-            Instant now = Instant.ofEpochMilli(context.timestamp());
-            Instant from = now.minus(dependenciesWindowSize);
-            WindowStoreIterator<DependencyLink> currentLinkWindow =
-                dependencyLinksStore.fetch(linkKey, from, now);
-            // Get latest window. Only two are possible.
-            KeyValue<Long, DependencyLink> windowAndValue = null;
-            if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
-            if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
-            // Persist dependency link per window
-            if (windowAndValue != null) {
-              DependencyLink currentLink = windowAndValue.value;
-              DependencyLink build = currentLink.toBuilder()
-                  .callCount(currentLink.callCount() + link.callCount())
-                  .errorCount(currentLink.errorCount() + link.errorCount())
-                  .build();
-              dependencyLinksStore.put(
-                  linkKey,
-                  build,
-                  windowAndValue.key);
-            } else {
-              dependencyLinksStore.put(linkKey, link);
-            }
-          }
-
-          @Override
-          public void close() {
-          }
-        }, DEPENDENCY_LINKS_STORE_NAME);
 
     return builder.build();
   }

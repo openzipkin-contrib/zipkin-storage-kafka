@@ -24,54 +24,43 @@ import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.TopologyDescription;
 import org.apache.kafka.streams.TopologyTestDriver;
-import org.apache.kafka.streams.kstream.Windowed;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.state.WindowStore;
-import org.apache.kafka.streams.state.WindowStoreIterator;
 import org.apache.kafka.streams.test.ConsumerRecordFactory;
 import org.junit.jupiter.api.Test;
-import zipkin2.DependencyLink;
 import zipkin2.Endpoint;
 import zipkin2.Span;
-import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static zipkin2.storage.kafka.streams.StoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.StoreTopologySupplier.DEPENDENCY_LINKS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.StoreTopologySupplier.SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.StoreTopologySupplier.SPAN_IDS_BY_TS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.StoreTopologySupplier.SPAN_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.StoreTopologySupplier.TRACES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_IDS_BY_TS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_STORE_NAME;
 
-class StoreTopologySupplierTest {
+class TraceStoreTopologySupplierTest {
 
   @Test void should_persist_stores() {
     // Given: configs
-    String tracesTopicName = "traces";
-    String dependencyLinksTopicName = "dependencies";
+    String spanTopicName = "zipkin-span";
     Duration tracesRetentionScanFrequency = Duration.ofMinutes(1);
     Duration tracesRetentionPeriod = Duration.ofMillis(5);
-    Duration dependenciesRetentionPeriod = Duration.ofMinutes(1);
-    Duration dependenciesWindowSize = Duration.ofMillis(100);
     List<String> autocompleteKeys = Collections.singletonList("environment");
     SpansSerde spansSerde = new SpansSerde();
     // When: topology provided
-    Topology topology = new StoreTopologySupplier(
-        tracesTopicName,
-        dependencyLinksTopicName,
+    Topology topology = new TraceStoreTopologySupplier(
+        spanTopicName,
         autocompleteKeys,
         tracesRetentionScanFrequency,
-        tracesRetentionPeriod,
-        dependenciesRetentionPeriod,
-        dependenciesWindowSize).get();
+        tracesRetentionPeriod
+    ).get();
     TopologyDescription description = topology.describe();
     System.out.println("Topology: \n" + description);
     // Then: 2 threads prepared
-    assertEquals(2, description.subtopologies().size());
+    assertEquals(1, description.subtopologies().size());
     // Given: streams config
     Properties props = new Properties();
     props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
@@ -81,7 +70,7 @@ class StoreTopologySupplierTest {
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     // When: a trace is passed
     ConsumerRecordFactory<String, List<Span>> factory =
-        new ConsumerRecordFactory<>(tracesTopicName, new StringSerializer(),
+        new ConsumerRecordFactory<>(spanTopicName, new StringSerializer(),
             spansSerde.serializer());
     Span a = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
@@ -93,7 +82,7 @@ class StoreTopologySupplierTest {
         .timestamp(10000L).duration(10L)
         .build();
     List<Span> spans = Arrays.asList(a, b);
-    testDriver.pipeInput(factory.create(tracesTopicName, a.traceId(), spans, 10L));
+    testDriver.pipeInput(factory.create(spanTopicName, a.traceId(), spans, 10L));
     // Then: trace stores are filled
     KeyValueStore<String, List<Span>> traces =
         testDriver.getKeyValueStore(TRACES_STORE_NAME);
@@ -121,72 +110,10 @@ class StoreTopologySupplierTest {
         .timestamp(tracesRetentionScanFrequency.toMillis() * 1000 + 20000L)
         .build();
     testDriver.pipeInput(
-        factory.create(tracesTopicName, c.traceId(), Collections.singletonList(c),
+        factory.create(spanTopicName, c.traceId(), Collections.singletonList(c),
             tracesRetentionScanFrequency.toMillis() + 1));
 
     // Then: Traces store is empty
     assertNull(traces.get(a.traceId()));
-  }
-
-  @Test void should_store_dependencies() {
-    // Given: configs
-    String tracesTopicName = "traces";
-    String dependencyLinksTopicName = "dependency-links";
-    DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
-    Duration tracesRetentionScanFrequency = Duration.ofMinutes(1);
-    Duration tracesRetentionPeriod = Duration.ofMillis(5);
-    Duration dependenciesRetentionPeriod = Duration.ofMinutes(1);
-    Duration dependenciesWindowSize = Duration.ofMillis(100);
-    // When: topology created
-    Topology topology = new StoreTopologySupplier(
-        tracesTopicName,
-        dependencyLinksTopicName,
-        Collections.emptyList(),
-        tracesRetentionScanFrequency,
-        tracesRetentionPeriod,
-        dependenciesRetentionPeriod,
-        dependenciesWindowSize).get();
-    TopologyDescription description = topology.describe();
-    System.out.println("Topology: \n" + description);
-    // Then: 2 threads prepared
-    assertEquals(2, description.subtopologies().size());
-    // Given: streams configuration
-    Properties props = new Properties();
-    props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
-    props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
-    props.put(StreamsConfig.STATE_DIR_CONFIG,
-        "target/kafka-streams-test/" + System.currentTimeMillis());
-    TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
-    // When: a trace is passed
-    ConsumerRecordFactory<String, DependencyLink> factory =
-        new ConsumerRecordFactory<>(dependencyLinksTopicName, new StringSerializer(),
-            dependencyLinkSerde.serializer());
-    DependencyLink dependencyLink = DependencyLink.newBuilder()
-        .parent("svc_a").child("svc_b").callCount(1).errorCount(0)
-        .build();
-    String dependencyLinkId = "svc_a:svc_b";
-    testDriver.pipeInput(
-        factory.create(dependencyLinksTopicName, dependencyLinkId, dependencyLink, 10L));
-    WindowStore<String, DependencyLink> links =
-        testDriver.getWindowStore(DEPENDENCY_LINKS_STORE_NAME);
-    // Then: dependency link created
-    WindowStoreIterator<DependencyLink> fetch1 = links.fetch(dependencyLinkId, 0L, 100L);
-    assertTrue(fetch1.hasNext());
-    assertEquals(fetch1.next().value, dependencyLink);
-    // When: new links appear
-    testDriver.pipeInput(
-        factory.create(dependencyLinksTopicName, dependencyLinkId, dependencyLink, 90L));
-    // Then: dependency link increases
-    WindowStoreIterator<DependencyLink> fetch2 = links.fetch(dependencyLinkId, 0L, 100L);
-    assertTrue(fetch2.hasNext());
-    assertEquals(fetch2.next().value.callCount(), 2);
-    // When: time moves forward
-    testDriver.advanceWallClockTime(dependenciesRetentionPeriod.toMillis() + 91L);
-    testDriver.pipeInput(
-        factory.create(dependencyLinksTopicName, dependencyLinkId, dependencyLink));
-    // Then: dependency link is removed and restarted
-    KeyValueIterator<Windowed<String>, DependencyLink> fetch3 = links.all();
-    assertTrue(fetch3.hasNext());
-    assertEquals(fetch3.next().value.callCount(), 1);
   }
 }

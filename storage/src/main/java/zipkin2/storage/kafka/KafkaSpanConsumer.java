@@ -16,6 +16,7 @@ package zipkin2.storage.kafka;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Future;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -29,7 +30,7 @@ import zipkin2.storage.SpanConsumer;
 
 /**
  * Collected Spans processor.
- *
+ * <p>
  * Spans are partitioned by trace ID to enabled downstream processing of spans as part of a trace.
  */
 public class KafkaSpanConsumer implements SpanConsumer {
@@ -39,7 +40,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
   final Producer<String, byte[]> producer;
 
   KafkaSpanConsumer(KafkaStorage storage) {
-    spansTopicName = storage.spansTopicName;
+    spansTopicName = storage.spanTopicName;
     producer = storage.getProducer();
   }
 
@@ -84,14 +85,17 @@ public class KafkaSpanConsumer implements SpanConsumer {
     @Override
     protected Void doExecute() throws IOException {
       AwaitableCallback callback = new AwaitableCallback();
-      kafkaProducer.send(new ProducerRecord<>(topic, key, value), new CallbackAdapter(callback));
+      Future<RecordMetadata> ignored = kafkaProducer.send(new ProducerRecord<>(topic, key, value),
+          new CallbackAdapter(callback));
       callback.await();
       return null;
     }
 
     @Override
     protected void doEnqueue(Callback<Void> callback) {
-      kafkaProducer.send(new ProducerRecord<>(topic, key, value), new CallbackAdapter(callback));
+      Future<RecordMetadata> ignored =
+          kafkaProducer.send(new ProducerRecord<>(topic, key, value),
+              new CallbackAdapter(callback));
     }
 
     @Override public Call<Void> clone() {

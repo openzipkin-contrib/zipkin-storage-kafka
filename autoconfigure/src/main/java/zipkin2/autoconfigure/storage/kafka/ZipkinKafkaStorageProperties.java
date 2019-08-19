@@ -28,16 +28,21 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private String bootstrapServers;
 
-  private Long tracesRetentionScanFrequency;
-  private Long tracesRetentionPeriod;
-  private Long dependenciesRetentionPeriod;
-  private Long tracesInactivityGap;
+  private Long traceRetentionScanFrequency;
+  private Long traceRetentionPeriod;
+  private Long traceInactivityGap;
 
-  private String spansTopic;
-  private String tracesTopic;
-  private String dependenciesTopic;
+  private Long dependencyRetentionPeriod;
+
+  private String spanTopic;
+  private String traceTopic;
+  private String dependencyTopic;
 
   private String storeDir;
+
+  private String aggregationStreamAppId;
+  private String traceStoreStreamAppId;
+  private String dependencyStoreStreamAppId;
 
   /**
    * Additional Kafka configuration.
@@ -45,34 +50,43 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private Map<String, String> adminOverrides = new LinkedHashMap<>();
   private Map<String, String> producerOverrides = new LinkedHashMap<>();
   private Map<String, String> aggregationStreamOverrides = new LinkedHashMap<>();
-  private Map<String, String> storeStreamOverrides = new LinkedHashMap<>();
+  private Map<String, String> traceStoreStreamOverrides = new LinkedHashMap<>();
+  private Map<String, String> dependencyStoreStreamOverrides = new LinkedHashMap<>();
 
   KafkaStorage.Builder toBuilder() {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
     if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
-    if (tracesInactivityGap != null) {
-      builder.tracesInactivityGap(Duration.ofMillis(tracesInactivityGap));
+    if (traceInactivityGap != null) {
+      builder.tracesInactivityGap(Duration.ofMillis(traceInactivityGap));
     }
-    if (tracesRetentionScanFrequency != null) {
-      builder.tracesRetentionScanFrequency(Duration.ofMillis(tracesRetentionScanFrequency));
+    if (traceRetentionScanFrequency != null) {
+      builder.tracesRetentionScanFrequency(Duration.ofMillis(traceRetentionScanFrequency));
     }
-    if (tracesRetentionPeriod != null) {
-      builder.tracesRetentionRetention(Duration.ofMillis(tracesRetentionPeriod));
+    if (traceRetentionPeriod != null) {
+      builder.tracesRetentionRetention(Duration.ofMillis(traceRetentionPeriod));
     }
-    if (dependenciesRetentionPeriod != null) {
-      builder.dependenciesRetentionPeriod(Duration.ofMillis(dependenciesRetentionPeriod));
+    if (dependencyRetentionPeriod != null) {
+      builder.dependenciesRetentionPeriod(Duration.ofMillis(dependencyRetentionPeriod));
+    }
+    if (aggregationStreamAppId != null) builder.aggregationStreamAppId(aggregationStreamAppId);
+    if (traceStoreStreamAppId != null) builder.aggregationStreamAppId(traceStoreStreamAppId);
+    if (dependencyStoreStreamAppId != null) {
+      builder.aggregationStreamAppId(dependencyStoreStreamAppId);
     }
     if (storeDir != null) builder.storeDirectory(storeDir);
-    if (spansTopic != null) builder.spansTopicName(spansTopic);
-    if (tracesTopic != null) builder.tracesTopicName(tracesTopic);
-    if (dependenciesTopic != null) builder.dependenciesTopicName(dependenciesTopic);
+    if (spanTopic != null) builder.spansTopicName(spanTopic);
+    if (traceTopic != null) builder.tracesTopicName(traceTopic);
+    if (dependencyTopic != null) builder.dependenciesTopicName(dependencyTopic);
     if (adminOverrides != null) builder.adminOverrides(adminOverrides);
     if (producerOverrides != null) builder.producerOverrides(producerOverrides);
     if (aggregationStreamOverrides != null) {
       builder.aggregationStreamOverrides(aggregationStreamOverrides);
     }
-    if (storeStreamOverrides != null) builder.storeStreamOverrides(storeStreamOverrides);
+    if (traceStoreStreamOverrides != null) builder.traceStoreStreamOverrides(traceStoreStreamOverrides);
+    if (dependencyStoreStreamOverrides != null) {
+      builder.dependencyStoreStreamOverrides(dependencyStoreStreamOverrides);
+    }
 
     return builder;
   }
@@ -89,36 +103,36 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.bootstrapServers = bootstrapServers;
   }
 
-  public Long getTracesRetentionScanFrequency() {
-    return tracesRetentionScanFrequency;
+  public Long getTraceRetentionScanFrequency() {
+    return traceRetentionScanFrequency;
   }
 
-  public void setTracesRetentionScanFrequency(Long tracesRetentionScanFrequency) {
-    this.tracesRetentionScanFrequency = tracesRetentionScanFrequency;
+  public void setTraceRetentionScanFrequency(Long traceRetentionScanFrequency) {
+    this.traceRetentionScanFrequency = traceRetentionScanFrequency;
   }
 
-  public Long getTracesRetentionPeriod() {
-    return tracesRetentionPeriod;
+  public Long getTraceRetentionPeriod() {
+    return traceRetentionPeriod;
   }
 
-  public void setTracesRetentionPeriod(Long tracesRetentionPeriod) {
-    this.tracesRetentionPeriod = tracesRetentionPeriod;
+  public void setTraceRetentionPeriod(Long traceRetentionPeriod) {
+    this.traceRetentionPeriod = traceRetentionPeriod;
   }
 
-  public Long getTracesInactivityGap() {
-    return tracesInactivityGap;
+  public Long getTraceInactivityGap() {
+    return traceInactivityGap;
   }
 
-  public void setTracesInactivityGap(Long tracesInactivityGap) {
-    this.tracesInactivityGap = tracesInactivityGap;
+  public void setTraceInactivityGap(Long traceInactivityGap) {
+    this.traceInactivityGap = traceInactivityGap;
   }
 
-  public String getSpansTopic() {
-    return spansTopic;
+  public String getSpanTopic() {
+    return spanTopic;
   }
 
-  public void setSpansTopic(String spansTopic) {
-    this.spansTopic = spansTopic;
+  public void setSpanTopic(String spanTopic) {
+    this.spanTopic = spanTopic;
   }
 
   public Boolean getSpanConsumerEnabled() {
@@ -129,20 +143,20 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.spanConsumerEnabled = spanConsumerEnabled;
   }
 
-  public String getTracesTopic() {
-    return tracesTopic;
+  public String getTraceTopic() {
+    return traceTopic;
   }
 
-  public void setTracesTopic(String tracesTopic) {
-    this.tracesTopic = tracesTopic;
+  public void setTraceTopic(String traceTopic) {
+    this.traceTopic = traceTopic;
   }
 
-  public String getDependenciesTopic() {
-    return dependenciesTopic;
+  public String getDependencyTopic() {
+    return dependencyTopic;
   }
 
-  public void setDependenciesTopic(String dependenciesTopic) {
-    this.dependenciesTopic = dependenciesTopic;
+  public void setDependencyTopic(String dependencyTopic) {
+    this.dependencyTopic = dependencyTopic;
   }
 
   public String getStoreDir() {
@@ -153,12 +167,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.storeDir = storeDir;
   }
 
-  public Long getDependenciesRetentionPeriod() {
-    return dependenciesRetentionPeriod;
+  public Long getDependencyRetentionPeriod() {
+    return dependencyRetentionPeriod;
   }
 
-  public void setDependenciesRetentionPeriod(Long dependenciesRetentionPeriod) {
-    this.dependenciesRetentionPeriod = dependenciesRetentionPeriod;
+  public void setDependencyRetentionPeriod(Long dependencyRetentionPeriod) {
+    this.dependencyRetentionPeriod = dependencyRetentionPeriod;
   }
 
   public Map<String, String> getAdminOverrides() {
@@ -186,12 +200,45 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.aggregationStreamOverrides = aggregationStreamOverrides;
   }
 
-  public Map<String, String> getStoreStreamOverrides() {
-    return storeStreamOverrides;
+  public Map<String, String> getTraceStoreStreamOverrides() {
+    return traceStoreStreamOverrides;
   }
 
-  public void setStoreStreamOverrides(
-      Map<String, String> storeStreamOverrides) {
-    this.storeStreamOverrides = storeStreamOverrides;
+  public void setTraceStoreStreamOverrides(
+      Map<String, String> traceStoreStreamOverrides) {
+    this.traceStoreStreamOverrides = traceStoreStreamOverrides;
+  }
+
+  public Map<String, String> getDependencyStoreStreamOverrides() {
+    return dependencyStoreStreamOverrides;
+  }
+
+  public void setDependencyStoreStreamOverrides(
+      Map<String, String> dependencyStoreStreamOverrides) {
+    this.dependencyStoreStreamOverrides = dependencyStoreStreamOverrides;
+  }
+
+  public String getAggregationStreamAppId() {
+    return aggregationStreamAppId;
+  }
+
+  public void setAggregationStreamAppId(String aggregationStreamAppId) {
+    this.aggregationStreamAppId = aggregationStreamAppId;
+  }
+
+  public String getTraceStoreStreamAppId() {
+    return traceStoreStreamAppId;
+  }
+
+  public void setTraceStoreStreamAppId(String traceStoreStreamAppId) {
+    this.traceStoreStreamAppId = traceStoreStreamAppId;
+  }
+
+  public String getDependencyStoreStreamAppId() {
+    return dependencyStoreStreamAppId;
+  }
+
+  public void setDependencyStoreStreamAppId(String dependencyStoreStreamAppId) {
+    this.dependencyStoreStreamAppId = dependencyStoreStreamAppId;
   }
 }

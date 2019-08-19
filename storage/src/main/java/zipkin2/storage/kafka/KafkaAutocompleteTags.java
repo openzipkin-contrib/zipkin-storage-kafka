@@ -23,13 +23,13 @@ import zipkin2.Call;
 import zipkin2.storage.AutocompleteTags;
 import zipkin2.storage.kafka.internal.KafkaStreamsStoreCall;
 
-import static zipkin2.storage.kafka.streams.StoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
 
 public class KafkaAutocompleteTags implements AutocompleteTags {
   final KafkaStreams storeStream;
 
   KafkaAutocompleteTags(KafkaStorage storage) {
-    storeStream = storage.getStoreStream();
+    storeStream = storage.getTraceStoreStream();
   }
 
   @Override public Call<List<String>> getKeys() {

@@ -45,24 +45,24 @@ import static zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde.linkKey;
  */
 public class AggregationTopologySupplier implements Supplier<Topology> {
   // Kafka topics
-  final String spansTopicName;
-  final String tracesTopicName;
-  final String dependencyLinksTopicName;
+  final String spanTopicName;
+  final String traceTopicName;
+  final String dependencyTopicName;
+  // Config
+  final Duration tracesInactivityGap;
   // SerDes
   final SpanSerde spanSerde;
   final SpansSerde spansSerde;
-  // Config
-  final Duration tracesInactivityGap;
   final DependencyLinkSerde dependencyLinkSerde;
 
   public AggregationTopologySupplier(
-      String spansTopicName,
-      String tracesTopicName,
-      String dependencyLinksTopicName,
+      String spanTopicName,
+      String traceTopicName,
+      String dependencyTopicName,
       Duration tracesInactivityGap) {
-    this.spansTopicName = spansTopicName;
-    this.tracesTopicName = tracesTopicName;
-    this.dependencyLinksTopicName = dependencyLinksTopicName;
+    this.spanTopicName = spanTopicName;
+    this.traceTopicName = traceTopicName;
+    this.dependencyTopicName = dependencyTopicName;
     this.tracesInactivityGap = tracesInactivityGap;
     spanSerde = new SpanSerde();
     spansSerde = new SpansSerde();
@@ -73,7 +73,7 @@ public class AggregationTopologySupplier implements Supplier<Topology> {
     StreamsBuilder builder = new StreamsBuilder();
     // Aggregate Spans to Traces
     KStream<String, List<Span>> tracesStream =
-        builder.stream(spansTopicName, Consumed.with(Serdes.String(), spanSerde))
+        builder.stream(spanTopicName, Consumed.with(Serdes.String(), spanSerde))
             .groupByKey()
             // how long to wait for another span
             .windowedBy(SessionWindows.with(tracesInactivityGap).grace(Duration.ZERO))
@@ -84,11 +84,11 @@ public class AggregationTopologySupplier implements Supplier<Topology> {
             .toStream()
             .selectKey((windowed, spans) -> windowed.key());
     // Downstream to traces topic
-    tracesStream.to(tracesTopicName, Produced.with(Serdes.String(), spansSerde));
+    tracesStream.to(traceTopicName, Produced.with(Serdes.String(), spansSerde));
     // Map to dependency links
     tracesStream.flatMapValues(spansToDependencyLinks())
         .selectKey((key, value) -> linkKey(value))
-        .to(dependencyLinksTopicName, Produced.with(Serdes.String(), dependencyLinkSerde));
+        .to(dependencyTopicName, Produced.with(Serdes.String(), dependencyLinkSerde));
     return builder.build();
   }
 

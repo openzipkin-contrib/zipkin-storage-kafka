@@ -61,7 +61,7 @@ class KafkaStorageIT {
   private KafkaStorage storage;
   private Properties testConsumerConfig;
   private KafkaProducer<String, List<Span>> tracesProducer;
-  private KafkaProducer<String, DependencyLink> linkProducer;
+  private KafkaProducer<String, DependencyLink> dependencyProducer;
 
   @BeforeEach void start() {
     testConsumerConfig = new Properties();
@@ -83,9 +83,9 @@ class KafkaStorageIT {
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       Collection<NewTopic> newTopics = new ArrayList<>();
-      newTopics.add(new NewTopic(storage.spansTopicName, 1, (short) 1));
-      newTopics.add(new NewTopic(storage.tracesTopicName, 1, (short) 1));
-      newTopics.add(new NewTopic(storage.dependenciesTopicName, 1, (short) 1));
+      newTopics.add(new NewTopic(storage.spanTopicName, 1, (short) 1));
+      newTopics.add(new NewTopic(storage.traceTopicName, 1, (short) 1));
+      newTopics.add(new NewTopic(storage.dependencyTopicName, 1, (short) 1));
       storage.getAdminClient().createTopics(newTopics).all().get();
       storage.checkTopics();
       return storage.topicsValidated;
@@ -97,13 +97,13 @@ class KafkaStorageIT {
     producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
     tracesProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
         new SpansSerde().serializer());
-    linkProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
+    dependencyProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
         new DependencyLinkSerde().serializer());
   }
 
   @AfterEach void close() {
-    linkProducer.close(Duration.ofSeconds(1));
-    linkProducer = null;
+    dependencyProducer.close(Duration.ofSeconds(1));
+    dependencyProducer = null;
     tracesProducer.close(Duration.ofSeconds(1));
     tracesProducer = null;
     storage.close();
@@ -126,7 +126,7 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: they are partitioned
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopicName, 2, 10000);
+        testConsumerConfig, storage.spanTopicName, 2, 10000);
     // Given: some time for stream processes to kick in
     Thread.sleep(traceInactivityGap.toMillis() * 2);
     // Given: another span to move 'event time' forward
@@ -139,12 +139,12 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: a trace is published
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopicName, 1, 1000);
+        testConsumerConfig, storage.spanTopicName, 1, 1000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopicName, 1, 30000);
+        testConsumerConfig, storage.traceTopicName, 1, 30000);
     // Then: and a dependency link created
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.dependenciesTopicName, 1, 1000);
+        testConsumerConfig, storage.dependencyTopicName, 1, 1000);
   }
 
   @Test void should_return_traces_query() throws Exception {
@@ -160,11 +160,11 @@ class KafkaStorageIT {
         .build();
     List<Span> spans = Arrays.asList(parent, child);
     // When: been published
-    tracesProducer.send(new ProducerRecord<>(storage.tracesTopicName, parent.traceId(), spans));
+    tracesProducer.send(new ProducerRecord<>(storage.spanTopicName, parent.traceId(), spans));
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.tracesTopicName, 1, 10000);
+        testConsumerConfig, storage.spanTopicName, 1, 10000);
     // When: and stores running
     SpanStore spanStore = storage.spanStore();
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
@@ -182,6 +182,9 @@ class KafkaStorageIT {
                     .build())
                     .execute();
           } catch (InvalidStateStoreException e) { // ignoring state issues
+            System.err.println(e.getMessage());
+          } catch (Exception e) {
+            e.printStackTrace();
           }
           return traces.size() == 1
               && traces.get(0).size() == 2; // Trace is found and has two spans
@@ -192,6 +195,9 @@ class KafkaStorageIT {
           try {
             services = serviceAndSpanNames.getServiceNames().execute();
           } catch (InvalidStateStoreException e) { // ignoring state issues
+            System.err.println(e.getMessage());
+          } catch (Exception e) {
+            e.printStackTrace();
           }
           return services.size() == 2;
         }); // There are two service names
@@ -202,6 +208,9 @@ class KafkaStorageIT {
             spanNames = serviceAndSpanNames.getSpanNames("svc_a")
                 .execute();
           } catch (InvalidStateStoreException e) { // ignoring state issues
+            System.err.println(e.getMessage());
+          } catch (Exception e) {
+            e.printStackTrace();
           }
           return spanNames.size() == 1;
         }); // Service names have one span name
@@ -211,6 +220,9 @@ class KafkaStorageIT {
           try {
             services = serviceAndSpanNames.getRemoteServiceNames("svc_a").execute();
           } catch (InvalidStateStoreException e) { // ignoring state issues
+            System.err.println(e.getMessage());
+          } catch (Exception e) {
+            e.printStackTrace();
           }
           return services.size() == 1;
         }); // And one remote service name
@@ -218,28 +230,28 @@ class KafkaStorageIT {
 
   @Test void should_find_dependencies() throws Exception {
     //Given: two related dependency links
-    DependencyLink link1 = DependencyLink.newBuilder()
-        .parent("svc_a")
-        .child("svc_b")
-        .callCount(1)
-        .errorCount(0)
-        .build();
     // When: sent first one
-    linkProducer.send(
-        new ProducerRecord<>(storage.dependenciesTopicName, "svc_a:svc_b", link1));
-    DependencyLink link2 = DependencyLink.newBuilder()
-        .parent("svc_a")
-        .child("svc_b")
-        .callCount(1)
-        .errorCount(0)
-        .build();
+    dependencyProducer.send(
+        new ProducerRecord<>(storage.dependencyTopicName, "svc_a:svc_b",
+            DependencyLink.newBuilder()
+                .parent("svc_a")
+                .child("svc_b")
+                .callCount(1)
+                .errorCount(0)
+                .build()));
     // When: and another one
-    linkProducer.send(
-        new ProducerRecord<>(storage.dependenciesTopicName, "svc_a:svc_b", link2));
-    linkProducer.flush();
+    dependencyProducer.send(
+        new ProducerRecord<>(storage.dependencyTopicName, "svc_a:svc_b",
+            DependencyLink.newBuilder()
+                .parent("svc_a")
+                .child("svc_b")
+                .callCount(1)
+                .errorCount(0)
+                .build()));
+    dependencyProducer.flush();
     // Then: stored in topic
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.dependenciesTopicName, 2, 10000);
+        testConsumerConfig, storage.dependencyTopicName, 2, 10000);
     // When: stores running
     SpanStore spanStore = storage.spanStore();
     // Then:
@@ -250,6 +262,9 @@ class KafkaStorageIT {
             spanStore.getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
                 .execute();
       } catch (InvalidStateStoreException e) { // ignoring state issues
+        System.err.println(e.getMessage());
+      } catch (Exception e) {
+        e.printStackTrace();
       }
       return links.size() == 1
           && links.get(0).callCount() == 2; // link stored and call count aggregated.
