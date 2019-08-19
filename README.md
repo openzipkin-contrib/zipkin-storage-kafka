@@ -89,9 +89,11 @@ There are two examples, running Zipkin with kafka as storage:
 
 ### Testing
 
-To validate storage:
+To validate storage make sure that Kafka topics are created so Kafka Stream instances can be 
+initialized properly:
 
 ```bash
+make kafka-topics
 make zipkin-test
 ```
 

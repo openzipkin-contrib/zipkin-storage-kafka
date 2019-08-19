@@ -74,26 +74,12 @@ zipkin-test-multi:
 	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/messaging.json | \
 	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
 	${OPEN} 'http://localhost:9412/zipkin/?lookback=custom&startTs=1'
-	echo 'waiting for a minute to send another span and trigger aggregation'
-	sleep 6
-	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/netflix.json | \
-	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
-	sleep 6
-	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/skew.json | \
-	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
 
 .PHONY: zipkin-test
 zipkin-test:
 	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/messaging.json | \
 	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
 	${OPEN} 'http://localhost:9411/zipkin/?lookback=custom&startTs=1'
-	echo 'waiting for a minute to send another span and trigger aggregation'
-	sleep 10
-	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/netflix.json | \
-	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
-	sleep 10
-	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/skew.json | \
-	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
 
 .PHONY: release
 release:
