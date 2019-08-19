@@ -104,10 +104,10 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
             Serdes.String(),
             namesSerde));
     // Traces stream
-    KStream<String, List<Span>> traceStream = builder
+    KStream<String, List<Span>> spansStream = builder
         .stream(spanTopicName, Consumed.with(Serdes.String(), spansSerde));
     // Store traces
-    traceStream
+    spansStream
         .process(() -> new Processor<String, List<Span>>() {
           ProcessorContext context;
           // Actual traces store
@@ -173,7 +173,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
           }
         }, TRACES_STORE_NAME, SPAN_IDS_BY_TS_STORE_NAME);
     // Store service, span and remote service names
-    traceStream.process(() -> new Processor<String, List<Span>>() {
+    spansStream.process(() -> new Processor<String, List<Span>>() {
           KeyValueStore<String, String> serviceNameStore;
           KeyValueStore<String, Set<String>> spanNamesStore;
           KeyValueStore<String, Set<String>> remoteServiceNamesStore;
