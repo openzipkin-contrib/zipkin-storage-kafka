@@ -8,16 +8,16 @@ Kafka-based storage for Zipkin.
 
 ```
                     +----------------------------*zipkin*----------------------------------------------
-                    |                                                        +-->( service-names     )
-                    |                                                        +-->( autocomplete-tags )
-( collected-spans )-|->[ span-consumer ]  [ aggregation ]    [ span-store ]--+-->( traces            )
-  via http, kafka,  |       |                    ^    |         ^      ^     +-->( dependencies      )
+                    |                                        [ dependency-store ]--->( dependencies   )
+                    |                                                  ^      +-->( autocomplete-tags )
+( collected-spans )-|->[ span-consumer ]  [ aggregation ]    [ trace-store ]--+-->( traces            )
+  via http, kafka,  |       |                    ^    |         ^      |      +-->( service-names     )
   amq, grpc, etc.   +-------|--------------------|----|---------|------|-------------------------------
                             |                    |    |         |      |
 ----------------------------|--------------------|----|---------|------|-------------------------------
-                            |                    |    |         |      |
-                            |                    |    |         |      |
-*kafka*                     +-->( spans )--------+    +->( traces )    |
+                            +-->( spans )--------+----+---------|      |
+                                                      |         |      |
+*kafka*                                               +->( traces )    |
  topics                                               |                |
                                                       +->( dependencies )
                                                          
@@ -25,8 +25,9 @@ Kafka-based storage for Zipkin.
 
 ```
 
-- [Design notes](DESIGN.md)
-- [Configuration](autoconfigure/)
+[Design notes](DESIGN.md)
+
+[Configuration](autoconfigure/README.md)
 
 ## Building
 
@@ -101,9 +102,6 @@ If running multi-node docker example, run:
 ```bash
 make zipkin-test-multi
 ```
-
-> Remember results won't be immediately available as traces require some buffering before 
-> emitting completed traces.
 
 ![traces](docs/traces.png)
 

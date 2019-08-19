@@ -2,7 +2,7 @@
 
 ## Goals
 
-* Provide a fast and reliable storage that enable extensibility via Kafka Topics.
+* Provide a fast and reliable storage that enable extensibility via Kafka topics.
 * Provide full storage functionality via streaming aggregations (e.g., dependency graph).
 * Create a processing space where additional enrichment can be plugged in into the processing 
 pipeline.
@@ -10,61 +10,115 @@ pipeline.
 * More focused on supporting processing than storage: traces and dependency links are emitted 
 downstream to support metrics aggregation. Storage is currently supported but in a single node.
 
-### Kafka Zipkin Storage
+## Kafka Zipkin Storage
 
-#### `KafkaSpanConsumer`
+Storage is composed by 3 main components: 
 
-This component take batches of `spans` collected on different transports (e.g. HTTP, Kafka) .
+- Span Consumer: repartition of collected span batches into individual spans keyed by `traceId`
+- Span Aggregation: stream processing of spans into aggregated traces and then into dependency links.
+- Span Store: building local state stores to support search and query API.
 
-In order to support aggregation and post-processing, batches are `flatmap`ing into individual 
-spans, keyed by `trace ID`.
+### Kafka Span Consumer
 
-#### Stream processors
+This component processes collected span batches (via HTTP, Kafka, ActiveMQ, etc), 
+take each element and re-indexed them by `traceId` on a Kafka topic (default name: `zipkin-span`).
 
-#### Trace Aggregation Stream Processor
+This component is currently compensating how `KafkaSender` (part of [Zipkin-Reporter](https://github.com/openzipkin/zipkin-reporter-java))
+is reporting spans to Kafka, by grouping spans into batches and sending them to a un-keyed
+Kafka topic.
 
-This processor take incoming partitioned spans and aggregate them into:
-- Traces
-- Dependencies
+Component source code: [KafkaSpanConsumer.java](storage/src/main/java/zipkin2/storage/kafka/KafkaSpanConsumer.java)
 
-**Trace completion:** A key part of the stream processing pipeline is define when a trace is completed
-to emit its complete state. This is done by using [Session windows](https://kafka.apache.org/23/javadoc/org/apache/kafka/streams/kstream/SessionWindows.html)
-grouping spans by trace ID, and waiting for a certain inactivity period without receiving messages 
-to emit a trace.
+### Stream Processing
 
-> One **main consideration** with this approach is that in order to evaluate inactivity gap, a new 
-> event has to be received. This means if you send a set of trace spans and wait for it to be shown 
-> as query result, it requires another span passed the inactivity gap to be trigger.
-> 
-> This might not be what you expect when using Zipkin for demo purposes, but is based on the assumption
-> that your applications are continuously emitting spans, so aggregation happens continuously.
-> For more info: <https://stackoverflow.com/questions/54222594/kafka-stream-suppress-session-windowed-aggregation/54226977#54226977> 
+#### Span Aggregation
+
+"Partitioned" Spans are processed to produced two aggregated streams: `Traces` and `Dependencies`.
+
+**Traces**: 
+
+Spans are grouped by ID and stored on a local
+[Session window](https://kafka.apache.org/23/javadoc/org/apache/kafka/streams/kstream/SessionWindows.html),
+where the `traceId` becomes the token, and session inactivity gap 
+(i.e. period of time without receiving a span with the same session) 
+defines if a trace is still active or not. This is evaluated on the next span received on the stream--
+regardless of incoming `traceId`. If session window is closed, a trace message is emitted to a topic
+downstream (default name: `zipkin-trace`)
+
+**Dependencies**
+
+Once `traces` are emitted downstream as part of the initial processing, dependency links are evaluated
+on each trace, and emitted on another topic (default name: `zipkin-dependency`) for further metric aggregation.
+
+Kafka Streams topology:
 
 ![trace aggregation](docs/trace-aggregation-topology.png)
 
-#### Store Stream Processor
+#### Trace Store Stream
 
-Kafka Stream store tables for traces, service names and dependencies to be available on local state.
+This component build local stores from state received on `span` Kafka topic 
+(default topic name: `zipkin-span`) for traces, service names and autocomplete tags. 
+
+Kafka Streams source code: [TraceStoreTopologySupplier](storage/src/main/java/zipkin2/storage/kafka/streams/TraceStoreTopologySupplier.java)
+
+Kafka Streams topology:
 
 ![trace store](docs/trace-store-topology.png)
 
+#### Dependency Store
 
-#### `KafkaSpanStore`
+This component build local store from state received on `dependency` Kafka topic (default name: `zipkin-dependency`)
 
-Traces and Dependencies emitted by aggregation process are used as source to prepare the stores
-for `traces`, `services`, `tags`, and `dependencies`. 
+It builds a 1 minute time-window when counts calls and errors.
 
-##### Get Service Names/Get Span Names
+Kafka Streams source code: [DependencyStoreTopologySupplier](storage/src/main/java/zipkin2/storage/kafka/streams/DependencyStoreTopologySupplier.java)
 
-Service name to Span names pairs are indexed by aggregating spans.
+Kafka Streams topology:
 
-##### Get Trace/Find Traces
+![dependency store](docs/dependency-store-topology.png)
 
-When search requests are received, span index is used to search for trace ids. After a list is 
-retrieved, trace DAG is retrieved from trace state store.
+### Kafka Span Store
 
-##### Get Dependencies
+This component supports search and query APIs on top of local state stores build by the Store 
+Kafka Streams component.
 
-After `spans` are aggregated into traces, traces are processed to collect dependencies. 
-Dependencies changelog are stored in a Kafka topic to be be stored as materialized view on 
-Zipkin instances.
+Component source code: [KafkaSpanStore.java](storage/src/main/java/zipkin2/storage/kafka/KafkaSpanStore.java)
+
+#### Get Service Names/Get Span Names/Get Remote Service Names
+
+These queries are supported by service names indexed stores built from `spans` Kafka topic.
+
+Store names:
+
+- `zipkin-service-names`: key/value store with service name as key and value.
+- `zipkin-span-names`: key/value store with service name as key and span names list as value.
+- `zipkin-remote-service-names`: key/value store with service name as key and remote service names as value.
+
+#### Get Trace/Find Traces
+
+These queries are supported by two key value stores: 
+
+- `zipkin-traces`: indexed by `traceId`, contains span list status received from `spans` Kafka topic.
+- `zipkin-traces-by-timestamp`: list of trace IDs indexed by `timestamp`.
+
+`GetTrace` query is supported by `zipkin-traces` store.
+`FindTraces` query is supported by both: When receiving a query request time range is used to get
+trace IDs, and then query request is tested on each trace to build a response.
+
+#### Get Dependencies
+
+This query is supported 1-minute windowed store from `DependencyStoreStream`.
+
+When a request is received, time range is used to pick valid windows and join counters.
+
+Windowed store:
+
+- `zipkin-dependencies`.
+
+### Kafka Autocomplete Tags
+
+#### Get Keys/Get Values
+
+Supported by a key-value containing list of values valid for `autocompleteKeys`.
+
+- `zipkin-autocomplete-tags`: key-value store.
