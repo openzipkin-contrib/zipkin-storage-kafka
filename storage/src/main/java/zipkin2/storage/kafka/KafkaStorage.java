@@ -205,6 +205,7 @@ public class KafkaStorage extends StorageComponent {
                 Arrays.asList(spanTopicName, dependencyTopicName, traceTopicName);
             for (String requiredTopic : requiredTopics) {
               if (!topics.contains(requiredTopic)) {
+                LOG.error("Topic {} not found", requiredTopic);
                 throw new RuntimeException("Required topics are not created");
               }
             }

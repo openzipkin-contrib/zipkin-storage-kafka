@@ -22,7 +22,7 @@ import zipkin2.storage.StorageComponent;
 
 @Configuration
 @EnableConfigurationProperties(ZipkinKafkaStorageProperties.class)
-@ConditionalOnProperty(name = "zipkin.storage.type", havingValue = "kafkastore")
+@ConditionalOnProperty(name = "zipkin.storage.type", havingValue = "kafka")
 @ConditionalOnMissingBean(StorageComponent.class)
 class ZipkinKafkaStorageAutoConfiguration {
 

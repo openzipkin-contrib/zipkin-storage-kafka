@@ -16,7 +16,7 @@ FROM alpine
 
 ENV ZIPKIN_REPO https://repo1.maven.org/maven2
 ENV ZIPKIN_VERSION 2.16.0
-ENV KAFKASTORE_VERSION 0.4.1-SNAPSHOT
+ENV KAFKA_STORAGE_VERSION 0.4.1-SNAPSHOT
 
 WORKDIR /zipkin
 
@@ -28,8 +28,8 @@ RUN apk add unzip curl --no-cache && \
     # && \
     # apk del unzip
 
-COPY autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKASTORE_VERSION}-module.jar BOOT-INF/lib/kafkastore-module.jar
-RUN unzip -o BOOT-INF/lib/kafkastore-module.jar lib/* -d BOOT-INF
+COPY autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKA_STORAGE_VERSION}-module.jar BOOT-INF/lib/kafka-module.jar
+RUN unzip -o BOOT-INF/lib/kafka-module.jar lib/* -d BOOT-INF
 
 FROM gcr.io/distroless/java:11-debug
 
@@ -39,16 +39,16 @@ ENV JAVA_OPTS -Djava.security.egd=file:/dev/./urandom
 RUN ["/busybox/sh", "-c", "adduser -g '' -D zipkin"]
 
 # Add environment settings for supported storage types
-ENV STORAGE_TYPE kafkastore
+ENV STORAGE_TYPE kafka
 
 COPY --from=0 /zipkin/ /zipkin/
 WORKDIR /zipkin
 
-#COPY autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKASTORE_VERSION}-module.jar kafkastore-module.jar
+#COPY autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKA_STORAGE_VERSION}-module.jar kafka-module.jar
 
 # TODO haven't found a better way to mount libs from custom storage as L31
-#ENV MODULE_OPTS -Dloader.path='BOOT-INF/lib/kafkastore-module.jar,BOOT-INF/lib/kafkastore-module.jar!/lib' -Dspring.profiles.active=kafkastore
-ENV MODULE_OPTS -Dspring.profiles.active=kafkastore
+#ENV MODULE_OPTS -Dloader.path='BOOT-INF/lib/kafka-module.jar,BOOT-INF/lib/kafka-module.jar!/lib' -Dspring.profiles.active=kafka
+ENV MODULE_OPTS -Dspring.profiles.active=kafka
 
 RUN ["/busybox/sh", "-c", "ln -s /busybox/* /bin"]
 

@@ -56,7 +56,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void providesStorageComponent_whenStorageTypeKafka() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore"
+        "zipkin.storage.type:kafka"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -68,7 +68,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_bootstrapServers() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.type:kafka",
         "zipkin.storage.kafka.bootstrap-servers:host1:19092"
     ).applyTo(context);
     Access.registerKafka(context);
@@ -82,7 +82,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_adminConfigs() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.type:kafka",
         "zipkin.storage.kafka.admin-overrides.bootstrap.servers:host1:19092"
     ).applyTo(context);
     Access.registerKafka(context);
@@ -96,7 +96,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_producerConfigs() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.type:kafka",
         "zipkin.storage.kafka.producer-overrides.acks:1"
     ).applyTo(context);
     Access.registerKafka(context);
@@ -109,7 +109,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_aggregationStreamConfigs() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.type:kafka",
         "zipkin.storage.kafka.aggregation-stream-overrides.application.id:agg1"
     ).applyTo(context);
     Access.registerKafka(context);
@@ -123,7 +123,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_traceStoreStreamConfigs() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.type:kafka",
         "zipkin.storage.kafka.trace-store-stream-overrides.application.id:store1"
     ).applyTo(context);
     Access.registerKafka(context);
@@ -137,7 +137,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_dependencyStoreStreamConfigs() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.type:kafka",
         "zipkin.storage.kafka.dependency-store-stream-overrides.application.id:store1"
     ).applyTo(context);
     Access.registerKafka(context);
@@ -151,7 +151,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_storeDirectory() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.type:kafka",
         "zipkin.storage.kafka.store-dir:/zipkin"
     ).applyTo(context);
     Access.registerKafka(context);
@@ -164,7 +164,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_spansTopicName() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.type:kafka",
         "zipkin.storage.kafka.span-topic:zipkin-spans-1"
     ).applyTo(context);
     Access.registerKafka(context);
@@ -177,7 +177,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_tracesTopicName() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.type:kafka",
         "zipkin.storage.kafka.trace-topic:zipkin-traces-1"
     ).applyTo(context);
     Access.registerKafka(context);
@@ -190,7 +190,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
   public void canOverridesProperty_dependenciesTopicName() {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
-        "zipkin.storage.type:kafkastore",
+        "zipkin.storage.type:kafka",
         "zipkin.storage.kafka.dependency-topic:zipkin-dependencies-1"
     ).applyTo(context);
     Access.registerKafka(context);
