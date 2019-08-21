@@ -57,6 +57,7 @@ import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
  * <ul>
  *   <li>repartitioning of spans,</li>
  *   <li>trace aggregation,</li>
+ *   <li>autocomplete tags, and</li>
  *   <li>indexing of traces and dependencies.</li>
  * </ul>
  */

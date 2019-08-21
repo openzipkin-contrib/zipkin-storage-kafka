@@ -22,26 +22,34 @@ import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import zipkin2.Call;
 import zipkin2.storage.AutocompleteTags;
 import zipkin2.storage.kafka.internal.KafkaStreamsStoreCall;
+import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
 
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
 
+/**
+ * Autocomplete tags query component based on Kafka Streams local store built by {@link
+ * TraceStoreTopologySupplier}
+ *
+ * These stores are currently supporting only single instance as there is not mechanism implemented
+ * for scatter gather data from different instances.
+ */
 public class KafkaAutocompleteTags implements AutocompleteTags {
-  final KafkaStreams storeStream;
+  final KafkaStreams traceStoreStream;
 
   KafkaAutocompleteTags(KafkaStorage storage) {
-    storeStream = storage.getTraceStoreStream();
+    traceStoreStream = storage.getTraceStoreStream();
   }
 
   @Override public Call<List<String>> getKeys() {
     ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-        storeStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
+        traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
             QueryableStoreTypes.keyValueStore());
     return new GetKeysCall(autocompleteTagsStore);
   }
 
   @Override public Call<List<String>> getValues(String key) {
     ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-        storeStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
+        traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
             QueryableStoreTypes.keyValueStore());
     return new GetValuesCall(autocompleteTagsStore, key);
   }

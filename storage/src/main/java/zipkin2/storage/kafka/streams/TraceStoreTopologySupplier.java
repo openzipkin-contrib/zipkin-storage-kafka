@@ -41,7 +41,7 @@ import zipkin2.storage.kafka.streams.serdes.SpanIdsSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 /**
- * Aggregation and storage of spans into traces.
+ * Storage of Traces, Service names and Autocomplete Tags.
  */
 public class TraceStoreTopologySupplier implements Supplier<Topology> {
   public static final String TRACES_STORE_NAME = "zipkin-traces";

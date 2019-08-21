@@ -41,7 +41,7 @@ import static org.apache.kafka.streams.kstream.Suppressed.untilWindowCloses;
 import static zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde.linkKey;
 
 /**
- *
+ * Processing of spans partitioned by trace Id, into traces and dependency links.
  */
 public class AggregationTopologySupplier implements Supplier<Topology> {
   // Kafka topics

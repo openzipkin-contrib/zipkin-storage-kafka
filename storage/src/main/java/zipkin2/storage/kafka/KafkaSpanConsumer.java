@@ -16,7 +16,6 @@ package zipkin2.storage.kafka;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Future;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -26,12 +25,14 @@ import zipkin2.Span;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.AggregateCall;
 import zipkin2.reporter.AwaitableCallback;
+import zipkin2.reporter.kafka.KafkaSender;
 import zipkin2.storage.SpanConsumer;
 
 /**
- * Collected Spans processor.
- * <p>
- * Spans are partitioned by trace ID to enabled downstream processing of spans as part of a trace.
+ * Span Consumer to compensate current {@link KafkaSender} distribution of span batched without key.
+ *
+ * This component split batch into individual spans keyed by trace ID to enabled downstream
+ * processing of spans as part of a trace.
  */
 public class KafkaSpanConsumer implements SpanConsumer {
   // Topic names

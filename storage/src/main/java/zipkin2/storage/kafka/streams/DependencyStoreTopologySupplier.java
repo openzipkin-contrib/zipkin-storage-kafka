@@ -30,7 +30,7 @@ import zipkin2.DependencyLink;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 
 /**
- * Aggregation and storage of spans into traces.
+ * Windowed storage of dependency links.
  */
 public class DependencyStoreTopologySupplier implements Supplier<Topology> {
   public static final String DEPENDENCIES_STORE_NAME = "zipkin-dependencies";

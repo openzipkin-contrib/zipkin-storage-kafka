@@ -33,6 +33,8 @@ import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.kafka.internal.KafkaStreamsStoreCall;
+import zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier;
+import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
 
 import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
@@ -42,7 +44,8 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAME
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_STORE_NAME;
 
 /**
- * Span store backed by Kafka Stream State Stores.
+ * Span store backed by Kafka Stream local stores built by {@link TraceStoreTopologySupplier} and
+ * {@link DependencyStoreTopologySupplier}.
  * <p>
  * These stores are currently supporting only single instance as there is not mechanism implemented
  * for scatter gather data from different instances.
