@@ -115,4 +115,5 @@ make zipkin-test-multi
 ## Acknowledgments
 
 This project is inspired in Adrian Cole's VoltDB storage <https://github.com/adriancole/zipkin-voltdb>
+
 Kafka Streams images are created with <https://zz85.github.io/kafka-streams-viz/>
