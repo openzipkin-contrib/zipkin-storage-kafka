@@ -1,4 +1,4 @@
-# Zipkin Storage: Kafka [EXPERIMENTAL]
+# Zipkin Storage: Kafka *[EXPERIMENTAL]*
 
 [![Build Status](https://www.travis-ci.org/jeqo/zipkin-storage-kafka.svg?branch=master)](https://www.travis-ci.org/jeqo/zipkin-storage-kafka)
 
