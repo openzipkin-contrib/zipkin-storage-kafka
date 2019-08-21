@@ -1,10 +1,8 @@
-# Zipkin Storage: Kafka
+# Zipkin Storage: Kafka [EXPERIMENTAL]
 
 [![Build Status](https://www.travis-ci.org/jeqo/zipkin-storage-kafka.svg?branch=master)](https://www.travis-ci.org/jeqo/zipkin-storage-kafka)
 
 Kafka-based storage for Zipkin.
-
-> This is in experimentation phase at the moment.
 
 ```
                     +----------------------------*zipkin*----------------------------------------------
@@ -24,6 +22,11 @@ Kafka-based storage for Zipkin.
 -------------------------------------------------------------------------------------------------------
 
 ```
+
+> Spans collected via different transports are partitioned by `traceId` and stored in a "spans" Kafka topic.
+Partitioned spans are then aggregated into traces and then into dependency links, both 
+results are emitted into Kafka topics as well.
+These 3 topics are used as source for local stores (Kafka Stream stores) that support Zipkin query and search APIs.
 
 [Design notes](DESIGN.md)
 
