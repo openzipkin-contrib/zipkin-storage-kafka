@@ -18,10 +18,16 @@ Storage is composed by 3 main components:
 - Span Aggregation: stream processing of spans into aggregated traces and then into dependency links.
 - Span Store: building local state stores to support search and query API.
 
+And it is supported by 3 main Kafka topics:
+
+- `zipkin-spans`: Topic where list of spans indexed by trace Id are stored.
+- `zipkin-trace`: Topic where aggregated traces are stored.
+- `zipkin-dependency`: Topic where dependency links per trace are stored. 
+
 ### Kafka Span Consumer
 
 This component processes collected span batches (via HTTP, Kafka, ActiveMQ, etc), 
-take each element and re-indexed them by `traceId` on a Kafka topic (default name: `zipkin-spans`).
+take each element and re-indexed them by `traceId` on the "spans" topic.
 
 This component is currently compensating how `KafkaSender` (part of [Zipkin-Reporter](https://github.com/openzipkin/zipkin-reporter-java))
 is reporting spans to Kafka, by grouping spans into batches and sending them to a un-keyed
@@ -42,13 +48,13 @@ Spans are grouped by ID and stored on a local
 where the `traceId` becomes the token, and session inactivity gap 
 (i.e. period of time without receiving a span with the same session) 
 defines if a trace is still active or not. This is evaluated on the next span received on the stream--
-regardless of incoming `traceId`. If session window is closed, a trace message is emitted to a topic
-downstream (default name: `zipkin-trace`)
+regardless of incoming `traceId`. If session window is closed, a trace message is emitted to the 
+traces topic.
 
 **Dependencies**
 
 Once `traces` are emitted downstream as part of the initial processing, dependency links are evaluated
-on each trace, and emitted on another topic (default name: `zipkin-dependency`) for further metric aggregation.
+on each trace, and emitted the dependencies topic for further metric aggregation.
 
 Kafka Streams topology:
 
@@ -57,7 +63,7 @@ Kafka Streams topology:
 #### Trace Store Stream
 
 This component build local stores from state received on `spans` Kafka topic 
-(default topic name: `zipkin-spans`) for traces, service names and autocomplete tags. 
+for traces, service names and autocomplete tags. 
 
 Kafka Streams source code: [TraceStoreTopologySupplier](storage/src/main/java/zipkin2/storage/kafka/streams/TraceStoreTopologySupplier.java)
 
@@ -67,7 +73,7 @@ Kafka Streams topology:
 
 #### Dependency Store
 
-This component build local store from state received on `dependency` Kafka topic (default name: `zipkin-dependency`)
+This component build local store from state received on `dependency` Kafka topic.
 
 It builds a 1 minute time-window when counts calls and errors.
 
