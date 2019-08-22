@@ -102,6 +102,9 @@ make zipkin-test
 
 This will start a browser and check a traces has been registered.
 
+It will send another trace after a minute (inactivity gap interval) + 1 second to trigger
+aggregation and visualize dependency graph.
+
 If running multi-node docker example, run:
 
 ```bash

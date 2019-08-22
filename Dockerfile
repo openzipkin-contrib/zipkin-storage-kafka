@@ -25,8 +25,6 @@ RUN apk add unzip curl --no-cache && \
     # don't break when unzip finds an extra header https://github.com/openzipkin/zipkin/issues/1932
     unzip zipkin-server.jar ; \
     rm zipkin-server.jar
-    # && \
-    # apk del unzip
 
 COPY autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKA_STORAGE_VERSION}-module.jar BOOT-INF/lib/kafka-module.jar
 RUN unzip -o BOOT-INF/lib/kafka-module.jar lib/* -d BOOT-INF
@@ -44,14 +42,14 @@ ENV STORAGE_TYPE kafka
 COPY --from=0 /zipkin/ /zipkin/
 WORKDIR /zipkin
 
+# TODO haven't found a better way to mount libs from custom storage. issue #28
 #COPY autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKA_STORAGE_VERSION}-module.jar kafka-module.jar
-
-# TODO haven't found a better way to mount libs from custom storage as L31
 #ENV MODULE_OPTS -Dloader.path='BOOT-INF/lib/kafka-module.jar,BOOT-INF/lib/kafka-module.jar!/lib' -Dspring.profiles.active=kafka
 ENV MODULE_OPTS -Dspring.profiles.active=kafka
 
 RUN ["/busybox/sh", "-c", "ln -s /busybox/* /bin"]
 
+ENV KAFKA_STORAGE_DIR /data
 RUN mkdir /data  && chown zipkin /data
 VOLUME /data
 
