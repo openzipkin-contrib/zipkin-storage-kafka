@@ -78,12 +78,12 @@ class KafkaStorageIT {
     storage = (KafkaStorage) new KafkaStorage.Builder()
         .bootstrapServers(kafka.getBootstrapServers())
         .storeDirectory("target/zipkin_" + System.currentTimeMillis())
-        .tracesInactivityGap(traceInactivityGap)
+        .traceInactivityGap(traceInactivityGap)
         .build();
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       Collection<NewTopic> newTopics = new ArrayList<>();
-      newTopics.add(new NewTopic(storage.spanTopicName, 1, (short) 1));
+      newTopics.add(new NewTopic(storage.spansTopicName, 1, (short) 1));
       newTopics.add(new NewTopic(storage.traceTopicName, 1, (short) 1));
       newTopics.add(new NewTopic(storage.dependencyTopicName, 1, (short) 1));
       storage.getAdminClient().createTopics(newTopics).all().get();
@@ -126,7 +126,7 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: they are partitioned
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spanTopicName, 2, 10000);
+        testConsumerConfig, storage.spansTopicName, 2, 10000);
     // Given: some time for stream processes to kick in
     Thread.sleep(traceInactivityGap.toMillis() * 2);
     // Given: another span to move 'event time' forward
@@ -139,7 +139,7 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: a trace is published
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spanTopicName, 1, 1000);
+        testConsumerConfig, storage.spansTopicName, 1, 1000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.traceTopicName, 1, 30000);
     // Then: and a dependency link created
@@ -160,11 +160,11 @@ class KafkaStorageIT {
         .build();
     List<Span> spans = Arrays.asList(parent, child);
     // When: been published
-    tracesProducer.send(new ProducerRecord<>(storage.spanTopicName, parent.traceId(), spans));
+    tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, parent.traceId(), spans));
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spanTopicName, 1, 10000);
+        testConsumerConfig, storage.spansTopicName, 1, 10000);
     // When: and stores running
     SpanStore spanStore = storage.spanStore();
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();

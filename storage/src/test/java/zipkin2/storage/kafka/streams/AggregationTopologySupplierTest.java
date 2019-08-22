@@ -15,6 +15,7 @@ package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -31,7 +32,6 @@ import zipkin2.DependencyLink;
 import zipkin2.Endpoint;
 import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
-import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -45,7 +45,6 @@ class AggregationTopologySupplierTest {
     String tracesTopicName = "traces";
     String dependencyLinksTopicName = "dependencies";
     Duration traceInactivityGap = Duration.ofSeconds(1);
-    SpanSerde spanSerde = new SpanSerde();
     SpansSerde spansSerde = new SpansSerde();
     DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
     // When: topology built
@@ -61,20 +60,20 @@ class AggregationTopologySupplierTest {
     props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     // When: two related spans coming on the same Session window
-    ConsumerRecordFactory<String, Span> factory =
-        new ConsumerRecordFactory<>(spansTopicName, new StringSerializer(), spanSerde.serializer());
+    ConsumerRecordFactory<String, List<Span>> factory =
+        new ConsumerRecordFactory<>(spansTopicName, new StringSerializer(), spansSerde.serializer());
     Span a = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
         .build();
     Span b = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
         .build();
-    testDriver.pipeInput(factory.create(spansTopicName, a.traceId(), a, 0L));
-    testDriver.pipeInput(factory.create(spansTopicName, b.traceId(), b, 0L));
+    testDriver.pipeInput(factory.create(spansTopicName, a.traceId(), Collections.singletonList(a), 0L));
+    testDriver.pipeInput(factory.create(spansTopicName, b.traceId(), Collections.singletonList(b), 0L));
     // When: and new record arrive, moving the event clock further than inactivity gap
     Span c = Span.newBuilder().traceId("c").id("c").build();
-    testDriver.pipeInput(factory.create(spansTopicName, c.traceId(), c, traceInactivityGap.toMillis() + 1));
-    // Then: a trace is aggregated.
+    testDriver.pipeInput(factory.create(spansTopicName, c.traceId(), Collections.singletonList(c), traceInactivityGap.toMillis() + 1));
+    // Then: a trace is aggregated.1
     ProducerRecord<String, List<Span>> trace =
         testDriver.readOutput(tracesTopicName, new StringDeserializer(), spansSerde.deserializer());
     assertNotNull(trace);

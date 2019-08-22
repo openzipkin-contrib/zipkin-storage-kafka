@@ -34,7 +34,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private Long dependencyRetentionPeriod;
 
-  private String spanTopic;
+  private String spansTopic;
   private String traceTopic;
   private String dependencyTopic;
 
@@ -58,16 +58,16 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
     if (traceInactivityGap != null) {
-      builder.tracesInactivityGap(Duration.ofMillis(traceInactivityGap));
+      builder.traceInactivityGap(Duration.ofMillis(traceInactivityGap));
     }
     if (traceRetentionScanFrequency != null) {
-      builder.tracesRetentionScanFrequency(Duration.ofMillis(traceRetentionScanFrequency));
+      builder.traceRetentionScanFrequency(Duration.ofMillis(traceRetentionScanFrequency));
     }
     if (traceRetentionPeriod != null) {
-      builder.tracesRetentionRetention(Duration.ofMillis(traceRetentionPeriod));
+      builder.traceRetentionPeriod(Duration.ofMillis(traceRetentionPeriod));
     }
     if (dependencyRetentionPeriod != null) {
-      builder.dependenciesRetentionPeriod(Duration.ofMillis(dependencyRetentionPeriod));
+      builder.dependencyRetentionPeriod(Duration.ofMillis(dependencyRetentionPeriod));
     }
     if (aggregationStreamAppId != null) builder.aggregationStreamAppId(aggregationStreamAppId);
     if (traceStoreStreamAppId != null) builder.aggregationStreamAppId(traceStoreStreamAppId);
@@ -75,7 +75,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       builder.aggregationStreamAppId(dependencyStoreStreamAppId);
     }
     if (storeDir != null) builder.storeDirectory(storeDir);
-    if (spanTopic != null) builder.spansTopicName(spanTopic);
+    if (spansTopic != null) builder.spansTopicName(spansTopic);
     if (traceTopic != null) builder.tracesTopicName(traceTopic);
     if (dependencyTopic != null) builder.dependenciesTopicName(dependencyTopic);
     if (adminOverrides != null) builder.adminOverrides(adminOverrides);
@@ -127,12 +127,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.traceInactivityGap = traceInactivityGap;
   }
 
-  public String getSpanTopic() {
-    return spanTopic;
+  public String getSpansTopic() {
+    return spansTopic;
   }
 
-  public void setSpanTopic(String spanTopic) {
-    this.spanTopic = spanTopic;
+  public void setSpansTopic(String spansTopic) {
+    this.spansTopic = spansTopic;
   }
 
   public Boolean getSpanConsumerEnabled() {

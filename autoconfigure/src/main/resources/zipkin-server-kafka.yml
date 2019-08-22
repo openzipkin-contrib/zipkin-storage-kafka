@@ -4,7 +4,7 @@ zipkin:
     kafka:
       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
 
-      span-topic: ${KAFKA_SPAN_TOPIC:zipkin-span}
+      spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
       trace-topic: ${KAFKA_TRACE_TOPIC:zipkin-trace}
       dependency-topic: ${KAFKA_DEPENDENCY_TOPIC:zipkin-dependency}
 

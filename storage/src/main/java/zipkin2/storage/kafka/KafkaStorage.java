@@ -71,7 +71,7 @@ public class KafkaStorage extends StorageComponent {
   // Kafka Storage configs
   final String storageDirectory;
   // Kafka Topics
-  final String spanTopicName, traceTopicName, dependencyTopicName;
+  final String spansTopicName, traceTopicName, dependencyTopicName;
   // Kafka Clients config
   final Properties adminConfig;
   final Properties producerConfig;
@@ -91,7 +91,7 @@ public class KafkaStorage extends StorageComponent {
     // Autocomplete tags
     this.autocompleteKeys = builder.autocompleteKeys;
     // Kafka Topics config
-    this.spanTopicName = builder.spanTopicName;
+    this.spansTopicName = builder.spansTopicName;
     this.traceTopicName = builder.traceTopicName;
     this.dependencyTopicName = builder.dependencyTopicName;
     // State store directories
@@ -103,13 +103,13 @@ public class KafkaStorage extends StorageComponent {
     this.traceStoreStreamConfig = builder.traceStoreStreamConfig;
     this.dependencyStoreStreamConfig = builder.dependencyStoreStreamConfig;
 
-    aggregationTopology = new AggregationTopologySupplier(spanTopicName, traceTopicName,
-        dependencyTopicName, builder.tracesInactivityGap).get();
+    aggregationTopology = new AggregationTopologySupplier(spansTopicName, traceTopicName,
+        dependencyTopicName, builder.traceInactivityGap).get();
     traceStoreTopology = new TraceStoreTopologySupplier(
-        spanTopicName,
+        spansTopicName,
         autocompleteKeys,
-        builder.tracesRetentionScanFrequency,
-        builder.tracesRetentionPeriod).get();
+        builder.traceRetentionScanFrequency,
+        builder.traceRetentionPeriod).get();
     dependencyStoreTopology = new DependencyStoreTopologySupplier(
         dependencyTopicName,
         builder.dependencyRetentionPeriod,
@@ -203,7 +203,7 @@ public class KafkaStorage extends StorageComponent {
           try {
             Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
             List<String> requiredTopics =
-                Arrays.asList(spanTopicName, dependencyTopicName, traceTopicName);
+                Arrays.asList(spansTopicName, dependencyTopicName, traceTopicName);
             for (String requiredTopic : requiredTopics) {
               if (!topics.contains(requiredTopic)) {
                 LOG.error("Topic {} not found", requiredTopic);
@@ -312,7 +312,8 @@ public class KafkaStorage extends StorageComponent {
     if (dependencyStoreStream == null) {
       synchronized (this) {
         if (dependencyStoreStream == null) {
-          dependencyStoreStream = new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
+          dependencyStoreStream =
+              new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
           dependencyStoreStream.start();
         }
       }
@@ -339,9 +340,9 @@ public class KafkaStorage extends StorageComponent {
 
     List<String> autocompleteKeys = new ArrayList<>();
 
-    Duration tracesRetentionPeriod = Duration.ofDays(7);
-    Duration tracesRetentionScanFrequency = Duration.ofHours(1);
-    Duration tracesInactivityGap = Duration.ofSeconds(30);
+    Duration traceRetentionPeriod = Duration.ofDays(7);
+    Duration traceRetentionScanFrequency = Duration.ofHours(1);
+    Duration traceInactivityGap = Duration.ofSeconds(30);
     Duration dependencyRetentionPeriod = Duration.ofDays(7);
     Duration dependencyWindowSize = Duration.ofMinutes(1);
 
@@ -357,7 +358,7 @@ public class KafkaStorage extends StorageComponent {
     String dependencyStoreStreamAppId = "zipkin-dependency-store";
     String aggregationStreamAppId = "zipkin-aggregation";
 
-    String spanTopicName = "zipkin-span";
+    String spansTopicName = "zipkin-spans";
     String traceTopicName = "zipkin-trace";
     String dependencyTopicName = "zipkin-dependency";
 
@@ -435,11 +436,11 @@ public class KafkaStorage extends StorageComponent {
     /**
      * How long to wait for a span in order to trigger a trace as completed.
      */
-    public Builder tracesInactivityGap(Duration tracesInactivityGap) {
-      if (tracesInactivityGap == null) {
-        throw new NullPointerException("tracesInactivityGap == null");
+    public Builder traceInactivityGap(Duration traceInactivityGap) {
+      if (traceInactivityGap == null) {
+        throw new NullPointerException("traceInactivityGap == null");
       }
-      this.tracesInactivityGap = tracesInactivityGap;
+      this.traceInactivityGap = traceInactivityGap;
       return this;
     }
 
@@ -466,16 +467,21 @@ public class KafkaStorage extends StorageComponent {
     }
 
     public Builder traceStoreStreamAppId(String traceStoreStreamAppId) {
-      if (traceStoreStreamAppId == null) throw new NullPointerException("traceStoreStreamAppId == null");
+      if (traceStoreStreamAppId == null) {
+        throw new NullPointerException("traceStoreStreamAppId == null");
+      }
       this.traceStoreStreamAppId = traceStoreStreamAppId;
       traceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, traceStoreStreamAppId);
       return this;
     }
 
     public Builder dependencyStoreStreamAppId(String dependencyStoreStreamAppId) {
-      if (dependencyStoreStreamAppId == null) throw new NullPointerException("dependencyStoreStreamAppId == null");
+      if (dependencyStoreStreamAppId == null) {
+        throw new NullPointerException("dependencyStoreStreamAppId == null");
+      }
       this.dependencyStoreStreamAppId = dependencyStoreStreamAppId;
-      dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, dependencyStoreStreamAppId);
+      dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
+          dependencyStoreStreamAppId);
       return this;
     }
 
@@ -487,7 +493,7 @@ public class KafkaStorage extends StorageComponent {
      */
     public Builder spansTopicName(String spansTopicName) {
       if (spansTopicName == null) throw new NullPointerException("spansTopicName == null");
-      this.spanTopicName = spansTopicName;
+      this.spansTopicName = spansTopicName;
       return this;
     }
 
@@ -528,41 +534,51 @@ public class KafkaStorage extends StorageComponent {
     /**
      * Frequency to check retention policy.
      */
-    public Builder tracesRetentionScanFrequency(Duration tracesRetentionScanFrequency) {
-      this.tracesRetentionScanFrequency = tracesRetentionScanFrequency;
+    public Builder traceRetentionScanFrequency(Duration traceRetentionScanFrequency) {
+      if (traceRetentionScanFrequency == null) {
+        throw new NullPointerException("traceRetentionScanFrequency == null");
+      }
+      this.traceRetentionScanFrequency = traceRetentionScanFrequency;
       return this;
     }
 
     /**
      * Maximum age for traces and spans to be retained on State Stores.
      */
-    public Builder tracesRetentionRetention(Duration tracesRetentionMaxAge) {
-      this.tracesRetentionPeriod = tracesRetentionMaxAge;
+    public Builder traceRetentionPeriod(Duration traceRetentionPeriod) {
+      if (this.traceRetentionPeriod == null) {
+        throw new NullPointerException("traceRetentionPeriod == null");
+      }
+      this.traceRetentionPeriod = traceRetentionPeriod;
       return this;
     }
 
     /**
      * Retention period for Dependencies.
      */
-    public Builder dependenciesRetentionPeriod(Duration dependenciesRetentionPeriod) {
-      this.dependencyRetentionPeriod = dependenciesRetentionPeriod;
+    public Builder dependencyRetentionPeriod(Duration dependencyRetentionPeriod) {
+      if (dependencyRetentionPeriod == null) {
+        throw new NullPointerException("dependencyRetentionPeriod == null");
+      }
+      this.dependencyRetentionPeriod = dependencyRetentionPeriod;
       return this;
     }
 
     /**
      * Dependencies store window size
      */
-    public Builder dependenciesWindowSize(Duration dependenciesWindowSize) {
-      this.dependencyWindowSize = dependenciesWindowSize;
+    public Builder dependencyWindowSize(Duration dependencyWindowSize) {
+      if (dependencyWindowSize == null) throw new NullPointerException("dependencyWindowSize == null");
+      this.dependencyWindowSize = dependencyWindowSize;
       return this;
     }
 
     String traceStoreDirectory() {
-      return storeDir + "/streams/traces";
+      return storeDir + "/traces";
     }
 
     String dependencyStoreDirectory() {
-      return storeDir + "/streams/dependencies";
+      return storeDir + "/dependencies";
     }
 
     /**
@@ -669,7 +685,6 @@ public class KafkaStorage extends StorageComponent {
       dependencyStoreStreamConfig.putAll(overrides);
       return this;
     }
-
 
     @Override
     public StorageComponent build() {

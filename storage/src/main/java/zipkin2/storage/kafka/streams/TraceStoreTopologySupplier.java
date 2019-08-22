@@ -53,7 +53,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
 
   static final Logger LOG = LoggerFactory.getLogger(TraceStoreTopologySupplier.class);
   // Kafka topics
-  final String spanTopicName;
+  final String spansTopicName;
   // Limits
   final List<String> autocompleteKeys;
   final Duration tracesRetentionScanFrequency;
@@ -63,10 +63,10 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   final SpanIdsSerde spanIdsSerde;
   final NamesSerde namesSerde;
 
-  public TraceStoreTopologySupplier(String spanTopicName,
+  public TraceStoreTopologySupplier(String spansTopicName,
       List<String> autocompleteKeys, Duration tracesRetentionScanFrequency,
       Duration tracesRetentionPeriod) {
-    this.spanTopicName = spanTopicName;
+    this.spansTopicName = spansTopicName;
     this.autocompleteKeys = autocompleteKeys;
     this.tracesRetentionScanFrequency = tracesRetentionScanFrequency;
     this.tracesRetentionPeriod = tracesRetentionPeriod;
@@ -105,7 +105,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
             namesSerde));
     // Traces stream
     KStream<String, List<Span>> spansStream = builder
-        .stream(spanTopicName, Consumed.with(Serdes.String(), spansSerde));
+        .stream(spansTopicName, Consumed.with(Serdes.String(), spansSerde));
     // Store traces
     spansStream
         .process(() -> new Processor<String, List<Span>>() {

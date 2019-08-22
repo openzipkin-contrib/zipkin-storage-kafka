@@ -33,7 +33,6 @@ import zipkin2.Span;
 import zipkin2.internal.DependencyLinker;
 import zipkin2.internal.Trace;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
-import zipkin2.storage.kafka.streams.serdes.SpanSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static org.apache.kafka.streams.kstream.Suppressed.BufferConfig.unbounded;
@@ -45,26 +44,24 @@ import static zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde.linkKey;
  */
 public class AggregationTopologySupplier implements Supplier<Topology> {
   // Kafka topics
-  final String spanTopicName;
+  final String spansTopicName;
   final String traceTopicName;
   final String dependencyTopicName;
   // Config
   final Duration tracesInactivityGap;
   // SerDes
-  final SpanSerde spanSerde;
   final SpansSerde spansSerde;
   final DependencyLinkSerde dependencyLinkSerde;
 
   public AggregationTopologySupplier(
-      String spanTopicName,
+      String spansTopicName,
       String traceTopicName,
       String dependencyTopicName,
       Duration tracesInactivityGap) {
-    this.spanTopicName = spanTopicName;
+    this.spansTopicName = spansTopicName;
     this.traceTopicName = traceTopicName;
     this.dependencyTopicName = dependencyTopicName;
     this.tracesInactivityGap = tracesInactivityGap;
-    spanSerde = new SpanSerde();
     spansSerde = new SpansSerde();
     dependencyLinkSerde = new DependencyLinkSerde();
   }
@@ -73,7 +70,7 @@ public class AggregationTopologySupplier implements Supplier<Topology> {
     StreamsBuilder builder = new StreamsBuilder();
     // Aggregate Spans to Traces
     KStream<String, List<Span>> tracesStream =
-        builder.stream(spanTopicName, Consumed.with(Serdes.String(), spanSerde))
+        builder.stream(spansTopicName, Consumed.with(Serdes.String(), spansSerde))
             .groupByKey()
             // how long to wait for another span
             .windowedBy(SessionWindows.with(tracesInactivityGap).grace(Duration.ZERO))
@@ -99,9 +96,9 @@ public class AggregationTopologySupplier implements Supplier<Topology> {
     };
   }
 
-  Aggregator<String, Span, List<Span>> aggregateSpans() {
+  Aggregator<String, List<Span>, List<Span>> aggregateSpans() {
     return (traceId, span, spans) -> {
-      if (!spans.contains(span)) spans.add(span);
+      if (!spans.containsAll(span)) spans.addAll(span);
       return Trace.merge(spans);
     };
   }

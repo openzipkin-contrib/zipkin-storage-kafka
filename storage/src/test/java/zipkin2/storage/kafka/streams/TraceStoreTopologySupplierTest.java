@@ -45,14 +45,14 @@ class TraceStoreTopologySupplierTest {
 
   @Test void should_persist_stores() {
     // Given: configs
-    String spanTopicName = "zipkin-span";
+    String spansTopicName = "zipkin-spans";
     Duration tracesRetentionScanFrequency = Duration.ofMinutes(1);
     Duration tracesRetentionPeriod = Duration.ofMillis(5);
     List<String> autocompleteKeys = Collections.singletonList("environment");
     SpansSerde spansSerde = new SpansSerde();
     // When: topology provided
     Topology topology = new TraceStoreTopologySupplier(
-        spanTopicName,
+        spansTopicName,
         autocompleteKeys,
         tracesRetentionScanFrequency,
         tracesRetentionPeriod
@@ -70,7 +70,7 @@ class TraceStoreTopologySupplierTest {
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     // When: a trace is passed
     ConsumerRecordFactory<String, List<Span>> factory =
-        new ConsumerRecordFactory<>(spanTopicName, new StringSerializer(),
+        new ConsumerRecordFactory<>(spansTopicName, new StringSerializer(),
             spansSerde.serializer());
     Span a = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
@@ -82,7 +82,7 @@ class TraceStoreTopologySupplierTest {
         .timestamp(10000L).duration(10L)
         .build();
     List<Span> spans = Arrays.asList(a, b);
-    testDriver.pipeInput(factory.create(spanTopicName, a.traceId(), spans, 10L));
+    testDriver.pipeInput(factory.create(spansTopicName, a.traceId(), spans, 10L));
     // Then: trace stores are filled
     KeyValueStore<String, List<Span>> traces =
         testDriver.getKeyValueStore(TRACES_STORE_NAME);
@@ -110,7 +110,7 @@ class TraceStoreTopologySupplierTest {
         .timestamp(tracesRetentionScanFrequency.toMillis() * 1000 + 20000L)
         .build();
     testDriver.pipeInput(
-        factory.create(spanTopicName, c.traceId(), Collections.singletonList(c),
+        factory.create(spansTopicName, c.traceId(), Collections.singletonList(c),
             tracesRetentionScanFrequency.toMillis() + 1));
 
     // Then: Traces store is empty

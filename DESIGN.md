@@ -21,7 +21,7 @@ Storage is composed by 3 main components:
 ### Kafka Span Consumer
 
 This component processes collected span batches (via HTTP, Kafka, ActiveMQ, etc), 
-take each element and re-indexed them by `traceId` on a Kafka topic (default name: `zipkin-span`).
+take each element and re-indexed them by `traceId` on a Kafka topic (default name: `zipkin-spans`).
 
 This component is currently compensating how `KafkaSender` (part of [Zipkin-Reporter](https://github.com/openzipkin/zipkin-reporter-java))
 is reporting spans to Kafka, by grouping spans into batches and sending them to a un-keyed
@@ -56,8 +56,8 @@ Kafka Streams topology:
 
 #### Trace Store Stream
 
-This component build local stores from state received on `span` Kafka topic 
-(default topic name: `zipkin-span`) for traces, service names and autocomplete tags. 
+This component build local stores from state received on `spans` Kafka topic 
+(default topic name: `zipkin-spans`) for traces, service names and autocomplete tags. 
 
 Kafka Streams source code: [TraceStoreTopologySupplier](storage/src/main/java/zipkin2/storage/kafka/streams/TraceStoreTopologySupplier.java)
 
