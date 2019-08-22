@@ -38,15 +38,15 @@ public class DependencyStoreTopologySupplier implements Supplier<Topology> {
   // Kafka topics
   final String dependencyTopicName;
   // Configs
-  final Duration dependencyRetentionPeriod;
+  final Duration dependencyTtl;
   final Duration dependencyWindowSize;
   // SerDes
   final DependencyLinkSerde dependencyLinkSerde;
 
   public DependencyStoreTopologySupplier(String dependencyTopicName,
-      Duration dependencyRetentionPeriod, Duration dependencyWindowSize) {
+      Duration dependencyTtl, Duration dependencyWindowSize) {
     this.dependencyTopicName = dependencyTopicName;
-    this.dependencyRetentionPeriod = dependencyRetentionPeriod;
+    this.dependencyTtl = dependencyTtl;
     this.dependencyWindowSize = dependencyWindowSize;
     dependencyLinkSerde = new DependencyLinkSerde();
   }
@@ -58,7 +58,7 @@ public class DependencyStoreTopologySupplier implements Supplier<Topology> {
     builder.addStateStore(Stores.windowStoreBuilder(
         Stores.persistentWindowStore(
             DEPENDENCIES_STORE_NAME,
-            dependencyRetentionPeriod,
+            dependencyTtl,
             dependencyWindowSize,
             false),
         Serdes.String(),

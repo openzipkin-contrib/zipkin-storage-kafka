@@ -78,13 +78,6 @@
                     <excludeGroupIds>
                         io.zipkin.zipkin2,io.zipkin.reporter2,org.springframework.boot,org.springframework,com.fasterxml.jackson.core,com.google.auto.value,com.google.gson
                     </excludeGroupIds>
-                    <excludes>
-                        <!-- zipkin-server depends on armeria-->
-                        <exclude>
-                            <groupId>com.linecorp.armeria</groupId>
-                            <artifactId>armeria</artifactId>
-                        </exclude>
-                    </excludes>
                 </configuration>
             </plugin>
         </plugins>

@@ -165,7 +165,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     context = new AnnotationConfigApplicationContext();
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.span-topic:zipkin-spans-1"
+        "zipkin.storage.kafka.spans-topic:zipkin-spans-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();

@@ -56,20 +56,20 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   final String spansTopicName;
   // Limits
   final List<String> autocompleteKeys;
-  final Duration tracesRetentionScanFrequency;
-  final Duration tracesRetentionPeriod;
+  final Duration tracesGcInterval;
+  final Duration tracesTtl;
   // SerDes
   final SpansSerde spansSerde;
   final SpanIdsSerde spanIdsSerde;
   final NamesSerde namesSerde;
 
   public TraceStoreTopologySupplier(String spansTopicName,
-      List<String> autocompleteKeys, Duration tracesRetentionScanFrequency,
-      Duration tracesRetentionPeriod) {
+      List<String> autocompleteKeys, Duration tracesGcInterval,
+      Duration tracesTtl) {
     this.spansTopicName = spansTopicName;
     this.autocompleteKeys = autocompleteKeys;
-    this.tracesRetentionScanFrequency = tracesRetentionScanFrequency;
-    this.tracesRetentionPeriod = tracesRetentionPeriod;
+    this.tracesGcInterval = tracesGcInterval;
+    this.tracesTtl = tracesTtl;
     spansSerde = new SpansSerde();
     spanIdsSerde = new SpanIdsSerde();
     namesSerde = new NamesSerde();
@@ -123,13 +123,13 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                 (KeyValueStore<Long, Set<String>>) context.getStateStore(SPAN_IDS_BY_TS_STORE_NAME);
             // Retention scheduling
             context.schedule(
-                tracesRetentionScanFrequency,
+                tracesGcInterval,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
-                  if (tracesRetentionPeriod.toMillis() > 0) {
+                  if (tracesTtl.toMillis() > 0) {
                     // preparing range filtering
                     long from = 0L;
-                    long to = timestamp - tracesRetentionPeriod.toMillis();
+                    long to = timestamp - tracesTtl.toMillis();
                     long toMicro = to * 1000;
                     // query traceIds active during period
                     try (final KeyValueIterator<Long, Set<String>> all =

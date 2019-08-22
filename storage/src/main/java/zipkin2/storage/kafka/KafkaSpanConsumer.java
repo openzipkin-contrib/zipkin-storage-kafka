@@ -15,6 +15,7 @@ package zipkin2.storage.kafka;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
@@ -52,7 +53,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
     // Collect traceId:spans
     for (Span span : spans) {
       String key = span.traceId();
-      byte[] value = SpanBytesEncoder.PROTO3.encode(span);
+      byte[] value = SpanBytesEncoder.PROTO3.encodeList(Collections.singletonList(span));
       calls.add(KafkaProducerCall.create(producer, spansTopicName, key, value));
     }
     return AggregateCall.newVoidCall(calls);

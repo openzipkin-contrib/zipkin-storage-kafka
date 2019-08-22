@@ -108,11 +108,11 @@ public class KafkaStorage extends StorageComponent {
     traceStoreTopology = new TraceStoreTopologySupplier(
         spansTopicName,
         autocompleteKeys,
-        builder.traceRetentionScanFrequency,
-        builder.traceRetentionPeriod).get();
+        builder.traceGcInterval,
+        builder.traceTtl).get();
     dependencyStoreTopology = new DependencyStoreTopologySupplier(
         dependencyTopicName,
-        builder.dependencyRetentionPeriod,
+        builder.dependencyTtl,
         builder.dependencyWindowSize).get();
   }
 
@@ -340,10 +340,10 @@ public class KafkaStorage extends StorageComponent {
 
     List<String> autocompleteKeys = new ArrayList<>();
 
-    Duration traceRetentionPeriod = Duration.ofDays(7);
-    Duration traceRetentionScanFrequency = Duration.ofHours(1);
+    Duration traceTtl = Duration.ofDays(7);
+    Duration traceGcInterval = Duration.ofHours(1);
     Duration traceInactivityGap = Duration.ofSeconds(30);
-    Duration dependencyRetentionPeriod = Duration.ofDays(7);
+    Duration dependencyTtl = Duration.ofDays(7);
     Duration dependencyWindowSize = Duration.ofMinutes(1);
 
     String storeDir = "/tmp/zipkin";
@@ -534,33 +534,33 @@ public class KafkaStorage extends StorageComponent {
     /**
      * Frequency to check retention policy.
      */
-    public Builder traceRetentionScanFrequency(Duration traceRetentionScanFrequency) {
-      if (traceRetentionScanFrequency == null) {
-        throw new NullPointerException("traceRetentionScanFrequency == null");
+    public Builder traceGcInterval(Duration traceGcInterval) {
+      if (traceGcInterval == null) {
+        throw new NullPointerException("traceGcInterval == null");
       }
-      this.traceRetentionScanFrequency = traceRetentionScanFrequency;
+      this.traceGcInterval = traceGcInterval;
       return this;
     }
 
     /**
-     * Maximum age for traces and spans to be retained on State Stores.
+     * Traces time-to-live on local state stores.
      */
-    public Builder traceRetentionPeriod(Duration traceRetentionPeriod) {
-      if (this.traceRetentionPeriod == null) {
-        throw new NullPointerException("traceRetentionPeriod == null");
+    public Builder traceTtl(Duration traceTtl) {
+      if (this.traceTtl == null) {
+        throw new NullPointerException("traceTtl == null");
       }
-      this.traceRetentionPeriod = traceRetentionPeriod;
+      this.traceTtl = traceTtl;
       return this;
     }
 
     /**
-     * Retention period for Dependencies.
+     * Dependencies time-to-live on local state stores.
      */
-    public Builder dependencyRetentionPeriod(Duration dependencyRetentionPeriod) {
-      if (dependencyRetentionPeriod == null) {
-        throw new NullPointerException("dependencyRetentionPeriod == null");
+    public Builder dependencyTtl(Duration dependencyTtl) {
+      if (dependencyTtl == null) {
+        throw new NullPointerException("dependencyTtl == null");
       }
-      this.dependencyRetentionPeriod = dependencyRetentionPeriod;
+      this.dependencyTtl = dependencyTtl;
       return this;
     }
 
