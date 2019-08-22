@@ -109,7 +109,8 @@ public class KafkaStorage extends StorageComponent {
         spansTopicName,
         autocompleteKeys,
         builder.traceGcInterval,
-        builder.traceTtl).get();
+        builder.traceTtl,
+        builder.minTracesStored).get();
     dependencyStoreTopology = new DependencyStoreTopologySupplier(
         dependencyTopicName,
         builder.dependencyTtl,
@@ -340,13 +341,15 @@ public class KafkaStorage extends StorageComponent {
 
     List<String> autocompleteKeys = new ArrayList<>();
 
-    Duration traceTtl = Duration.ofDays(7);
+    Duration traceTtl = Duration.ofDays(3);
     Duration traceGcInterval = Duration.ofHours(1);
-    Duration traceInactivityGap = Duration.ofSeconds(30);
+    Duration traceInactivityGap = Duration.ofMinutes(1);
     Duration dependencyTtl = Duration.ofDays(7);
     Duration dependencyWindowSize = Duration.ofMinutes(1);
 
-    String storeDir = "/tmp/zipkin";
+    long minTracesStored = 10_000;
+
+    String storeDir = "/tmp/zipkin-storage-kafka";
 
     Properties adminConfig = new Properties();
     Properties producerConfig = new Properties();
@@ -369,7 +372,7 @@ public class KafkaStorage extends StorageComponent {
       producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
       producerConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.SNAPPY.name);
       producerConfig.put(ProducerConfig.BATCH_SIZE_CONFIG, 500_000);
-      producerConfig.put(ProducerConfig.LINGER_MS_CONFIG, 100);
+      producerConfig.put(ProducerConfig.LINGER_MS_CONFIG, 5);
       // Trace Aggregation Stream Topology configuration
       aggregationStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
           Serdes.StringSerde.class);
@@ -564,15 +567,6 @@ public class KafkaStorage extends StorageComponent {
       return this;
     }
 
-    /**
-     * Dependencies store window size
-     */
-    public Builder dependencyWindowSize(Duration dependencyWindowSize) {
-      if (dependencyWindowSize == null) throw new NullPointerException("dependencyWindowSize == null");
-      this.dependencyWindowSize = dependencyWindowSize;
-      return this;
-    }
-
     String traceStoreDirectory() {
       return storeDir + "/traces";
     }
@@ -582,19 +576,19 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * By default, a consumer will be built from properties derived from builder defaults, as well
-     * as "auto.offset.reset" -> "earliest". Any properties set here will override the consumer
+     * By default, an Admin Client will be built from properties derived from builder defaults, as well
+     * as "client.id" -> "zipkin-storage". Any properties set here will override the admin client
      * config.
      *
-     * <p>For example: Only consume spans since you connected by setting the below.
+     * <p>For example: Set the client ID for the AdminClient.
      *
      * <pre>{@code
      * Map<String, String> overrides = new LinkedHashMap<>();
-     * overrides.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+     * overrides.put(AdminClientConfig.CLIENT_ID_CONFIG, "zipkin-storage");
      * builder.overrides(overrides);
      * }</pre>
      *
-     * @see org.apache.kafka.clients.consumer.ConsumerConfig
+     * @see org.apache.kafka.clients.admin.AdminClientConfig
      */
     public final Builder adminOverrides(Map<String, ?> overrides) {
       if (overrides == null) throw new NullPointerException("overrides == null");
@@ -603,19 +597,19 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * By default, a consumer will be built from properties derived from builder defaults, as well
-     * as "auto.offset.reset" -> "earliest". Any properties set here will override the consumer
+     * By default, a produce will be built from properties derived from builder defaults, as well
+     * as "batch.size" -> 1000. Any properties set here will override the consumer
      * config.
      *
-     * <p>For example: Only consume spans since you connected by setting the below.
+     * <p>For example: Only send batch of list of spans with a maximum size of 1000 bytes
      *
      * <pre>{@code
      * Map<String, String> overrides = new LinkedHashMap<>();
-     * overrides.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+     * overrides.put(ProducerConfig.BATCH_SIZE_CONFIG, 1000);
      * builder.overrides(overrides);
      * }</pre>
      *
-     * @see org.apache.kafka.clients.consumer.ConsumerConfig
+     * @see org.apache.kafka.clients.producer.ProducerConfig
      */
     public final Builder producerOverrides(Map<String, ?> overrides) {
       if (overrides == null) throw new NullPointerException("overrides == null");
@@ -624,19 +618,19 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * By default, a consumer will be built from properties derived from builder defaults, as well
-     * as "auto.offset.reset" -> "earliest". Any properties set here will override the consumer
+     * By default, a Kafka Streams applications will be built from properties derived from builder defaults, as well
+     * as "poll.ms" -> 5000. Any properties set here will override the Kafka Streams application
      * config.
      *
-     * <p>For example: Only consume spans since you connected by setting the below.
+     * <p>For example: to change the Streams poll timeout:
      *
      * <pre>{@code
      * Map<String, String> overrides = new LinkedHashMap<>();
-     * overrides.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
-     * builder.overrides(overrides);
+     * overrides.put(StreamsConfig.POLL_MS, 5000);
+     * builder.aggregationStreamOverrides(overrides);
      * }</pre>
      *
-     * @see org.apache.kafka.clients.consumer.ConsumerConfig
+     * @see org.apache.kafka.streams.StreamsConfig
      */
     public final Builder aggregationStreamOverrides(Map<String, ?> overrides) {
       if (overrides == null) throw new NullPointerException("overrides == null");
@@ -645,19 +639,19 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * By default, a consumer will be built from properties derived from builder defaults, as well
-     * as "auto.offset.reset" -> "earliest". Any properties set here will override the consumer
+     * By default, a Kafka Streams applications will be built from properties derived from builder defaults, as well
+     * as "poll.ms" -> 5000. Any properties set here will override the Kafka Streams application
      * config.
      *
-     * <p>For example: Only consume spans since you connected by setting the below.
+     * <p>For example: to change the Streams poll timeout:
      *
      * <pre>{@code
      * Map<String, String> overrides = new LinkedHashMap<>();
-     * overrides.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
-     * builder.overrides(overrides);
+     * overrides.put(StreamsConfig.POLL_MS, 5000);
+     * builder.traceStoreStreamOverrides(overrides);
      * }</pre>
      *
-     * @see org.apache.kafka.clients.consumer.ConsumerConfig
+     * @see org.apache.kafka.streams.StreamsConfig
      */
     public final Builder traceStoreStreamOverrides(Map<String, ?> overrides) {
       if (overrides == null) throw new NullPointerException("overrides == null");
@@ -666,19 +660,19 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * By default, a consumer will be built from properties derived from builder defaults, as well
-     * as "auto.offset.reset" -> "earliest". Any properties set here will override the consumer
+     * By default, a Kafka Streams applications will be built from properties derived from builder defaults, as well
+     * as "poll.ms" -> 5000. Any properties set here will override the Kafka Streams application
      * config.
      *
-     * <p>For example: Only consume spans since you connected by setting the below.
+     * <p>For example: to change the Streams poll timeout:
      *
      * <pre>{@code
      * Map<String, String> overrides = new LinkedHashMap<>();
-     * overrides.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
-     * builder.overrides(overrides);
+     * overrides.put(StreamsConfig.POLL_MS, 5000);
+     * builder.dependencyStoreStreamOverrides(overrides);
      * }</pre>
      *
-     * @see org.apache.kafka.clients.consumer.ConsumerConfig
+     * @see org.apache.kafka.streams.StreamsConfig
      */
     public final Builder dependencyStoreStreamOverrides(Map<String, ?> overrides) {
       if (overrides == null) throw new NullPointerException("overrides == null");

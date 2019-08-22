@@ -55,8 +55,8 @@ class TraceStoreTopologySupplierTest {
         spansTopicName,
         autocompleteKeys,
         tracesRetentionScanFrequency,
-        tracesRetentionPeriod
-    ).get();
+        tracesRetentionPeriod,
+        0).get();
     TopologyDescription description = topology.describe();
     System.out.println("Topology: \n" + description);
     // Then: 2 threads prepared

@@ -58,18 +58,19 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   final List<String> autocompleteKeys;
   final Duration tracesGcInterval;
   final Duration tracesTtl;
+  final long minTracesStored;
   // SerDes
   final SpansSerde spansSerde;
   final SpanIdsSerde spanIdsSerde;
   final NamesSerde namesSerde;
 
-  public TraceStoreTopologySupplier(String spansTopicName,
-      List<String> autocompleteKeys, Duration tracesGcInterval,
-      Duration tracesTtl) {
+  public TraceStoreTopologySupplier(String spansTopicName, List<String> autocompleteKeys,
+      Duration tracesGcInterval, Duration tracesTtl, long minTracesStored) {
     this.spansTopicName = spansTopicName;
     this.autocompleteKeys = autocompleteKeys;
     this.tracesGcInterval = tracesGcInterval;
     this.tracesTtl = tracesTtl;
+    this.minTracesStored = minTracesStored;
     spansSerde = new SpansSerde();
     spanIdsSerde = new SpanIdsSerde();
     namesSerde = new NamesSerde();
@@ -126,7 +127,8 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                 tracesGcInterval,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
-                  if (tracesTtl.toMillis() > 0) {
+                  if (tracesTtl.toMillis() > 0 &&
+                      tracesStore.approximateNumEntries() > minTracesStored) {
                     // preparing range filtering
                     long from = 0L;
                     long to = timestamp - tracesTtl.toMillis();

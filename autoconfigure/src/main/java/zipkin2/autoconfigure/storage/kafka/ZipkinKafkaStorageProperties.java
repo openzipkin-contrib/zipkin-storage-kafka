@@ -83,9 +83,16 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     if (aggregationStreamOverrides != null) {
       builder.aggregationStreamOverrides(aggregationStreamOverrides);
     }
-    if (traceStoreStreamOverrides != null) builder.traceStoreStreamOverrides(traceStoreStreamOverrides);
+    if (traceStoreStreamOverrides != null) {
+      builder.traceStoreStreamOverrides(traceStoreStreamOverrides);
+    }
     if (dependencyStoreStreamOverrides != null) {
       builder.dependencyStoreStreamOverrides(dependencyStoreStreamOverrides);
+    }
+    if (aggregationStreamAppId != null) builder.aggregationStreamAppId(aggregationStreamAppId);
+    if (traceStoreStreamAppId != null) builder.traceStoreStreamAppId(traceStoreStreamAppId);
+    if (dependencyStoreStreamAppId != null) {
+      builder.dependencyStoreStreamAppId(dependencyStoreStreamAppId);
     }
 
     return builder;
