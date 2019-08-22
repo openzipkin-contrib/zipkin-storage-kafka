@@ -97,9 +97,9 @@ public class AggregationTopologySupplier implements Supplier<Topology> {
   }
 
   Aggregator<String, List<Span>, List<Span>> aggregateSpans() {
-    return (traceId, span, spans) -> {
-      if (!spans.containsAll(span)) spans.addAll(span);
-      return Trace.merge(spans);
+    return (traceId, spans, allSpans) -> {
+      allSpans.addAll(spans);
+      return Trace.merge(allSpans);
     };
   }
 
