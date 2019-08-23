@@ -12,34 +12,49 @@
 # the License.
 #
 
-FROM openjdk:8
+FROM alpine
 
-ARG KAFKA_STORAGE_VERSION=0.1.1
+ENV ZIPKIN_REPO https://repo1.maven.org/maven2
+ENV ZIPKIN_VERSION 2.16.1
+ENV KAFKA_STORAGE_VERSION 0.4.1-SNAPSHOT
 
-ENV ZIPKIN_REPO https://jcenter.bintray.com
-ENV ZIPKIN_VERSION 2.12.6
-ENV ZIPKIN_LOGGING_LEVEL INFO
+WORKDIR /zipkin
+
+RUN apk add unzip curl --no-cache && \
+    curl -SL $ZIPKIN_REPO/io/zipkin/zipkin-server/$ZIPKIN_VERSION/zipkin-server-$ZIPKIN_VERSION-exec.jar > zipkin-server.jar && \
+    # don't break when unzip finds an extra header https://github.com/openzipkin/zipkin/issues/1932
+    unzip zipkin-server.jar ; \
+    rm zipkin-server.jar
+
+COPY autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKA_STORAGE_VERSION}-module.jar BOOT-INF/lib/kafka-module.jar
+RUN unzip -o BOOT-INF/lib/kafka-module.jar lib/* -d BOOT-INF
+
+FROM gcr.io/distroless/java:11-debug
 
 # Use to set heap, trust store or other system properties.
 ENV JAVA_OPTS -Djava.security.egd=file:/dev/./urandom
+
+RUN ["/busybox/sh", "-c", "adduser -g '' -D zipkin"]
+
 # Add environment settings for supported storage types
+ENV STORAGE_TYPE kafka
+
+COPY --from=0 /zipkin/ /zipkin/
 WORKDIR /zipkin
 
-RUN curl -SL $ZIPKIN_REPO/io/zipkin/java/zipkin-server/$ZIPKIN_VERSION/zipkin-server-${ZIPKIN_VERSION}-exec.jar > zipkin.jar
+# TODO haven't found a better way to mount libs from custom storage. issue #28
+#COPY autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKA_STORAGE_VERSION}-module.jar kafka-module.jar
+#ENV MODULE_OPTS -Dloader.path='BOOT-INF/lib/kafka-module.jar,BOOT-INF/lib/kafka-module.jar!/lib' -Dspring.profiles.active=kafka
+ENV MODULE_OPTS -Dspring.profiles.active=kafka
 
-ADD storage/target/zipkin-storage-kafka-${KAFKA_STORAGE_VERSION}.jar zipkin-storage-kafka.jar
-ADD autoconfigure/target/zipkin-autoconfigure-storage-kafka-${KAFKA_STORAGE_VERSION}-module.jar zipkin-autoconfigure-storage-kafka.jar
+RUN ["/busybox/sh", "-c", "ln -s /busybox/* /bin"]
 
-ENV STORAGE_TYPE=kafkastore
+ENV KAFKA_STORAGE_DIR /data
+RUN mkdir /data  && chown zipkin /data
+VOLUME /data
 
-EXPOSE 9410 9411
+USER zipkin
 
-CMD exec java \
-    ${JAVA_OPTS} \
-    -Dloader.path='zipkin-storage-kafka.jar,zipkin-autoconfigure-storage-kafka.jar' \
-    -Dspring.profiles.active=kafkastore \
-    -Dcom.linecorp.armeria.annotatedServiceExceptionVerbosity=all \
-    -Dcom.linecorp.armeria.verboseExceptions=true \
-    -cp zipkin.jar \
-    org.springframework.boot.loader.PropertiesLauncher \
-    --logging.level.zipkin2=${ZIPKIN_LOGGING_LEVEL}
+EXPOSE 9411
+
+ENTRYPOINT ["/busybox/sh", "-c", "exec java ${MODULE_OPTS} ${JAVA_OPTS} -cp . org.springframework.boot.loader.PropertiesLauncher"]

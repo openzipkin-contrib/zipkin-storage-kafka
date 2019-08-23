@@ -15,7 +15,8 @@ package zipkin2.autoconfigure.storage.kafka;
 
 import java.io.Serializable;
 import java.time.Duration;
-import org.apache.kafka.common.record.CompressionType;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import zipkin2.storage.kafka.KafkaStorage;
 
@@ -23,90 +24,82 @@ import zipkin2.storage.kafka.KafkaStorage;
 public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
 
-  private boolean spanConsumerEnabled = true;
-  private boolean spanStoreEnabled = true;
+  private Boolean spanConsumerEnabled;
 
-  private boolean ensureTopics = true;
-  private String bootstrapServers = "localhost:9092";
-  private String compressionType = CompressionType.NONE.name();
+  private String bootstrapServers;
 
-  private Long retentionScanFrequency = Duration.ofDays(1).toMillis();
-  private Long retentionMaxAge = Duration.ofDays(7).toMillis();
-  private Long traceInactivityGap = Duration.ofMinutes(1).toMillis();
+  private Long traceTtlCheckInterval;
+  private Long traceTtl;
+  private Long traceTimeout;
 
-  private String spansTopic = "zipkin-spans-v1";
-  private Integer spansTopicPartitions = 1;
-  private Short spansTopicReplicationFactor = 1;
-  private String spanServicesTopic = "zipkin-span-services-v1";
-  private Integer spanServicesTopicPartitions = 1;
-  private Short spanServicesTopicReplicationFactor = 1;
-  private String servicesTopic = "zipkin-services-v1";
-  private Integer servicesTopicPartitions = 1;
-  private Short servicesTopicReplicationFactor = 1;
-  private String spanDependenciesTopic = "zipkin-span-dependencies-v1";
-  private Integer spanDependenciesTopicPartitions = 1;
-  private Short spanDependenciesTopicReplicationFactor = 1;
-  private String dependenciesTopic = "zipkin-dependencies-v1";
-  private Integer dependenciesTopicPartitions = 1;
-  private Short dependenciesTopicReplicationFactor = 1;
+  private Long dependencyTtl;
 
-  private String storeDirectory = "/tmp/zipkin";
+  private String spansTopic;
+  private String traceTopic;
+  private String dependencyTopic;
+
+  private String storeDir;
+
+  private String aggregationStreamAppId;
+  private String traceStoreStreamAppId;
+  private String dependencyStoreStreamAppId;
+
+  /**
+   * Additional Kafka configuration.
+   */
+  private Map<String, String> adminOverrides = new LinkedHashMap<>();
+  private Map<String, String> producerOverrides = new LinkedHashMap<>();
+  private Map<String, String> aggregationStreamOverrides = new LinkedHashMap<>();
+  private Map<String, String> traceStoreStreamOverrides = new LinkedHashMap<>();
+  private Map<String, String> dependencyStoreStreamOverrides = new LinkedHashMap<>();
 
   KafkaStorage.Builder toBuilder() {
-    return KafkaStorage.newBuilder()
-        .spanConsumerEnabled(spanConsumerEnabled)
-        .spanStoreEnabled(spanStoreEnabled)
-        .ensureTopics(ensureTopics)
-        .bootstrapServers(bootstrapServers)
-        .compressionType(compressionType)
-        .retentionMaxAge(Duration.ofMillis(retentionMaxAge))
-        .retentionScanFrequency(Duration.ofMillis(retentionScanFrequency))
-        .traceInactivityGap(Duration.ofMillis(traceInactivityGap))
-        .spansTopic(KafkaStorage.Topic.builder(spansTopic)
-            .partitions(spansTopicPartitions)
-            .replicationFactor(spansTopicReplicationFactor)
-            .build())
-        .spanServicesTopic(KafkaStorage.Topic.builder(spanServicesTopic)
-            .partitions(spanServicesTopicPartitions)
-            .replicationFactor(spanServicesTopicReplicationFactor)
-            .build())
-        .servicesTopic(KafkaStorage.Topic.builder(servicesTopic)
-            .partitions(servicesTopicPartitions)
-            .replicationFactor(servicesTopicReplicationFactor)
-            .build())
-        .spanDependenciesTopic(KafkaStorage.Topic.builder(spanDependenciesTopic)
-            .partitions(spanDependenciesTopicPartitions)
-            .replicationFactor(spanDependenciesTopicReplicationFactor)
-            .build())
-        .dependenciesTopic(KafkaStorage.Topic.builder(dependenciesTopic)
-            .partitions(dependenciesTopicPartitions)
-            .replicationFactor(dependenciesTopicReplicationFactor)
-            .build())
-        .storeDirectory(storeDirectory);
-  }
+    KafkaStorage.Builder builder = KafkaStorage.newBuilder();
+    if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
+    if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
+    if (traceTimeout != null) {
+      builder.traceTimeout(Duration.ofMillis(traceTimeout));
+    }
+    if (traceTtlCheckInterval != null) {
+        builder.traceTtlCheckInterval(Duration.ofMillis(traceTtlCheckInterval));
+    }
+    if (traceTtl != null) {
+      builder.traceTtl(Duration.ofMillis(traceTtl));
+    }
+    if (dependencyTtl != null) {
+      builder.dependencyTtl(Duration.ofMillis(dependencyTtl));
+    }
+    if (aggregationStreamAppId != null) builder.aggregationStreamAppId(aggregationStreamAppId);
+    if (traceStoreStreamAppId != null) builder.aggregationStreamAppId(traceStoreStreamAppId);
+    if (dependencyStoreStreamAppId != null) {
+      builder.aggregationStreamAppId(dependencyStoreStreamAppId);
+    }
+    if (storeDir != null) builder.storeDirectory(storeDir);
+    if (spansTopic != null) builder.spansTopicName(spansTopic);
+    if (traceTopic != null) builder.tracesTopicName(traceTopic);
+    if (dependencyTopic != null) builder.dependenciesTopicName(dependencyTopic);
+    if (adminOverrides != null) builder.adminOverrides(adminOverrides);
+    if (producerOverrides != null) builder.producerOverrides(producerOverrides);
+    if (aggregationStreamOverrides != null) {
+      builder.aggregationStreamOverrides(aggregationStreamOverrides);
+    }
+    if (traceStoreStreamOverrides != null) {
+      builder.traceStoreStreamOverrides(traceStoreStreamOverrides);
+    }
+    if (dependencyStoreStreamOverrides != null) {
+      builder.dependencyStoreStreamOverrides(dependencyStoreStreamOverrides);
+    }
+    if (aggregationStreamAppId != null) builder.aggregationStreamAppId(aggregationStreamAppId);
+    if (traceStoreStreamAppId != null) builder.traceStoreStreamAppId(traceStoreStreamAppId);
+    if (dependencyStoreStreamAppId != null) {
+      builder.dependencyStoreStreamAppId(dependencyStoreStreamAppId);
+    }
 
-  public boolean isSpanConsumerEnabled() {
-    return spanConsumerEnabled;
+    return builder;
   }
 
   public void setSpanConsumerEnabled(boolean spanConsumerEnabled) {
     this.spanConsumerEnabled = spanConsumerEnabled;
-  }
-
-  public boolean isSpanStoreEnabled() {
-    return spanStoreEnabled;
-  }
-
-  public void setSpanStoreEnabled(boolean spanStoreEnabled) {
-    this.spanStoreEnabled = spanStoreEnabled;
-  }
-
-  public boolean isEnsureTopics() {
-    return ensureTopics;
-  }
-
-  public void setEnsureTopics(boolean ensureTopics) {
-    this.ensureTopics = ensureTopics;
   }
 
   public String getBootstrapServers() {
@@ -117,36 +110,28 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.bootstrapServers = bootstrapServers;
   }
 
-  public String getCompressionType() {
-    return compressionType;
+  public Long getTraceTtlCheckInterval() {
+    return traceTtlCheckInterval;
   }
 
-  public void setCompressionType(String compressionType) {
-    this.compressionType = compressionType;
+  public void setTraceTtlCheckInterval(Long traceTtlCheckInterval) {
+    this.traceTtlCheckInterval = traceTtlCheckInterval;
   }
 
-  public Long getRetentionScanFrequency() {
-    return retentionScanFrequency;
+  public Long getTraceTtl() {
+    return traceTtl;
   }
 
-  public void setRetentionScanFrequency(Long retentionScanFrequency) {
-    this.retentionScanFrequency = retentionScanFrequency;
+  public void setTraceTtl(Long traceTtl) {
+    this.traceTtl = traceTtl;
   }
 
-  public Long getRetentionMaxAge() {
-    return retentionMaxAge;
+  public Long getTraceTimeout() {
+    return traceTimeout;
   }
 
-  public void setRetentionMaxAge(Long retentionMaxAge) {
-    this.retentionMaxAge = retentionMaxAge;
-  }
-
-  public Long getTraceInactivityGap() {
-    return traceInactivityGap;
-  }
-
-  public void setTraceInactivityGap(Long traceInactivityGap) {
-    this.traceInactivityGap = traceInactivityGap;
+  public void setTraceTimeout(Long traceTimeout) {
+    this.traceTimeout = traceTimeout;
   }
 
   public String getSpansTopic() {
@@ -157,124 +142,110 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.spansTopic = spansTopic;
   }
 
-  public Integer getSpansTopicPartitions() {
-    return spansTopicPartitions;
+  public Boolean getSpanConsumerEnabled() {
+    return spanConsumerEnabled;
   }
 
-  public void setSpansTopicPartitions(Integer spansTopicPartitions) {
-    this.spansTopicPartitions = spansTopicPartitions;
+  public void setSpanConsumerEnabled(Boolean spanConsumerEnabled) {
+    this.spanConsumerEnabled = spanConsumerEnabled;
   }
 
-  public Short getSpansTopicReplicationFactor() {
-    return spansTopicReplicationFactor;
+  public String getTraceTopic() {
+    return traceTopic;
   }
 
-  public void setSpansTopicReplicationFactor(Short spansTopicReplicationFactor) {
-    this.spansTopicReplicationFactor = spansTopicReplicationFactor;
+  public void setTraceTopic(String traceTopic) {
+    this.traceTopic = traceTopic;
   }
 
-  public String getSpanServicesTopic() {
-    return spanServicesTopic;
+  public String getDependencyTopic() {
+    return dependencyTopic;
   }
 
-  public void setSpanServicesTopic(String spanServicesTopic) {
-    this.spanServicesTopic = spanServicesTopic;
+  public void setDependencyTopic(String dependencyTopic) {
+    this.dependencyTopic = dependencyTopic;
   }
 
-  public Integer getSpanServicesTopicPartitions() {
-    return spanServicesTopicPartitions;
+  public String getStoreDir() {
+    return storeDir;
   }
 
-  public void setSpanServicesTopicPartitions(Integer spanServicesTopicPartitions) {
-    this.spanServicesTopicPartitions = spanServicesTopicPartitions;
+  public void setStoreDir(String storeDir) {
+    this.storeDir = storeDir;
   }
 
-  public Short getSpanServicesTopicReplicationFactor() {
-    return spanServicesTopicReplicationFactor;
+  public Long getDependencyTtl() {
+    return dependencyTtl;
   }
 
-  public void setSpanServicesTopicReplicationFactor(Short spanServicesTopicReplicationFactor) {
-    this.spanServicesTopicReplicationFactor = spanServicesTopicReplicationFactor;
+  public void setDependencyTtl(Long dependencyTtl) {
+    this.dependencyTtl = dependencyTtl;
   }
 
-  public String getServicesTopic() {
-    return servicesTopic;
+  public Map<String, String> getAdminOverrides() {
+    return adminOverrides;
   }
 
-  public void setServicesTopic(String servicesTopic) {
-    this.servicesTopic = servicesTopic;
+  public void setAdminOverrides(Map<String, String> adminOverrides) {
+    this.adminOverrides = adminOverrides;
   }
 
-  public Integer getServicesTopicPartitions() {
-    return servicesTopicPartitions;
+  public Map<String, String> getProducerOverrides() {
+    return producerOverrides;
   }
 
-  public void setServicesTopicPartitions(Integer servicesTopicPartitions) {
-    this.servicesTopicPartitions = servicesTopicPartitions;
+  public void setProducerOverrides(Map<String, String> producerOverrides) {
+    this.producerOverrides = producerOverrides;
   }
 
-  public Short getServicesTopicReplicationFactor() {
-    return servicesTopicReplicationFactor;
+  public Map<String, String> getAggregationStreamOverrides() {
+    return aggregationStreamOverrides;
   }
 
-  public void setServicesTopicReplicationFactor(Short servicesTopicReplicationFactor) {
-    this.servicesTopicReplicationFactor = servicesTopicReplicationFactor;
+  public void setAggregationStreamOverrides(
+      Map<String, String> aggregationStreamOverrides) {
+    this.aggregationStreamOverrides = aggregationStreamOverrides;
   }
 
-  public String getSpanDependenciesTopic() {
-    return spanDependenciesTopic;
+  public Map<String, String> getTraceStoreStreamOverrides() {
+    return traceStoreStreamOverrides;
   }
 
-  public void setSpanDependenciesTopic(String spanDependenciesTopic) {
-    this.spanDependenciesTopic = spanDependenciesTopic;
+  public void setTraceStoreStreamOverrides(
+      Map<String, String> traceStoreStreamOverrides) {
+    this.traceStoreStreamOverrides = traceStoreStreamOverrides;
   }
 
-  public Integer getSpanDependenciesTopicPartitions() {
-    return spanDependenciesTopicPartitions;
+  public Map<String, String> getDependencyStoreStreamOverrides() {
+    return dependencyStoreStreamOverrides;
   }
 
-  public void setSpanDependenciesTopicPartitions(Integer spanDependenciesTopicPartitions) {
-    this.spanDependenciesTopicPartitions = spanDependenciesTopicPartitions;
+  public void setDependencyStoreStreamOverrides(
+      Map<String, String> dependencyStoreStreamOverrides) {
+    this.dependencyStoreStreamOverrides = dependencyStoreStreamOverrides;
   }
 
-  public Short getSpanDependenciesTopicReplicationFactor() {
-    return spanDependenciesTopicReplicationFactor;
+  public String getAggregationStreamAppId() {
+    return aggregationStreamAppId;
   }
 
-  public void setSpanDependenciesTopicReplicationFactor(
-      Short spanDependenciesTopicReplicationFactor) {
-    this.spanDependenciesTopicReplicationFactor = spanDependenciesTopicReplicationFactor;
+  public void setAggregationStreamAppId(String aggregationStreamAppId) {
+    this.aggregationStreamAppId = aggregationStreamAppId;
   }
 
-  public String getDependenciesTopic() {
-    return dependenciesTopic;
+  public String getTraceStoreStreamAppId() {
+    return traceStoreStreamAppId;
   }
 
-  public void setDependenciesTopic(String dependenciesTopic) {
-    this.dependenciesTopic = dependenciesTopic;
+  public void setTraceStoreStreamAppId(String traceStoreStreamAppId) {
+    this.traceStoreStreamAppId = traceStoreStreamAppId;
   }
 
-  public Integer getDependenciesTopicPartitions() {
-    return dependenciesTopicPartitions;
+  public String getDependencyStoreStreamAppId() {
+    return dependencyStoreStreamAppId;
   }
 
-  public void setDependenciesTopicPartitions(Integer dependenciesTopicPartitions) {
-    this.dependenciesTopicPartitions = dependenciesTopicPartitions;
-  }
-
-  public Short getDependenciesTopicReplicationFactor() {
-    return dependenciesTopicReplicationFactor;
-  }
-
-  public void setDependenciesTopicReplicationFactor(Short dependenciesTopicReplicationFactor) {
-    this.dependenciesTopicReplicationFactor = dependenciesTopicReplicationFactor;
-  }
-
-  public String getStoreDirectory() {
-    return storeDirectory;
-  }
-
-  public void setStoreDirectory(String storeDirectory) {
-    this.storeDirectory = storeDirectory;
+  public void setDependencyStoreStreamAppId(String dependencyStoreStreamAppId) {
+    this.dependencyStoreStreamAppId = dependencyStoreStreamAppId;
   }
 }

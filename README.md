@@ -1,74 +1,55 @@
-# Zipkin Storage: Kafka
+# Zipkin Storage: Kafka *[EXPERIMENTAL]*
 
 [![Build Status](https://www.travis-ci.org/jeqo/zipkin-storage-kafka.svg?branch=master)](https://www.travis-ci.org/jeqo/zipkin-storage-kafka)
 
 Kafka-based storage for Zipkin.
 
-> This is in experimentation phase at the moment.
-
 ```
-                    +----------------------------*zipkin*-------------------------------------------
-                    |                                                           +-->( service:span )
-                    |                                                           +-->( span-index   )
-( collected-spans )-|->[ span-consumer ]        [ aggregation ] [ span-store ]--+-->( traces       )
-                    |       |                        ^    |         ^           +-->( dependencies )
-                    +-------|------------------------|----|---------|-------------------------------
-                            |                        |    |         |     
-----------------------------|------------------------|----|---------|-------------------------
-                            |                        |    |         |     
-                            |                        |    |         |     
-*kafka*                     +-->( trace-spans  )---// enriching //--+------->( service:span )
-                            |                     // sampling  //   |     
-                            +-->( service-span )-// filtering // ---+------->( dependencies )
-                                                     |    ^
------------------------------------------------------|----|---------------------------------
-                                                     |    |
-*stream-processors*                           [ custom processors ]--->( other storages )
-
-
+                    +----------------------------*zipkin*----------------------------------------------
+                    |                                        [ dependency-store ]--->( dependencies   )
+                    |                                                  ^      +-->( autocomplete-tags )
+( collected-spans )-|->[ span-consumer ]  [ aggregation ]    [ trace-store ]--+-->( traces            )
+  via http, kafka,  |       |                    ^    |         ^      |      +-->( service-names     )
+  amq, grpc, etc.   +-------|--------------------|----|---------|------|-------------------------------
+                            |                    |    |         |      |
+----------------------------|--------------------|----|---------|------|-------------------------------
+                            +-->( spans )--------+----+---------|      |
+                                                      |         |      |
+*kafka*                                               +->( traces )    |
+ topics                                               |                |
+                                                      +->( dependencies )
+                                                         
+-------------------------------------------------------------------------------------------------------
 
 ```
 
-- [Design notes](DESIGN.md)
+> Spans collected via different transports are partitioned by `traceId` and stored in a "spans" Kafka topic.
+Partitioned spans are then aggregated into traces and then into dependency links, both 
+results are emitted into Kafka topics as well.
+These 3 topics are used as source for local stores (Kafka Stream stores) that support Zipkin query and search APIs.
 
-## Configuration
+[Design notes](DESIGN.md)
 
-### Storage configurations
+[Configuration](autoconfigure/README.md)
 
-| Configuration | Description | Default |
-|---------------|-------------|---------|
-| `KAFKA_STORE_SPAN_CONSUMER_ENABLED` | Process spans collected by Zipkin server | `true` |
-| `KAFKA_STORE_SPAN_STORE_ENABLED` | Aggregate and store Zipkin data | `true` |
-| `KAFKA_STORE_BOOTSTRAP_SERVERS` | Kafka bootstrap servers, format: `host:port` | `localhost:9092` |
-| `KAFKA_STORE_ENSURE_TOPICS` | Ensure topics are created if don't exist | `true` |
-| `KAFKA_STORE_DIRECTORY` | Root path where Zipkin stores tracing data | `/tmp/zipkin` |
-| `KAFKA_STORE_COMPRESSION_TYPE` | Compression type used to store data in Kafka topics | `NONE` |
-| `KAFKA_STORE_RETENTION_SCAN_FREQUENCY` | Frequency to scan old records, in milliseconds. | `86400000` (1 day) |
-| `KAFKA_STORE_RETENTION_MAX_AGE` | Max age of a trace, to recognize old one for retention policies. | `604800000` (7 day) |
-
-### Topics configuration
-
-| Configuration | Description | Default |
-| `KAFKA_STORE_SPANS_TOPIC` | Topic where incoming spans are stored. | `zipkin-spans` |
-| `KAFKA_STORE_SPANS_TOPIC_PARTITIONS` | Span topic number of partitions. | `1` |
-| `KAFKA_STORE_SPANS_TOPIC_REPLICATION_FACTOR` | Span topic replication factor. | `1` |
-| `KAFKA_STORE_TRACES_TOPIC` | Topic where aggregated traces are stored. | `zipkin-traces` |
-| `KAFKA_STORE_TRACES_TOPIC_PARTITIONS` | Traces topic number of partitions. | `1` |
-| `KAFKA_STORE_TRACES_TOPIC_REPLICATION_FACTOR` | Traces topic replication factor. | `1` |
-| `KAFKA_STORE_DEPENDENCIES_TOPIC` | Topic where aggregated service dependencies names are stored. | `zipkin-dependencies` |
-| `KAFKA_STORE_DEPENDENCIES_TOPIC_PARTITIONS` | Services topic number of partitions. | `1` |
-| `KAFKA_STORE_DEPENDENCIES_TOPIC_REPLICATION_FACTOR` | Services topic replication factor. | `1` |
-
-> Use partitions and replication factor when Topics are created by Zipkin. If topics are created manually
-those options are not used.
-
-## Get started
+## Building
 
 To build the project you will need Java 8+.
 
 ```bash
 make build
+```
+
+And testing:
+
+```bash
 make test
+```
+
+If you want to build a docker image:
+
+```bash
+make docker-build
 ```
 
 ### Run locally
@@ -79,7 +60,7 @@ To run locally, first you need to get Zipkin binaries:
 make get-zipkin
 ```
 
-By default Zipkin will be waiting for a Kafka broker to be running on `localhost:29092`. If you don't have one, 
+By default Zipkin will be waiting for a Kafka broker to be running on `localhost:19092`. If you don't have one, 
 this service is available via Docker Compose:
 
 ```bash
@@ -94,31 +75,48 @@ make run
 
 ### Run with Docker
 
-Run:
+If you have Docker available, run:
 
 ```bash
-make run-docker
+make run-docker 
 ```
 
 And Docker image will be built and Docker compose will start.
 
+#### Examples
+
+There are two examples, running Zipkin with kafka as storage:
+
++ [Single-node](docker-compose.yml)
++ [Multi-mode](docker-compose-distributed.yml)
+
 ### Testing
 
-To validate storage:
+To validate storage make sure that Kafka topics are created so Kafka Stream instances can be 
+initialized properly:
 
 ```bash
+make kafka-topics
 make zipkin-test
 ```
 
 This will start a browser and check a traces has been registered.
 
-### Examples
+It will send another trace after a minute (`trace timeout`) + 1 second to trigger
+aggregation and visualize dependency graph.
 
-There are two examples, running zipkin with kafka as storage:
+If running multi-node docker example, run:
 
-+ Single-node: `examples/single-node`
-+ Multi-mode: `examples/multi-mode`
+```bash
+make zipkin-test-multi
+```
 
-## Acknowledged
+![traces](docs/traces.png)
 
-This project is inspired in Adrian Cole's <https://github.com/adriancole/zipkin-voltdb>
+![dependencies](docs/dependencies.png)
+
+## Acknowledgments
+
+This project is inspired in Adrian Cole's VoltDB storage <https://github.com/adriancole/zipkin-voltdb>
+
+Kafka Streams images are created with <https://zz85.github.io/kafka-streams-viz/>

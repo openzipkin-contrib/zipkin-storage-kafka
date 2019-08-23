@@ -13,6 +13,7 @@
  */
 package zipkin2.storage.kafka.streams.serdes;
 
+import java.util.Map;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
@@ -20,9 +21,12 @@ import zipkin2.DependencyLink;
 import zipkin2.codec.DependencyLinkBytesDecoder;
 import zipkin2.codec.DependencyLinkBytesEncoder;
 
-import java.util.Map;
-
 public class DependencyLinkSerde implements Serde<DependencyLink> {
+  static final String KEY_PATTERN = "%s:%s";
+
+  public static String linkKey(DependencyLink link) {
+    return String.format(KEY_PATTERN, link.parent(), link.child());
+  }
 
   @Override
   public void configure(Map<String, ?> configs, boolean isKey) {

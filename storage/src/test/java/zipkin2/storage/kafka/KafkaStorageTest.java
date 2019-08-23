@@ -13,71 +13,34 @@
  */
 package zipkin2.storage.kafka;
 
-import java.util.Arrays;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
-public class KafkaStorageTest {
+// Testing builder
+class KafkaStorageTest {
 
-  @Test
-  public void notSupported() {
+  @Test void notSupported() {
     try {
       KafkaStorage.newBuilder().strictTraceId(false);
       fail();
     } catch (IllegalArgumentException ignored) {
     }
-
-    try {
-      KafkaStorage.newBuilder().searchEnabled(true);
-      fail();
-    } catch (IllegalArgumentException ignored) {
-    }
-
-    try {
-      KafkaStorage.newBuilder().autocompleteKeys(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    try {
-      KafkaStorage.newBuilder().autocompleteKeys(Arrays.asList("key1", "key2"));
-      fail();
-    } catch (IllegalArgumentException ignored) {
-    }
   }
 
-  @Test
-  public void buildDefaultBuilder() {
+  @Test void buildDefaultBuilder() {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
-    assertNotNull(builder.dependencyStoreName);
-    assertNotNull(builder.storeDirectory);
+    assertNotNull(builder.storeDir);
 
     try {
-      builder.spansTopic(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-
-    try {
-      builder.spanServicesTopic(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-    try {
-      builder.servicesTopic(null);
+      builder.spansTopicName(null);
       fail();
     } catch (NullPointerException ignored) {
     }
 
     try {
-      builder.spanDependenciesTopic(null);
-      fail();
-    } catch (NullPointerException ignored) {
-    }
-    try {
-      builder.dependenciesTopic(null);
+      builder.dependenciesTopicName(null);
       fail();
     } catch (NullPointerException ignored) {
     }
@@ -87,41 +50,5 @@ public class KafkaStorageTest {
       fail();
     } catch (NullPointerException ignored) {
     }
-  }
-
-  @Test
-  public void topicDefault() {
-      try{
-          KafkaStorage.Topic.builder(null);
-          fail();
-      } catch (NullPointerException ignored){}
-
-      KafkaStorage.Topic.Builder topicBuilder = KafkaStorage.Topic.builder("topic-1");
-
-      try {
-          topicBuilder.partitions(0);
-          fail();
-      } catch (IllegalArgumentException ignored){}
-
-      try {
-          topicBuilder.partitions(null);
-          fail();
-      } catch (NullPointerException ignored){}
-
-      try {
-          topicBuilder.partitions(-1);
-          fail();
-      } catch (IllegalArgumentException ignored){}
-
-      try {
-          topicBuilder.replicationFactor(null);
-          fail();
-      } catch (NullPointerException ignored){}
-
-      try {
-          topicBuilder.replicationFactor( (short) 0);
-          fail();
-      } catch (IllegalArgumentException ignored){}
-
   }
 }

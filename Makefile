@@ -3,7 +3,8 @@ all: build
 
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
-VERSION := '0.3.3-SNAPSHOT'
+VERSION := '0.4.1-SNAPSHOT'
+IMAGE_NAME := 'jeqo/zipkin-kafka'
 
 .PHONY: run
 run: build zipkin-local
@@ -11,15 +12,24 @@ run: build zipkin-local
 .PHONY: run-docker
 run-docker: build docker-build docker-up
 
+.PHONY: kafka-topics
+kafka-topics:
+	docker-compose exec kafka-zookeeper /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand \
+		--zookeeper localhost:2181 --create --topic zipkin-spans --partitions 1 --replication-factor 1 --if-not-exists
+	docker-compose exec kafka-zookeeper /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand \
+		--zookeeper localhost:2181 --create --topic zipkin-trace --partitions 1 --replication-factor 1 --if-not-exists
+	docker-compose exec kafka-zookeeper /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand \
+		--zookeeper localhost:2181 --create --topic zipkin-dependency --partitions 1 --replication-factor 1 --if-not-exists
+
 .PHONY: docker-build
 docker-build:
-	TAG=${VERSION} \
-	docker-compose build
+	docker build -t ${IMAGE_NAME}:latest .
+	docker build -t ${IMAGE_NAME}:${VERSION} .
 
 .PHONY: docker-push
 docker-push: docker-build
-	TAG=${VERSION} \
-	docker-compose push
+	docker push ${IMAGE_NAME}:latest
+	docker push ${IMAGE_NAME}:${VERSION}
 
 .PHONY: docker-up
 docker-up:
@@ -33,7 +43,7 @@ docker-down:
 
 .PHONY: docker-kafka-up
 docker-kafka-up:
-	docker-compose up -d kafka zookeeper
+	docker-compose up -d kafka-zookeeper
 
 .PHONY: license-header
 license-header:
@@ -49,10 +59,11 @@ test: build
 
 .PHONY: zipkin-local
 zipkin-local:
-	STORAGE_TYPE=kafkastore \
+	STORAGE_TYPE=kafka \
+	KAFKA_BOOTSTRAP_SERVERS=localhost:19092 \
 	java \
-	-Dloader.path='storage/target/zipkin-storage-kafka-${VERSION}.jar,autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar' \
-	-Dspring.profiles.active=kafkastore \
+	-Dloader.path='autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar,autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar!/lib' \
+	-Dspring.profiles.active=kafka \
 	-cp zipkin.jar \
 	org.springframework.boot.loader.PropertiesLauncher
 
@@ -60,11 +71,23 @@ zipkin-local:
 get-zipkin:
 	curl -sSL https://zipkin.io/quickstart.sh | bash -s
 
+.PHONY: zipkin-test-multi
+zipkin-test-multi:
+	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/netflix.json | \
+	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
+	${OPEN} 'http://localhost:9412/zipkin/?lookback=custom&startTs=1'
+	sleep 61
+	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/messaging.json | \
+	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
+
 .PHONY: zipkin-test
 zipkin-test:
-	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-ui/testdata/netflix.json | \
+	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/netflix.json | \
 	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
 	${OPEN} 'http://localhost:9411/zipkin/?lookback=custom&startTs=1'
+	sleep 61
+	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/messaging.json | \
+	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
 
 .PHONY: release
 release:

@@ -14,15 +14,14 @@
 package zipkin2.storage.kafka.streams.serdes;
 
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
 import zipkin2.Span;
 import zipkin2.codec.SpanBytesDecoder;
 import zipkin2.codec.SpanBytesEncoder;
-
-import java.util.List;
-import java.util.Map;
 
 public class SpansSerde implements Serde<List<Span>> {
 

@@ -1,0 +1,22 @@
+# When enabled, this allows shorter env properties (ex -Dspring.profiles.active=kafka)
+zipkin:
+  storage:
+    kafka:
+      # Connection to Kafka
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      # Kafka topic names
+      spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
+      trace-topic: ${KAFKA_TRACE_TOPIC:zipkin-trace}
+      dependency-topic: ${KAFKA_DEPENDENCY_TOPIC:zipkin-dependency}
+      # Kafka Streams configs
+      aggregation-stream-app-id: ${KAFKA_STORAGE_AGGREGATION_STREAM_APP_ID:zipkin-aggregation}
+      trace-store-stream-app-id: ${KAFKA_STORAGE_TRACE_STORE_STREAM_APP_ID:zipkin-trace-store}
+      dependency-store-stream-app-id: ${KAFKA_STORAGE_DEPENDENCY_STORE_STREAM_APP_ID:zipkin-dependency-store}
+      store-dir: ${KAFKA_STORAGE_DIR:/tmp/zipkin-storage-kafka}
+      # Kafka Storage flags
+      span-consumer-enabled: true
+      # Kafka Storage timing configs
+      trace-timeout: ${KAFKA_STORAGE_TRACE_TIMEOUT:60000}
+      trace-ttl: ${KAFKA_STORAGE_TRACE_TTL:259200000}
+      trace-ttl-check-interval: ${KAFKA_STORAGE_TRACE_TTL_CHECK_INTERVAL:3600000}
+      dependency-ttl: ${KAFKA_STORAGE_DEPENDENCY_TTL:604800000}

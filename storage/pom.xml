@@ -14,7 +14,9 @@
     the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>io.github.jeqo.zipkin</groupId>
@@ -27,8 +29,7 @@
 
     <properties>
         <main.basedir>${project.basedir}/..</main.basedir>
-        <kafka.version>2.1.1</kafka.version>
-      <lucene.version>7.7.0</lucene.version>
+        <kafka.version>2.3.0</kafka.version>
     </properties>
 
     <dependencies>
@@ -44,21 +45,17 @@
             <version>${kafka.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.lucene</groupId>
-            <artifactId>lucene-core</artifactId>
-            <version>${lucene.version}</version>
+            <groupId>io.zipkin.reporter2</groupId>
+            <artifactId>zipkin-sender-kafka</artifactId>
+            <version>${zipkin-sender-kafka.version}</version>
         </dependency>
-      <dependency>
-        <groupId>org.apache.lucene</groupId>
-        <artifactId>lucene-grouping</artifactId>
-        <version>${lucene.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.apache.lucene</groupId>
-        <artifactId>lucene-queryparser</artifactId>
-        <version>${lucene.version}</version>
-      </dependency>
 
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.5.1</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-streams-test-utils</artifactId>
@@ -87,8 +84,14 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>1.12.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
             <artifactId>kafka</artifactId>
-            <version>1.10.6</version>
+            <version>1.12.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>

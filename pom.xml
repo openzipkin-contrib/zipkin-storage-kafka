@@ -14,7 +14,9 @@
     the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>io.github.jeqo.zipkin</groupId>
@@ -37,18 +39,19 @@
         <project.build.resourceEncoding>UTF-8</project.build.resourceEncoding>
 
         <!-- default bytecode version for src/main -->
-        <main.java.version>1.6</main.java.version>
-        <main.signature.artifact>java16</main.signature.artifact>
+        <main.java.version>1.8</main.java.version>
+        <main.signature.artifact>java18</main.signature.artifact>
 
         <main.basedir>${project.basedir}</main.basedir>
 
         <!-- must match (ex. use spring-boot used by zipkin-server) -->
-        <zipkin.version>2.12.7</zipkin.version>
-        <spring-boot.version>2.1.3.RELEASE</spring-boot.version>
+        <zipkin.version>2.16.1</zipkin.version>
+        <spring-boot.version>2.1.7.RELEASE</spring-boot.version>
         <log4j.version>2.11.1</log4j.version>
+        <zipkin-sender-kafka.version>2.10.1</zipkin-sender-kafka.version>
 
         <!-- override to set exclusions per-project -->
-        <errorprone.args />
+        <errorprone.args/>
         <errorprone.version>2.3.2</errorprone.version>
 
         <license-maven-plugin.version>3.0</license-maven-plugin.version>
@@ -91,12 +94,6 @@
                 <artifactId>zipkin-storage-kafka</artifactId>
                 <version>${project.version}</version>
             </dependency>
-
-            <!--<dependency>-->
-            <!--<groupId>org.testcontainers</groupId>-->
-            <!--<artifactId>testcontainers</artifactId>-->
-            <!--<version>1.10.6</version>-->
-            <!--</dependency>-->
         </dependencies>
     </dependencyManagement>
 
@@ -105,27 +102,6 @@
             <groupId>io.zipkin.zipkin2</groupId>
             <artifactId>zipkin</artifactId>
             <version>${zipkin.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>io.zipkin.zipkin2</groupId>
-            <artifactId>zipkin</artifactId>
-            <type>test-jar</type>
-            <version>${zipkin.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <scope>test</scope>
-            <version>4.12</version>
-        </dependency>
-        <dependency>
-            <groupId>org.assertj</groupId>
-            <artifactId>assertj-core</artifactId>
-            <version>3.11.1</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -181,24 +157,6 @@
 
         <plugins>
             <plugin>
-                <groupId>net.orfjackal.retrolambda</groupId>
-                <artifactId>retrolambda-maven-plugin</artifactId>
-                <version>2.5.6</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>process-main</goal>
-                        </goals>
-                        <configuration>
-                            <target>${main.java.version}</target>
-                            <fork>true</fork>
-                            <quiet>true</quiet>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
                 <version>3.1.0</version>
             </plugin>
@@ -252,6 +210,8 @@
                         <exclude>**/*.md</exclude>
                         <exclude>src/test/resources/**</exclude>
                         <exclude>src/main/resources/**</exclude>
+                        <exclude>**/*.puml</exclude>
+                        <exclude>Makefile</exclude>
                     </excludes>
                     <strictCheck>true</strictCheck>
                 </configuration>
