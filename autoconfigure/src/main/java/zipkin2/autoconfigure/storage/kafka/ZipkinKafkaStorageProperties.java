@@ -28,9 +28,9 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private String bootstrapServers;
 
-  private Long traceFlushInterval;
+  private Long traceTtlCheckInterval;
   private Long traceTtl;
-  private Long traceInactivityGap;
+  private Long traceTimeout;
 
   private Long dependencyTtl;
 
@@ -57,11 +57,11 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     KafkaStorage.Builder builder = KafkaStorage.newBuilder();
     if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
-    if (traceInactivityGap != null) {
-      builder.traceInactivityGap(Duration.ofMillis(traceInactivityGap));
+    if (traceTimeout != null) {
+      builder.traceTimeout(Duration.ofMillis(traceTimeout));
     }
-    if (traceFlushInterval != null) {
-        builder.traceFlushInterval(Duration.ofMillis(traceFlushInterval));
+    if (traceTtlCheckInterval != null) {
+        builder.traceTtlCheckInterval(Duration.ofMillis(traceTtlCheckInterval));
     }
     if (traceTtl != null) {
       builder.traceTtl(Duration.ofMillis(traceTtl));
@@ -110,12 +110,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.bootstrapServers = bootstrapServers;
   }
 
-  public Long getTraceFlushInterval() {
-    return traceFlushInterval;
+  public Long getTraceTtlCheckInterval() {
+    return traceTtlCheckInterval;
   }
 
-  public void setTraceFlushInterval(Long traceFlushInterval) {
-    this.traceFlushInterval = traceFlushInterval;
+  public void setTraceTtlCheckInterval(Long traceTtlCheckInterval) {
+    this.traceTtlCheckInterval = traceTtlCheckInterval;
   }
 
   public Long getTraceTtl() {
@@ -126,12 +126,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.traceTtl = traceTtl;
   }
 
-  public Long getTraceInactivityGap() {
-    return traceInactivityGap;
+  public Long getTraceTimeout() {
+    return traceTimeout;
   }
 
-  public void setTraceInactivityGap(Long traceInactivityGap) {
-    this.traceInactivityGap = traceInactivityGap;
+  public void setTraceTimeout(Long traceTimeout) {
+    this.traceTimeout = traceTimeout;
   }
 
   public String getSpansTopic() {

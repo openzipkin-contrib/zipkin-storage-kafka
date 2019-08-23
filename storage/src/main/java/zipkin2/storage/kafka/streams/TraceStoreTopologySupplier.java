@@ -56,8 +56,8 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   final String spansTopicName;
   // Limits
   final List<String> autoCompleteKeys;
-  final Duration tracesFlushInterval;
-  final Duration tracesTtl;
+  final Duration traceTtl;
+  final Duration traceTtlCheckInterval;
   final long minTracesStored;
   // SerDes
   final SpansSerde spansSerde;
@@ -65,11 +65,11 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   final NamesSerde namesSerde;
 
   public TraceStoreTopologySupplier(String spansTopicName, List<String> autoCompleteKeys,
-                                    Duration tracesFlushInterval, Duration tracesTtl, long minTracesStored) {
+      Duration traceTtl, Duration traceTtlCheckInterval, long minTracesStored) {
     this.spansTopicName = spansTopicName;
     this.autoCompleteKeys = autoCompleteKeys;
-    this.tracesFlushInterval = tracesFlushInterval;
-    this.tracesTtl = tracesTtl;
+    this.traceTtl = traceTtl;
+    this.traceTtlCheckInterval = traceTtlCheckInterval;
     this.minTracesStored = minTracesStored;
     spansSerde = new SpansSerde();
     spanIdsSerde = new SpanIdsSerde();
@@ -124,14 +124,14 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                 (KeyValueStore<Long, Set<String>>) context.getStateStore(SPAN_IDS_BY_TS_STORE_NAME);
             // Retention scheduling
             context.schedule(
-                tracesFlushInterval,
+                traceTtlCheckInterval,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
-                  if (tracesTtl.toMillis() > 0 &&
+                  if (traceTtl.toMillis() > 0 &&
                       tracesStore.approximateNumEntries() > minTracesStored) {
                     // preparing range filtering
                     long from = 0L;
-                    long to = timestamp - tracesTtl.toMillis();
+                    long to = timestamp - traceTtl.toMillis();
                     long toMicro = to * 1000;
                     // query traceIds active during period
                     try (final KeyValueIterator<Long, Set<String>> all =

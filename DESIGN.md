@@ -45,15 +45,16 @@ Component source code: [KafkaSpanConsumer.java](storage/src/main/java/zipkin2/st
 
 Spans are grouped by ID and stored on a local
 [Session window](https://kafka.apache.org/23/javadoc/org/apache/kafka/streams/kstream/SessionWindows.html),
-where the `traceId` becomes the token, and session inactivity gap 
-(i.e. period of time without receiving a span with the same session) 
+where the `traceId` becomes the token, and `trace-timeout` (default: 1 minute)
+(i.e. period of time without receiving a span with the same session; also known as session inactivity gap
+in Kafka Streams) 
 defines if a trace is still active or not. This is evaluated on the next span received on the stream--
 regardless of incoming `traceId`. If session window is closed, a trace message is emitted to the 
 traces topic.
 
 ![Session Windows](https://kafka.apache.org/20/images/streams-session-windows-02.png)
 
-Each color represents a trace. The longer `inactivity gap` (default: 1 minute) we have, the longer we wait 
+> Each color represents a trace. The longer `trace timeout` we have, the longer we wait 
 to close a window and the longer we wait to emit traces downstream for dependency link and additional
 aggregations; but also the more consistent the trace aggregation is.
 If we choose a smaller gap, then we emit traces faster with the risk of breaking traces into 

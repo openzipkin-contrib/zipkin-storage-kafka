@@ -57,7 +57,7 @@ class KafkaStorageIT {
 
   @Container private KafkaContainer kafka = new KafkaContainer("5.3.0");
 
-  private Duration traceInactivityGap;
+  private Duration traceTimeout;
   private KafkaStorage storage;
   private Properties testConsumerConfig;
   private KafkaProducer<String, List<Span>> tracesProducer;
@@ -74,11 +74,11 @@ class KafkaStorageIT {
 
     if (!kafka.isRunning()) fail();
 
-    traceInactivityGap = Duration.ofSeconds(5);
+    traceTimeout = Duration.ofSeconds(5);
     storage = (KafkaStorage) new KafkaStorage.Builder()
         .bootstrapServers(kafka.getBootstrapServers())
         .storeDirectory("target/zipkin_" + System.currentTimeMillis())
-        .traceInactivityGap(traceInactivityGap)
+        .traceTimeout(traceTimeout)
         .build();
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
@@ -128,7 +128,7 @@ class KafkaStorageIT {
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopicName, 2, 10000);
     // Given: some time for stream processes to kick in
-    Thread.sleep(traceInactivityGap.toMillis() * 2);
+    Thread.sleep(traceTimeout.toMillis() * 2);
     // Given: another span to move 'event time' forward
     Span another = Span.newBuilder().traceId("c").id("d").name("op_a").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())

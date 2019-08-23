@@ -103,13 +103,16 @@ public class KafkaStorage extends StorageComponent {
     this.traceStoreStreamConfig = builder.traceStoreStreamConfig;
     this.dependencyStoreStreamConfig = builder.dependencyStoreStreamConfig;
 
-    aggregationTopology = new AggregationTopologySupplier(spansTopicName, traceTopicName,
-        dependencyTopicName, builder.traceInactivityGap).get();
+    aggregationTopology = new AggregationTopologySupplier(
+        spansTopicName,
+        traceTopicName,
+        dependencyTopicName,
+        builder.traceTimeout).get();
     traceStoreTopology = new TraceStoreTopologySupplier(
         spansTopicName,
         autocompleteKeys,
-        builder.traceFlushInterval,
         builder.traceTtl,
+        builder.traceTtlCheckInterval,
         builder.minTracesStored).get();
     dependencyStoreTopology = new DependencyStoreTopologySupplier(
         dependencyTopicName,
@@ -342,8 +345,8 @@ public class KafkaStorage extends StorageComponent {
     List<String> autocompleteKeys = new ArrayList<>();
 
     Duration traceTtl = Duration.ofDays(3);
-    Duration traceFlushInterval = Duration.ofHours(1);
-    Duration traceInactivityGap = Duration.ofMinutes(1);
+    Duration traceTtlCheckInterval = Duration.ofHours(1);
+    Duration traceTimeout = Duration.ofMinutes(1);
     Duration dependencyTtl = Duration.ofDays(7);
     Duration dependencyWindowSize = Duration.ofMinutes(1);
 
@@ -439,11 +442,11 @@ public class KafkaStorage extends StorageComponent {
     /**
      * How long to wait for a span in order to trigger a trace as completed.
      */
-    public Builder traceInactivityGap(Duration traceInactivityGap) {
-      if (traceInactivityGap == null) {
-        throw new NullPointerException("traceInactivityGap == null");
+    public Builder traceTimeout(Duration traceTimeout) {
+      if (traceTimeout == null) {
+        throw new NullPointerException("traceTimeout == null");
       }
-      this.traceInactivityGap = traceInactivityGap;
+      this.traceTimeout = traceTimeout;
       return this;
     }
 
@@ -537,11 +540,11 @@ public class KafkaStorage extends StorageComponent {
     /**
      * Frequency to check retention policy.
      */
-    public Builder traceFlushInterval(Duration traceFlushInterval) {
-      if (traceFlushInterval == null) {
-        throw new NullPointerException("traceFlushInterval == null");
+    public Builder traceTtlCheckInterval(Duration traceTtlCheckInterval) {
+      if (traceTtlCheckInterval == null) {
+        throw new NullPointerException("traceTtlCheckInterval == null");
       }
-      this.traceFlushInterval = traceFlushInterval;
+      this.traceTtlCheckInterval = traceTtlCheckInterval;
       return this;
     }
 
@@ -549,9 +552,7 @@ public class KafkaStorage extends StorageComponent {
      * Traces time-to-live on local state stores.
      */
     public Builder traceTtl(Duration traceTtl) {
-      if (this.traceTtl == null) {
-        throw new NullPointerException("traceTtl == null");
-      }
+      if (this.traceTtl == null) throw new NullPointerException("traceTtl == null");
       this.traceTtl = traceTtl;
       return this;
     }
@@ -560,9 +561,7 @@ public class KafkaStorage extends StorageComponent {
      * Dependencies time-to-live on local state stores.
      */
     public Builder dependencyTtl(Duration dependencyTtl) {
-      if (dependencyTtl == null) {
-        throw new NullPointerException("dependencyTtl == null");
-      }
+      if (dependencyTtl == null) throw new NullPointerException("dependencyTtl == null");
       this.dependencyTtl = dependencyTtl;
       return this;
     }
@@ -576,9 +575,9 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * By default, an Admin Client will be built from properties derived from builder defaults, as well
-     * as "client.id" -> "zipkin-storage". Any properties set here will override the admin client
-     * config.
+     * By default, an Admin Client will be built from properties derived from builder defaults, as
+     * well as "client.id" -> "zipkin-storage". Any properties set here will override the admin
+     * client config.
      *
      * <p>For example: Set the client ID for the AdminClient.
      *
@@ -597,9 +596,8 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * By default, a produce will be built from properties derived from builder defaults, as well
-     * as "batch.size" -> 1000. Any properties set here will override the consumer
-     * config.
+     * By default, a produce will be built from properties derived from builder defaults, as well as
+     * "batch.size" -> 1000. Any properties set here will override the consumer config.
      *
      * <p>For example: Only send batch of list of spans with a maximum size of 1000 bytes
      *
@@ -618,9 +616,9 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * By default, a Kafka Streams applications will be built from properties derived from builder defaults, as well
-     * as "poll.ms" -> 5000. Any properties set here will override the Kafka Streams application
-     * config.
+     * By default, a Kafka Streams applications will be built from properties derived from builder
+     * defaults, as well as "poll.ms" -> 5000. Any properties set here will override the Kafka
+     * Streams application config.
      *
      * <p>For example: to change the Streams poll timeout:
      *
@@ -639,9 +637,9 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * By default, a Kafka Streams applications will be built from properties derived from builder defaults, as well
-     * as "poll.ms" -> 5000. Any properties set here will override the Kafka Streams application
-     * config.
+     * By default, a Kafka Streams applications will be built from properties derived from builder
+     * defaults, as well as "poll.ms" -> 5000. Any properties set here will override the Kafka
+     * Streams application config.
      *
      * <p>For example: to change the Streams poll timeout:
      *
@@ -660,9 +658,9 @@ public class KafkaStorage extends StorageComponent {
     }
 
     /**
-     * By default, a Kafka Streams applications will be built from properties derived from builder defaults, as well
-     * as "poll.ms" -> 5000. Any properties set here will override the Kafka Streams application
-     * config.
+     * By default, a Kafka Streams applications will be built from properties derived from builder
+     * defaults, as well as "poll.ms" -> 5000. Any properties set here will override the Kafka
+     * Streams application config.
      *
      * <p>For example: to change the Streams poll timeout:
      *

@@ -46,16 +46,16 @@ class TraceStoreTopologySupplierTest {
   @Test void should_persist_stores() {
     // Given: configs
     String spansTopicName = "zipkin-spans";
-    Duration tracesRetentionScanFrequency = Duration.ofMinutes(1);
-    Duration tracesRetentionPeriod = Duration.ofMillis(5);
+    Duration traceTtl = Duration.ofMillis(5);
+    Duration traceTtlCheckInterval = Duration.ofMinutes(1);
     List<String> autocompleteKeys = Collections.singletonList("environment");
     SpansSerde spansSerde = new SpansSerde();
     // When: topology provided
     Topology topology = new TraceStoreTopologySupplier(
         spansTopicName,
         autocompleteKeys,
-        tracesRetentionScanFrequency,
-        tracesRetentionPeriod,
+        traceTtl,
+        traceTtlCheckInterval,
         0).get();
     TopologyDescription description = topology.describe();
     System.out.println("Topology: \n" + description);
@@ -107,11 +107,11 @@ class TraceStoreTopologySupplierTest {
     // When: clock moves forward
     Span c = Span.newBuilder()
         .traceId("c").id("c")
-        .timestamp(tracesRetentionScanFrequency.toMillis() * 1000 + 20000L)
+        .timestamp(traceTtlCheckInterval.toMillis() * 1000 + 20000L)
         .build();
     testDriver.pipeInput(
         factory.create(spansTopicName, c.traceId(), Collections.singletonList(c),
-            tracesRetentionScanFrequency.toMillis() + 1));
+            traceTtlCheckInterval.toMillis() + 1));
 
     // Then: Traces store is empty
     assertNull(traces.get(a.traceId()));

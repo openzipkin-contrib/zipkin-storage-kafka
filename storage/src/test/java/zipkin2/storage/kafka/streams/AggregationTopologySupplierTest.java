@@ -44,12 +44,12 @@ class AggregationTopologySupplierTest {
     String spansTopicName = "spans";
     String tracesTopicName = "traces";
     String dependencyLinksTopicName = "dependencies";
-    Duration traceInactivityGap = Duration.ofSeconds(1);
+    Duration traceTimeout = Duration.ofSeconds(1);
     SpansSerde spansSerde = new SpansSerde();
     DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
     // When: topology built
     Topology topology = new AggregationTopologySupplier(
-        spansTopicName, tracesTopicName, dependencyLinksTopicName, traceInactivityGap).get();
+        spansTopicName, tracesTopicName, dependencyLinksTopicName, traceTimeout).get();
     TopologyDescription description = topology.describe();
     System.out.println("Topology: \n" + description);
     // Then: single threaded topology
@@ -72,7 +72,7 @@ class AggregationTopologySupplierTest {
     testDriver.pipeInput(factory.create(spansTopicName, b.traceId(), Collections.singletonList(b), 0L));
     // When: and new record arrive, moving the event clock further than inactivity gap
     Span c = Span.newBuilder().traceId("c").id("c").build();
-    testDriver.pipeInput(factory.create(spansTopicName, c.traceId(), Collections.singletonList(c), traceInactivityGap.toMillis() + 1));
+    testDriver.pipeInput(factory.create(spansTopicName, c.traceId(), Collections.singletonList(c), traceTimeout.toMillis() + 1));
     // Then: a trace is aggregated.1
     ProducerRecord<String, List<Span>> trace =
         testDriver.readOutput(tracesTopicName, new StringDeserializer(), spansSerde.deserializer());
