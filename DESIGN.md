@@ -51,6 +51,14 @@ defines if a trace is still active or not. This is evaluated on the next span re
 regardless of incoming `traceId`. If session window is closed, a trace message is emitted to the 
 traces topic.
 
+![Session Windows](https://kafka.apache.org/20/images/streams-session-windows-02.png)
+
+Each color represents a trace. The longer `inactivity gap` (default: 1 minute) we have, the longer we wait 
+to close a window and the longer we wait to emit traces downstream for dependency link and additional
+aggregations; but also the more consistent the trace aggregation is.
+If we choose a smaller gap, then we emit traces faster with the risk of breaking traces into 
+smaller chunks, and potentially affecting counters downstream.
+
 **Dependencies**
 
 Once `traces` are emitted downstream as part of the initial processing, dependency links are evaluated
