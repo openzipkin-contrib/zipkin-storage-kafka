@@ -15,7 +15,7 @@ zipkin:
 
       span-consumer-enabled: true
 
-      trace-ttl-check-interval: ${KAFKA_STORAGE_TRACE_TTL_CHECK_INTERVAL:3600000}
+      trace-flush-interval: ${KAFKA_STORAGE_TRACE_FLUSH_INTERVAL:3600000}
       trace-ttl: ${KAFKA_STORAGE_TRACE_TTL:259200000}
       trace-inactivity-gap: ${KAFKA_STORAGE_TRACE_INACTIVITY_GAP:30000}
 

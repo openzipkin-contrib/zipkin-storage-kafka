@@ -28,7 +28,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private String bootstrapServers;
 
-  private Long traceTtlCheckInterval;
+  private Long traceFlushInterval;
   private Long traceTtl;
   private Long traceInactivityGap;
 
@@ -60,8 +60,8 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     if (traceInactivityGap != null) {
       builder.traceInactivityGap(Duration.ofMillis(traceInactivityGap));
     }
-    if (traceTtlCheckInterval != null) {
-        builder.traceTtlCheckInterval(Duration.ofMillis(traceTtlCheckInterval));
+    if (traceFlushInterval != null) {
+        builder.traceFlushInterval(Duration.ofMillis(traceFlushInterval));
     }
     if (traceTtl != null) {
       builder.traceTtl(Duration.ofMillis(traceTtl));
@@ -110,12 +110,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.bootstrapServers = bootstrapServers;
   }
 
-  public Long getTraceTtlCheckInterval() {
-    return traceTtlCheckInterval;
+  public Long getTraceFlushInterval() {
+    return traceFlushInterval;
   }
 
-  public void setTraceTtlCheckInterval(Long traceTtlCheckInterval) {
-    this.traceTtlCheckInterval = traceTtlCheckInterval;
+  public void setTraceFlushInterval(Long traceFlushInterval) {
+    this.traceFlushInterval = traceFlushInterval;
   }
 
   public Long getTraceTtl() {

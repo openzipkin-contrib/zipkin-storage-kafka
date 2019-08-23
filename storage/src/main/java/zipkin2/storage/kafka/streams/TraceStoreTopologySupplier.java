@@ -55,8 +55,8 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   // Kafka topics
   final String spansTopicName;
   // Limits
-  final List<String> autocompleteKeys;
-  final Duration tracesGcInterval;
+  final List<String> autoCompleteKeys;
+  final Duration tracesFlushInterval;
   final Duration tracesTtl;
   final long minTracesStored;
   // SerDes
@@ -64,11 +64,11 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   final SpanIdsSerde spanIdsSerde;
   final NamesSerde namesSerde;
 
-  public TraceStoreTopologySupplier(String spansTopicName, List<String> autocompleteKeys,
-      Duration tracesGcInterval, Duration tracesTtl, long minTracesStored) {
+  public TraceStoreTopologySupplier(String spansTopicName, List<String> autoCompleteKeys,
+                                    Duration tracesFlushInterval, Duration tracesTtl, long minTracesStored) {
     this.spansTopicName = spansTopicName;
-    this.autocompleteKeys = autocompleteKeys;
-    this.tracesGcInterval = tracesGcInterval;
+    this.autoCompleteKeys = autoCompleteKeys;
+    this.tracesFlushInterval = tracesFlushInterval;
     this.tracesTtl = tracesTtl;
     this.minTracesStored = minTracesStored;
     spansSerde = new SpansSerde();
@@ -124,7 +124,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                 (KeyValueStore<Long, Set<String>>) context.getStateStore(SPAN_IDS_BY_TS_STORE_NAME);
             // Retention scheduling
             context.schedule(
-                tracesGcInterval,
+                tracesFlushInterval,
                 PunctuationType.STREAM_TIME,
                 timestamp -> {
                   if (tracesTtl.toMillis() > 0 &&
@@ -216,7 +216,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
               }
               if (!span.tags().isEmpty()) {
                 span.tags().forEach((key, value) -> {
-                  if (autocompleteKeys.contains(key)) {
+                  if (autoCompleteKeys.contains(key)) {
                     Set<String> values = autocompleteTagsStore.get(key);
                     if (values == null) values = new HashSet<>();
                     values.add(value);

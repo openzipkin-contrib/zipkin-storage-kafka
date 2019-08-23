@@ -108,7 +108,7 @@ public class KafkaStorage extends StorageComponent {
     traceStoreTopology = new TraceStoreTopologySupplier(
         spansTopicName,
         autocompleteKeys,
-        builder.traceTtlCheckInterval,
+        builder.traceFlushInterval,
         builder.traceTtl,
         builder.minTracesStored).get();
     dependencyStoreTopology = new DependencyStoreTopologySupplier(
@@ -342,7 +342,7 @@ public class KafkaStorage extends StorageComponent {
     List<String> autocompleteKeys = new ArrayList<>();
 
     Duration traceTtl = Duration.ofDays(3);
-    Duration traceTtlCheckInterval = Duration.ofHours(1);
+    Duration traceFlushInterval = Duration.ofHours(1);
     Duration traceInactivityGap = Duration.ofMinutes(1);
     Duration dependencyTtl = Duration.ofDays(7);
     Duration dependencyWindowSize = Duration.ofMinutes(1);
@@ -537,11 +537,11 @@ public class KafkaStorage extends StorageComponent {
     /**
      * Frequency to check retention policy.
      */
-    public Builder traceTtlCheckInterval(Duration traceTtlCheckInterval) {
-      if (traceTtlCheckInterval == null) {
-        throw new NullPointerException("traceTtlCheckInterval == null");
+    public Builder traceFlushInterval(Duration traceFlushInterval) {
+      if (traceFlushInterval == null) {
+        throw new NullPointerException("traceFlushInterval == null");
       }
-      this.traceTtlCheckInterval = traceTtlCheckInterval;
+      this.traceFlushInterval = traceFlushInterval;
       return this;
     }
 
