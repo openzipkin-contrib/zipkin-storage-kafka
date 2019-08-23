@@ -28,11 +28,11 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private String bootstrapServers;
 
-  private Long traceRetentionScanFrequency;
-  private Long traceRetentionPeriod;
+  private Long traceTtlCheckInterval;
+  private Long traceTtl;
   private Long traceInactivityGap;
 
-  private Long dependencyRetentionPeriod;
+  private Long dependencyTtl;
 
   private String spansTopic;
   private String traceTopic;
@@ -60,14 +60,14 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     if (traceInactivityGap != null) {
       builder.traceInactivityGap(Duration.ofMillis(traceInactivityGap));
     }
-    if (traceRetentionScanFrequency != null) {
-      builder.traceGcInterval(Duration.ofMillis(traceRetentionScanFrequency));
+    if (traceTtlCheckInterval != null) {
+        builder.traceTtlCheckInterval(Duration.ofMillis(traceTtlCheckInterval));
     }
-    if (traceRetentionPeriod != null) {
-      builder.traceTtl(Duration.ofMillis(traceRetentionPeriod));
+    if (traceTtl != null) {
+      builder.traceTtl(Duration.ofMillis(traceTtl));
     }
-    if (dependencyRetentionPeriod != null) {
-      builder.dependencyTtl(Duration.ofMillis(dependencyRetentionPeriod));
+    if (dependencyTtl != null) {
+      builder.dependencyTtl(Duration.ofMillis(dependencyTtl));
     }
     if (aggregationStreamAppId != null) builder.aggregationStreamAppId(aggregationStreamAppId);
     if (traceStoreStreamAppId != null) builder.aggregationStreamAppId(traceStoreStreamAppId);
@@ -110,20 +110,20 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.bootstrapServers = bootstrapServers;
   }
 
-  public Long getTraceRetentionScanFrequency() {
-    return traceRetentionScanFrequency;
+  public Long getTraceTtlCheckInterval() {
+    return traceTtlCheckInterval;
   }
 
-  public void setTraceRetentionScanFrequency(Long traceRetentionScanFrequency) {
-    this.traceRetentionScanFrequency = traceRetentionScanFrequency;
+  public void setTraceTtlCheckInterval(Long traceTtlCheckInterval) {
+    this.traceTtlCheckInterval = traceTtlCheckInterval;
   }
 
-  public Long getTraceRetentionPeriod() {
-    return traceRetentionPeriod;
+  public Long getTraceTtl() {
+    return traceTtl;
   }
 
-  public void setTraceRetentionPeriod(Long traceRetentionPeriod) {
-    this.traceRetentionPeriod = traceRetentionPeriod;
+  public void setTraceTtl(Long traceTtl) {
+    this.traceTtl = traceTtl;
   }
 
   public Long getTraceInactivityGap() {
@@ -174,12 +174,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.storeDir = storeDir;
   }
 
-  public Long getDependencyRetentionPeriod() {
-    return dependencyRetentionPeriod;
+  public Long getDependencyTtl() {
+    return dependencyTtl;
   }
 
-  public void setDependencyRetentionPeriod(Long dependencyRetentionPeriod) {
-    this.dependencyRetentionPeriod = dependencyRetentionPeriod;
+  public void setDependencyTtl(Long dependencyTtl) {
+    this.dependencyTtl = dependencyTtl;
   }
 
   public Map<String, String> getAdminOverrides() {

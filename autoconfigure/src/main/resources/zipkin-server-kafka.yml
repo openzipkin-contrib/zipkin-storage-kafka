@@ -15,8 +15,8 @@ zipkin:
 
       span-consumer-enabled: true
 
-      trace-retention-scan-frequency: ${KAFKA_STORAGE_TRACE_GC_INTERVAL:3600000}
-      trace-retention-period: ${KAFKA_STORAGE_TRACE_TTL:259200000}
+      trace-ttl-check-interval: ${KAFKA_STORAGE_TRACE_TTL_CHECK_INTERVAL:3600000}
+      trace-ttl: ${KAFKA_STORAGE_TRACE_TTL:259200000}
       trace-inactivity-gap: ${KAFKA_STORAGE_TRACE_INACTIVITY_GAP:30000}
 
-      dependency-retention-period: ${KAFKA_STORAGE_DEPENDENCY_TTL:604800000}
+      dependency-ttl: ${KAFKA_STORAGE_DEPENDENCY_TTL:604800000}
