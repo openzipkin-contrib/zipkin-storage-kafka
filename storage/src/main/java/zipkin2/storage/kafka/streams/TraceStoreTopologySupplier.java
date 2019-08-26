@@ -199,8 +199,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
           public void process(String traceId, List<Span> spans) {
             for (Span span : spans) {
               if (span.localServiceName() != null) { // if service name
-                serviceNameStore.putIfAbsent(span.localServiceName(),
-                    span.localServiceName()); // store it
+                serviceNameStore.put(span.localServiceName(), span.localServiceName());
                 if (span.name() != null) { // store span names
                   Set<String> spanNames = spanNamesStore.get(span.localServiceName());
                   if (spanNames == null) spanNames = new HashSet<>();
@@ -215,12 +214,13 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                 }
               }
               if (!span.tags().isEmpty()) {
-                span.tags().forEach((key, value) -> {
-                  if (autoCompleteKeys.contains(key)) {
-                    Set<String> values = autocompleteTagsStore.get(key);
+                autoCompleteKeys.forEach(tagKey -> {
+                  String value = span.tags().get(tagKey);
+                  if (value != null) {
+                    Set<String> values = autocompleteTagsStore.get(tagKey);
                     if (values == null) values = new HashSet<>();
                     values.add(value);
-                    autocompleteTagsStore.put(key, values);
+                    autocompleteTagsStore.put(tagKey, values);
                   }
                 });
               }
