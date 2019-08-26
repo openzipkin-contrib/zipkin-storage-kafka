@@ -111,7 +111,10 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
     @Override public List<String> query() {
       List<String> serviceNames = new ArrayList<>();
-      serviceStore.all().forEachRemaining(keyValue -> serviceNames.add(keyValue.value));
+      serviceStore.all().forEachRemaining(keyValue -> {
+        // double check service names are unique
+        if (!serviceNames.contains(keyValue.value)) serviceNames.add(keyValue.value);
+      });
       // comply with Zipkin API as service names are required to be ordered lexicographically
       Collections.sort(serviceNames);
       return serviceNames;

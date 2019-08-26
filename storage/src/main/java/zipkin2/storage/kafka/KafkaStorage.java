@@ -27,7 +27,6 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.KafkaFuture;
-import org.apache.kafka.common.record.CompressionType;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -373,7 +372,6 @@ public class KafkaStorage extends StorageComponent {
       producerConfig.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
       producerConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
       producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
-      producerConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, CompressionType.SNAPPY.name);
       producerConfig.put(ProducerConfig.BATCH_SIZE_CONFIG, 500_000);
       producerConfig.put(ProducerConfig.LINGER_MS_CONFIG, 5);
       // Trace Aggregation Stream Topology configuration
@@ -384,9 +382,6 @@ public class KafkaStorage extends StorageComponent {
       aggregationStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, aggregationStreamAppId);
       aggregationStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
       aggregationStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-      aggregationStreamConfig.put(
-          StreamsConfig.PRODUCER_PREFIX + ProducerConfig.COMPRESSION_TYPE_CONFIG,
-          CompressionType.SNAPPY.name);
       // Trace Store Stream Topology configuration
       traceStoreStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
           Serdes.StringSerde.class);
@@ -394,8 +389,6 @@ public class KafkaStorage extends StorageComponent {
           Serdes.ByteArraySerde.class);
       traceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, traceStoreStreamAppId);
       traceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
-      traceStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
-          CompressionType.SNAPPY.name);
       traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
       // Dependency Store Stream Topology configuration
       dependencyStoreStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
@@ -405,8 +398,6 @@ public class KafkaStorage extends StorageComponent {
       dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
           dependencyStoreStreamAppId);
       dependencyStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, dependencyStoreDirectory());
-      dependencyStoreStreamConfig.put(ProducerConfig.COMPRESSION_TYPE_CONFIG,
-          CompressionType.SNAPPY.name);
       dependencyStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
     }
 

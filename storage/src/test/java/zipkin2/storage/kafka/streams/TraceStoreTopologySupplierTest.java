@@ -14,6 +14,7 @@
 package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -81,7 +82,12 @@ class TraceStoreTopologySupplierTest {
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
         .timestamp(10000L).duration(10L)
         .build();
-    List<Span> spans = Arrays.asList(a, b);
+    Span c = Span.newBuilder().traceId("c").id("c").name("op_a").kind(Span.Kind.CLIENT)
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+        .timestamp(10000L).duration(11L)
+        .putTag("environment", "dev")
+        .build();
+    List<Span> spans = Arrays.asList(a, b, c);
     testDriver.pipeInput(factory.create(spansTopicName, a.traceId(), spans, 10L));
     // Then: trace stores are filled
     KeyValueStore<String, List<Span>> traces =
@@ -95,6 +101,9 @@ class TraceStoreTopologySupplierTest {
     // Then: service name stores are filled
     KeyValueStore<String, String> serviceNames =
         testDriver.getKeyValueStore(SERVICE_NAMES_STORE_NAME);
+    List<String> serviceNameList = new ArrayList<>();
+    serviceNames.all().forEachRemaining(serviceName -> serviceNameList.add(serviceName.value));
+    assertEquals(2, serviceNameList.size());
     assertEquals("svc_a", serviceNames.get("svc_a"));
     assertEquals("svc_b", serviceNames.get("svc_b"));
     KeyValueStore<String, Set<String>> spanNames =
@@ -105,8 +114,8 @@ class TraceStoreTopologySupplierTest {
         testDriver.getKeyValueStore(AUTOCOMPLETE_TAGS_STORE_NAME);
     assertEquals(Collections.singleton("dev"), autocompleteTags.get("environment"));
     // When: clock moves forward
-    Span c = Span.newBuilder()
-        .traceId("c").id("c")
+    Span d = Span.newBuilder()
+        .traceId("d").id("d")
         .timestamp(traceTtlCheckInterval.toMillis() * 1000 + 20000L)
         .build();
     testDriver.pipeInput(
