@@ -158,9 +158,14 @@ class KafkaStorageIT {
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
         .timestamp(TODAY * 1000).duration(2)
         .build();
+    Span other = Span.newBuilder().traceId("c").id("c").name("op_c").kind(Span.Kind.SERVER)
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_c").build())
+        .timestamp(TODAY * 1000 + 10).duration(8)
+        .build();
     List<Span> spans = Arrays.asList(parent, child);
     // When: been published
     tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, parent.traceId(), spans));
+    tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, other.traceId(), Collections.singletonList(other)));
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
@@ -189,6 +194,25 @@ class KafkaStorageIT {
           return traces.size() == 1
               && traces.get(0).size() == 2; // Trace is found and has two spans
         });
+    await().atMost(30, TimeUnit.SECONDS)
+        .until(() -> {
+          List<List<Span>> traces = new ArrayList<>();
+          try {
+            traces =
+                spanStore.getTraces(QueryRequest.newBuilder()
+                    .endTs(TODAY + 1)
+                    .lookback(Duration.ofMinutes(1).toMillis())
+                    .limit(1)
+                    .build())
+                    .execute();
+          } catch (InvalidStateStoreException e) { // ignoring state issues
+            System.err.println(e.getMessage());
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
+          return traces.size() == 1
+              && traces.get(0).size() == 1; // last trace is returned first
+        });
     await().atMost(5, TimeUnit.SECONDS)
         .until(() -> {
           List<String> services = new ArrayList<>();
@@ -199,7 +223,7 @@ class KafkaStorageIT {
           } catch (Exception e) {
             e.printStackTrace();
           }
-          return services.size() == 2;
+          return services.size() == 3;
         }); // There are two service names
     await().atMost(5, TimeUnit.SECONDS)
         .until(() -> {

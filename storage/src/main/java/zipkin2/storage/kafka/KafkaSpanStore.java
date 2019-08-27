@@ -211,9 +211,9 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
         }
       });
       traces.sort(Comparator.comparing(o -> o.get(0).timestamp()));
-      // TODO check if we should reverse
+      Collections.reverse(traces); // return most recent traces
       LOG.debug("Traces found from query {}: {}", queryRequest, traces.size());
-      return traces.subList(0, queryRequest.limit());
+      return traces.subList(0, queryRequest.limit() >= traces.size() ? traceIds.size() : queryRequest.limit());
     }
 
     @Override
