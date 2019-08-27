@@ -212,8 +212,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           }
         });
       }
-      traces.sort(Comparator.comparing(o -> o.get(0).timestamp()));
-      Collections.reverse(traces); // return most recent traces
+      traces.sort(Comparator.<List<Span>>comparingLong(o -> o.get(0).timestampAsLong()).reversed());
       LOG.debug("Traces found from query {}: {}", request, traces.size());
       return traces.subList(0,
           request.limit() >= traces.size() ? traceIds.size() : request.limit());
