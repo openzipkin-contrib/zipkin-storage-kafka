@@ -15,7 +15,7 @@
 FROM alpine
 
 ENV USER jeqo
-ENV VERSION 0.5.0
+ENV VERSION 0.5.1
 
 WORKDIR /zipkin
 
