@@ -181,7 +181,7 @@ class KafkaStorageIT {
             traces =
                 spanStore.getTraces(QueryRequest.newBuilder()
                     .endTs(TODAY + 1)
-                    .lookback(Duration.ofMinutes(1).toMillis())
+                    .lookback(Duration.ofSeconds(30).toMillis())
                     .serviceName("svc_a")
                     .limit(10)
                     .build())
@@ -201,7 +201,7 @@ class KafkaStorageIT {
             traces =
                 spanStore.getTraces(QueryRequest.newBuilder()
                     .endTs(TODAY + 1)
-                    .lookback(Duration.ofMinutes(2).toMillis())
+                    .lookback(Duration.ofMinutes(1).toMillis())
                     .limit(1)
                     .build())
                     .execute();

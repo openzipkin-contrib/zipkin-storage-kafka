@@ -198,7 +198,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       // milliseconds to microseconds
       long from = (request.endTs() - request.lookback()) * 1000;
       long to = request.endTs() * 1000;
-      long checkpoint = to - (60 * 1000 * 1000); // 1 min before upper bound
+      long checkpoint = to - (30 * 1000 * 1000); // 30 sec before upper bound
       if (checkpoint <= from) { // do one run
         try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to)) {
           spanIds.forEachRemaining(keyValue -> {
