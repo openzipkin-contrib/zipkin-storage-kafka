@@ -16,6 +16,7 @@ package zipkin2.storage.kafka;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import org.apache.kafka.streams.KafkaStreams;
@@ -199,7 +200,8 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to);
       spanIds.forEachRemaining(keyValue -> {
         for (String traceId : keyValue.value) {
-          if (!traceIds.contains(traceId) && traces.size() < queryRequest.limit()) {
+          if (!traceIds.contains(traceId)) {
+          //if (!traceIds.contains(traceId) && traces.size() < queryRequest.limit()) {
             List<Span> spans = tracesStore.get(traceId);
             if (spans != null && queryRequest.test(spans)) { // apply filters
               traceIds.add(traceId); // adding to check if we have already add it later
@@ -208,8 +210,10 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           }
         }
       });
+      traces.sort(Comparator.comparing(o -> o.get(0).timestamp()));
+      // TODO check if we should reverse
       LOG.debug("Traces found from query {}: {}", queryRequest, traces.size());
-      return traces;
+      return traces.subList(0, queryRequest.limit());
     }
 
     @Override
