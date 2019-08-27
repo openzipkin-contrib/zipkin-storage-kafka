@@ -16,6 +16,7 @@ package zipkin2.storage.kafka;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import org.apache.kafka.streams.KafkaStreams;
@@ -111,10 +112,12 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
     @Override public List<String> query() {
       List<String> serviceNames = new ArrayList<>();
-      serviceStore.all().forEachRemaining(keyValue -> {
-        // double check service names are unique
-        if (!serviceNames.contains(keyValue.value)) serviceNames.add(keyValue.value);
-      });
+      try (KeyValueIterator<String, String> all = serviceStore.all()) {
+        all.forEachRemaining(keyValue -> {
+          // double check service names are unique
+          if (!serviceNames.contains(keyValue.value)) serviceNames.add(keyValue.value);
+        });
+      }
       // comply with Zipkin API as service names are required to be ordered lexicographically
       Collections.sort(serviceNames);
       return serviceNames;
@@ -178,43 +181,66 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   static class GetTracesCall extends KafkaStreamsStoreCall<List<List<Span>>> {
     final ReadOnlyKeyValueStore<String, List<Span>> tracesStore;
     final ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore;
-    final QueryRequest queryRequest;
+    final QueryRequest request;
 
     GetTracesCall(
         ReadOnlyKeyValueStore<String, List<Span>> tracesStore,
         ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore,
-        QueryRequest queryRequest) {
+        QueryRequest request) {
       this.tracesStore = tracesStore;
       this.traceIdsByTsStore = traceIdsByTsStore;
-      this.queryRequest = queryRequest;
+      this.request = request;
     }
 
     @Override public List<List<Span>> query() {
       List<List<Span>> traces = new ArrayList<>();
       List<String> traceIds = new ArrayList<>();
       // milliseconds to microseconds
-      long from = (queryRequest.endTs() - queryRequest.lookback()) * 1000;
-      long to = queryRequest.endTs() * 1000;
-      // first index
-      KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to);
-      spanIds.forEachRemaining(keyValue -> {
-        for (String traceId : keyValue.value) {
-          if (!traceIds.contains(traceId) && traces.size() < queryRequest.limit()) {
-            List<Span> spans = tracesStore.get(traceId);
-            if (spans != null && queryRequest.test(spans)) { // apply filters
-              traceIds.add(traceId); // adding to check if we have already add it later
-              traces.add(spans);
+      long from = (request.endTs() - request.lookback()) * 1000;
+      long to = request.endTs() * 1000;
+      long checkpoint = to - (30 * 1000 * 1000); // 30 sec before upper bound
+      if (checkpoint <= from) { // do one run
+        try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to)) {
+          spanIds.forEachRemaining(keyValue -> {
+            for (String traceId : keyValue.value) {
+              if (!traceIds.contains(traceId)) {
+                List<Span> spans = tracesStore.get(traceId);
+                if (spans != null && request.test(spans)) { // apply filters
+                  traceIds.add(traceId); // adding to check if we have already add it later
+                  traces.add(spans);
+                }
+              }
             }
-          }
+          });
         }
-      });
-      LOG.debug("Traces found from query {}: {}", queryRequest, traces.size());
-      return traces;
+      } else {
+        while (checkpoint > from && traces.size() < request.limit()) {
+          try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(checkpoint, to)) {
+            spanIds.forEachRemaining(keyValue -> {
+              for (String traceId : keyValue.value) {
+                if (!traceIds.contains(traceId)) {
+                  List<Span> spans = tracesStore.get(traceId);
+                  if (spans != null && request.test(spans)) { // apply filters
+                    traceIds.add(traceId); // adding to check if we have already add it later
+                    traces.add(spans);
+                  }
+                }
+              }
+            });
+          }
+          to = checkpoint;
+          checkpoint = checkpoint - (60 * 1000 * 1000); // 1 min before more
+        }
+      }
+      traces.sort(Comparator.<List<Span>>comparingLong(o -> o.get(0).timestampAsLong()).reversed());
+      LOG.debug("Traces found from query {}: {}", request, traces.size());
+      return traces.subList(0,
+          request.limit() >= traces.size() ? traceIds.size() : request.limit());
     }
 
     @Override
     public Call<List<List<Span>>> clone() {
-      return new GetTracesCall(tracesStore, traceIdsByTsStore, queryRequest);
+      return new GetTracesCall(tracesStore, traceIdsByTsStore, request);
     }
   }
 
@@ -222,9 +248,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
     final String traceId;
 
-    GetTraceCall(
-        ReadOnlyKeyValueStore<String, List<Span>> traceStore,
-        String traceId) {
+    GetTraceCall(ReadOnlyKeyValueStore<String, List<Span>> traceStore, String traceId) {
       this.traceStore = traceStore;
       this.traceId = traceId;
     }
