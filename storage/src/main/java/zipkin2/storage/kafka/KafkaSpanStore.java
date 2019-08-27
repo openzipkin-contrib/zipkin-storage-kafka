@@ -56,10 +56,12 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   // Kafka Streams Store provider
   final KafkaStreams traceStoreStream;
   final KafkaStreams dependencyStoreStream;
+  final long minTracesStored;
 
   KafkaSpanStore(KafkaStorage storage) {
     traceStoreStream = storage.getTraceStoreStream();
     dependencyStoreStream = storage.getDependencyStoreStream();
+    minTracesStored = storage.minTracesStored;
   }
 
   @Override public Call<List<List<Span>>> getTraces(QueryRequest request) {
@@ -67,7 +69,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
         traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
     ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore =
         traceStoreStream.store(SPAN_IDS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
-    return new GetTracesCall(tracesStore, traceIdsByTsStore, request);
+    return new GetTracesCall(tracesStore, traceIdsByTsStore, request, minTracesStored);
   }
 
   @Override
@@ -182,14 +184,16 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     final ReadOnlyKeyValueStore<String, List<Span>> tracesStore;
     final ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore;
     final QueryRequest request;
+    final long minTracesStored;
 
     GetTracesCall(
         ReadOnlyKeyValueStore<String, List<Span>> tracesStore,
         ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore,
-        QueryRequest request) {
+        QueryRequest request, long minTracesStored) {
       this.tracesStore = tracesStore;
       this.traceIdsByTsStore = traceIdsByTsStore;
       this.request = request;
+      this.minTracesStored = minTracesStored;
     }
 
     @Override public List<List<Span>> query() {
@@ -198,8 +202,9 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       // milliseconds to microseconds
       long from = (request.endTs() - request.lookback()) * 1000;
       long to = request.endTs() * 1000;
-      long checkpoint = to - (30 * 1000 * 1000); // 30 sec before upper bound
-      if (checkpoint <= from) { // do one run
+      int bucket = 30 * 1000 * 1000;
+      long checkpoint = to - bucket; // 30 sec before upper bound
+      if (checkpoint <= from || tracesStore.approximateNumEntries() <= minTracesStored) { // do one run
         try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to)) {
           spanIds.forEachRemaining(keyValue -> {
             for (String traceId : keyValue.value) {
@@ -229,7 +234,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
             });
           }
           to = checkpoint;
-          checkpoint = checkpoint - (60 * 1000 * 1000); // 1 min before more
+          checkpoint = checkpoint - bucket; // 1 min before more
         }
       }
       traces.sort(Comparator.<List<Span>>comparingLong(o -> o.get(0).timestampAsLong()).reversed());
@@ -240,7 +245,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
     @Override
     public Call<List<List<Span>>> clone() {
-      return new GetTracesCall(tracesStore, traceIdsByTsStore, request);
+      return new GetTracesCall(tracesStore, traceIdsByTsStore, request, minTracesStored);
     }
   }
 

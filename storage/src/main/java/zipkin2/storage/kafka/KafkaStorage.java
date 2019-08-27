@@ -82,6 +82,7 @@ public class KafkaStorage extends StorageComponent {
   volatile Producer<String, byte[]> producer;
   volatile KafkaStreams traceAggregationStream, traceStoreStream, dependencyStoreStream;
   volatile boolean closeCalled, topicsValidated;
+  long minTracesStored;
 
   KafkaStorage(Builder builder) {
     // Kafka Storage modes
@@ -117,6 +118,7 @@ public class KafkaStorage extends StorageComponent {
         dependencyTopicName,
         builder.dependencyTtl,
         builder.dependencyWindowSize).get();
+    minTracesStored = builder.minTracesStored;
   }
 
   public static Builder newBuilder() {
