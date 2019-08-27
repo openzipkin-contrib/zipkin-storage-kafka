@@ -3,7 +3,7 @@ all: build
 
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
-VERSION := '0.5.3-SNAPSHOT'
+VERSION := '0.5.4-SNAPSHOT'
 IMAGE_NAME := 'jeqo/zipkin-kafka'
 
 .PHONY: run
