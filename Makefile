@@ -54,7 +54,7 @@ build: license-header
 	${MAVEN} clean install -DskipTests
 
 .PHONY: test
-test: build
+test:
 	${MAVEN} test verify
 
 .PHONY: zipkin-local

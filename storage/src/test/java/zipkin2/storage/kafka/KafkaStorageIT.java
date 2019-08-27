@@ -174,7 +174,7 @@ class KafkaStorageIT {
     SpanStore spanStore = storage.spanStore();
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
     // Then: services names are searchable
-    await().atMost(30, TimeUnit.SECONDS)
+    await().atMost(10, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces = new ArrayList<>();
           try {
@@ -194,14 +194,14 @@ class KafkaStorageIT {
           return traces.size() == 1
               && traces.get(0).size() == 2; // Trace is found and has two spans
         });
-    await().atMost(30, TimeUnit.SECONDS)
+    await().atMost(10, TimeUnit.SECONDS)
         .until(() -> {
           List<List<Span>> traces = new ArrayList<>();
           try {
             traces =
                 spanStore.getTraces(QueryRequest.newBuilder()
                     .endTs(TODAY + 1)
-                    .lookback(Duration.ofMinutes(1).toMillis())
+                    .lookback(Duration.ofMinutes(2).toMillis())
                     .limit(1)
                     .build())
                     .execute();

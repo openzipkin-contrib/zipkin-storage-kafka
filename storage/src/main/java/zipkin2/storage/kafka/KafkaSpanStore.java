@@ -198,19 +198,39 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       // milliseconds to microseconds
       long from = (request.endTs() - request.lookback()) * 1000;
       long to = request.endTs() * 1000;
-      // first index
-      try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to)) {
-        spanIds.forEachRemaining(keyValue -> {
-          for (String traceId : keyValue.value) {
-            if (!traceIds.contains(traceId)) {
-              List<Span> spans = tracesStore.get(traceId);
-              if (spans != null && request.test(spans)) { // apply filters
-                traceIds.add(traceId); // adding to check if we have already add it later
-                traces.add(spans);
+      long checkpoint = to - (60 * 1000 * 1000); // 1 min before upper bound
+      if (checkpoint <= from) { // do one run
+        try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to)) {
+          spanIds.forEachRemaining(keyValue -> {
+            for (String traceId : keyValue.value) {
+              if (!traceIds.contains(traceId)) {
+                List<Span> spans = tracesStore.get(traceId);
+                if (spans != null && request.test(spans)) { // apply filters
+                  traceIds.add(traceId); // adding to check if we have already add it later
+                  traces.add(spans);
+                }
               }
             }
+          });
+        }
+      } else {
+        while (checkpoint > from && traces.size() < request.limit()) {
+          try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(checkpoint, to)) {
+            spanIds.forEachRemaining(keyValue -> {
+              for (String traceId : keyValue.value) {
+                if (!traceIds.contains(traceId)) {
+                  List<Span> spans = tracesStore.get(traceId);
+                  if (spans != null && request.test(spans)) { // apply filters
+                    traceIds.add(traceId); // adding to check if we have already add it later
+                    traces.add(spans);
+                  }
+                }
+              }
+            });
           }
-        });
+          to = checkpoint;
+          checkpoint = checkpoint - (60 * 1000 * 1000); // 1 min before more
+        }
       }
       traces.sort(Comparator.<List<Span>>comparingLong(o -> o.get(0).timestampAsLong()).reversed());
       LOG.debug("Traces found from query {}: {}", request, traces.size());
