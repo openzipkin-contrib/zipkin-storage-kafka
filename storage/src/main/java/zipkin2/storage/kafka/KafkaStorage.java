@@ -674,4 +674,15 @@ public class KafkaStorage extends StorageComponent {
       return new KafkaStorage(this);
     }
   }
+
+  @Override public String toString() {
+    return "KafkaStorage{" +
+        "spanConsumerEnabled=" + spanConsumerEnabled +
+        ", searchEnabled=" + searchEnabled +
+        ", storageDirectory='" + storageDirectory + '\'' +
+        ", spansTopicName='" + spansTopicName + '\'' +
+        ", traceTopicName='" + traceTopicName + '\'' +
+        ", dependencyTopicName='" + dependencyTopicName + '\'' +
+        '}';
+  }
 }
