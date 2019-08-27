@@ -3,7 +3,7 @@ all: build
 
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
-VERSION := '0.5.2-SNAPSHOT'
+VERSION := '0.5.2'
 IMAGE_NAME := 'jeqo/zipkin-kafka'
 
 .PHONY: run
@@ -91,5 +91,5 @@ zipkin-test:
 
 .PHONY: release
 release:
-	${MAVEN} release:prepare
-	${MAVEN} release:perform
+	${MAVEN} release:prepare -Darguments="-Dmaven.test.skip=true"
+	${MAVEN} release:perform -Darguments="-Dmaven.test.skip=true"
