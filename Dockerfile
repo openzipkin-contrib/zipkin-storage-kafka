@@ -27,9 +27,15 @@ RUN apk add curl unzip && \
 
 FROM openzipkin/zipkin:2.16.2
 
-COPY --from=0 /zipkin/ /zipkin/
+COPY --from=0  --chown=zipkin /zipkin/ /zipkin/
 
 ENV MODULE_OPTS="-Dloader.path=kafka -Dspring.profiles.active=kafka"
+ENV STORAGE_TYPE=kafka
 
+# Prepare state dir
+USER root
+RUN mkdir /data && chown zipkin:zipkin /data
 ENV KAFKA_STORAGE_DIR /data
 VOLUME /data
+
+USER zipkin

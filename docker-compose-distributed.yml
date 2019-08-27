@@ -39,8 +39,6 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
       KAFKA_STORAGE_SPAN_CONSUMER_ENABLED: 'false'
-      KAFKA_STORAGE_TRACES_RETENTION_PERIOD: -1
-      KAFKA_STORAGE_TRACES_INACTIVITY_GAP: 5000
     volumes:
       - zipkin:/data
 volumes:
