@@ -165,7 +165,8 @@ class KafkaStorageIT {
     List<Span> spans = Arrays.asList(parent, child);
     // When: been published
     tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, parent.traceId(), spans));
-    tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, other.traceId(), Collections.singletonList(other)));
+    tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, other.traceId(),
+        Collections.singletonList(other)));
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
@@ -193,63 +194,54 @@ class KafkaStorageIT {
           }
           return traces.size() == 1
               && traces.get(0).size() == 2; // Trace is found and has two spans
-        });
-    await().atMost(10, TimeUnit.SECONDS)
-        .until(() -> {
-          List<List<Span>> traces = new ArrayList<>();
-          try {
-            traces =
-                spanStore.getTraces(QueryRequest.newBuilder()
-                    .endTs(TODAY + 1)
-                    .lookback(Duration.ofMinutes(1).toMillis())
-                    .limit(1)
-                    .build())
-                    .execute();
-          } catch (InvalidStateStoreException e) { // ignoring state issues
-            System.err.println(e.getMessage());
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
-          return traces.size() == 1
-              && traces.get(0).size() == 1; // last trace is returned first
-        });
-    await().atMost(5, TimeUnit.SECONDS)
-        .until(() -> {
-          List<String> services = new ArrayList<>();
-          try {
-            services = serviceAndSpanNames.getServiceNames().execute();
-          } catch (InvalidStateStoreException e) { // ignoring state issues
-            System.err.println(e.getMessage());
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
-          return services.size() == 3;
-        }); // There are two service names
-    await().atMost(5, TimeUnit.SECONDS)
-        .until(() -> {
-          List<String> spanNames = new ArrayList<>();
-          try {
-            spanNames = serviceAndSpanNames.getSpanNames("svc_a")
-                .execute();
-          } catch (InvalidStateStoreException e) { // ignoring state issues
-            System.err.println(e.getMessage());
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
-          return spanNames.size() == 1;
-        }); // Service names have one span name
-    await().atMost(5, TimeUnit.SECONDS)
-        .until(() -> {
-          List<String> services = new ArrayList<>();
-          try {
-            services = serviceAndSpanNames.getRemoteServiceNames("svc_a").execute();
-          } catch (InvalidStateStoreException e) { // ignoring state issues
-            System.err.println(e.getMessage());
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
-          return services.size() == 1;
-        }); // And one remote service name
+        }); // wait for services to be available
+    List<List<Span>> traces = new ArrayList<>();
+    try {
+      traces =
+          spanStore.getTraces(QueryRequest.newBuilder()
+              .endTs(TODAY + 1)
+              .lookback(Duration.ofMinutes(1).toMillis())
+              .limit(1)
+              .build())
+              .execute();
+    } catch (InvalidStateStoreException e) { // ignoring state issues
+      System.err.println(e.getMessage());
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    assertEquals(1, traces.size());
+    assertEquals(1, traces.get(0).size()); // last trace is returned first
+
+    List<String> services = new ArrayList<>();
+    try {
+      services = serviceAndSpanNames.getServiceNames().execute();
+    } catch (InvalidStateStoreException e) { // ignoring state issues
+      System.err.println(e.getMessage());
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    assertEquals(3, services.size()); // There are two service names
+
+    List<String> spanNames = new ArrayList<>();
+    try {
+      spanNames = serviceAndSpanNames.getSpanNames("svc_a")
+          .execute();
+    } catch (InvalidStateStoreException e) { // ignoring state issues
+      System.err.println(e.getMessage());
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    assertEquals(1, spanNames.size());// Service names have one span name
+
+    List<String> remoteServices = new ArrayList<>();
+    try {
+      remoteServices = serviceAndSpanNames.getRemoteServiceNames("svc_a").execute();
+    } catch (InvalidStateStoreException e) { // ignoring state issues
+      System.err.println(e.getMessage());
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+    assertEquals(1, remoteServices.size());// And one remote service name
   }
 
   @Test void should_find_dependencies() throws Exception {
