@@ -14,70 +14,72 @@
     the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-    <parent>
-        <groupId>io.github.jeqo.zipkin</groupId>
-        <artifactId>zipkin-storage-kafka-parent</artifactId>
-        <version>0.5.4-SNAPSHOT</version>
-    </parent>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>io.github.jeqo.zipkin</groupId>
+    <artifactId>zipkin-storage-kafka-parent</artifactId>
+    <version>0.5.4-SNAPSHOT</version>
+  </parent>
 
-    <artifactId>zipkin-autoconfigure-storage-kafka</artifactId>
-    <name>Auto Configuration: Kafka Storage</name>
+  <artifactId>zipkin-autoconfigure-storage-kafka</artifactId>
+  <name>Auto Configuration: Kafka Storage</name>
 
-    <properties>
-        <main.basedir>${project.basedir}/..</main.basedir>
+  <properties>
+    <main.basedir>${project.basedir}/..</main.basedir>
 
-        <!-- Server is Java 8+ -->
-        <main.java.version>1.8</main.java.version>
-        <main.signature.artifact>java18</main.signature.artifact>
-    </properties>
+    <!-- Server is Java 8+ -->
+    <main.java.version>1.8</main.java.version>
+    <main.signature.artifact>java18</main.signature.artifact>
+  </properties>
 
-    <dependencies>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>zipkin-storage-kafka</artifactId>
-        </dependency>
+  <dependencies>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>zipkin-storage-kafka</artifactId>
+    </dependency>
 
 
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <scope>test</scope>
-            <version>4.12</version>
-        </dependency>
-        <dependency>
-            <groupId>org.assertj</groupId>
-            <artifactId>assertj-core</artifactId>
-            <version>3.13.2</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-autoconfigure</artifactId>
-            <version>${spring-boot.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-test</artifactId>
-            <version>${spring-boot.version}</version>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+      <version>4.12</version>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>3.13.2</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-autoconfigure</artifactId>
+      <version>${spring-boot.version}</version>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-test</artifactId>
+      <version>${spring-boot.version}</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <!-- https://github.com/spring-projects/spring-boot/issues/3426 transitive exclude doesn't work -->
-                    <excludeGroupIds>
-                        io.zipkin.zipkin2,io.zipkin.reporter2,org.springframework.boot,org.springframework,com.fasterxml.jackson.core,com.google.auto.value,com.google.gson
-                    </excludeGroupIds>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <!-- https://github.com/spring-projects/spring-boot/issues/3426 transitive exclude doesn't work -->
+          <excludeGroupIds>
+            io.zipkin.zipkin2,io.zipkin.reporter2,org.springframework.boot,org.springframework,com.fasterxml.jackson.core,com.google.auto.value,com.google.gson
+          </excludeGroupIds>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

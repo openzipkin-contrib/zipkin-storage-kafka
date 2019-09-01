@@ -78,7 +78,6 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
 
   @Override public Topology get() {
     StreamsBuilder builder = new StreamsBuilder();
-
     builder
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(TRACES_STORE_NAME),
@@ -108,8 +107,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
     KStream<String, List<Span>> spansStream = builder
         .stream(spansTopicName, Consumed.with(Serdes.String(), spansSerde));
     // Store traces
-    spansStream
-        .process(() -> new Processor<String, List<Span>>() {
+    spansStream.process(() -> new Processor<String, List<Span>>() {
           ProcessorContext context;
           // Actual traces store
           KeyValueStore<String, List<Span>> tracesStore;
