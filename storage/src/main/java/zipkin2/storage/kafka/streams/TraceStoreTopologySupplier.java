@@ -107,7 +107,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(AUTOCOMPLETE_TAGS_STORE_NAME),
             Serdes.String(),
-            namesSerde));
+            namesSerde).withLoggingDisabled());
     // Traces stream
     KStream<String, List<Span>> spansStream = builder
         .stream(
