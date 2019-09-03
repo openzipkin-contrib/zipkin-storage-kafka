@@ -148,9 +148,10 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                       tracesStore.delete(traceId); // clean traces store
                     }
                   });
-                  LOG.info("Traces deletion emitted at {}, approx. number of traces stored {}",
+                  LOG.info("Traces deletion emitted at {}, approx. number of traces stored {} - partition: {}",
                       Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()),
-                      tracesStore.approximateNumEntries());
+                      tracesStore.approximateNumEntries(),
+                      context.partition());
                 }
               }
             });
