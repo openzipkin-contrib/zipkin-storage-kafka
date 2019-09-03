@@ -14,8 +14,8 @@
 
 FROM alpine
 
+ARG VERSION=master-SNAPSHOT
 ENV USER jeqo
-ENV VERSION 0.5.3
 
 WORKDIR /zipkin
 

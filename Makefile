@@ -3,7 +3,7 @@ all: build
 
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
-VERSION := '0.5.4-SNAPSHOT'
+VERSION := 'faster-start-SNAPSHOT'
 IMAGE_NAME := 'jeqo/zipkin-kafka'
 
 .PHONY: run
@@ -23,11 +23,11 @@ kafka-topics:
 
 .PHONY: docker-build
 docker-build:
-	docker build -t ${IMAGE_NAME}:latest .
-	docker build -t ${IMAGE_NAME}:${VERSION} .
+	docker build --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:latest .
+	docker build --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:${VERSION} .
 
 .PHONY: docker-push
-docker-push: docker-build
+docker-push:
 	docker push ${IMAGE_NAME}:latest
 	docker push ${IMAGE_NAME}:${VERSION}
 
