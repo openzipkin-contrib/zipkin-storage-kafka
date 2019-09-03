@@ -83,7 +83,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
             Stores.persistentKeyValueStore(TRACES_STORE_NAME),
             Serdes.String(),
             spansSerde).withLoggingDisabled())
-        // Logging disabled to avoid long starting times
+        // Disabling logging to avoid long starting times
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(SPAN_IDS_BY_TS_STORE_NAME),
             Serdes.Long(),

@@ -55,15 +55,17 @@ public class DependencyStoreTopologySupplier implements Supplier<Topology> {
     StreamsBuilder builder = new StreamsBuilder();
 
     // Dependency links window store
-    builder.addStateStore(Stores.windowStoreBuilder(
-        Stores.persistentWindowStore(
-            DEPENDENCIES_STORE_NAME,
-            dependencyTtl,
-            dependencyWindowSize,
-            false),
-        Serdes.String(),
-        dependencyLinkSerde
-    ));
+    builder.addStateStore(
+        // Disabling logging to avoid long starting times
+        Stores.windowStoreBuilder(
+            Stores.persistentWindowStore(
+                DEPENDENCIES_STORE_NAME,
+                dependencyTtl,
+                dependencyWindowSize,
+                false),
+            Serdes.String(),
+            dependencyLinkSerde
+        ).withLoggingDisabled());
     // Consume dependency links stream
     builder.stream(dependencyTopicName, Consumed.with(Serdes.String(), dependencyLinkSerde))
         // Storage
