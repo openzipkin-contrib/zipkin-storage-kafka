@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
-import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.kstream.Consumed;
@@ -79,99 +78,103 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   @Override public Topology get() {
     StreamsBuilder builder = new StreamsBuilder();
     builder
+        // Logging disabled to avoid long starting times
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(TRACES_STORE_NAME),
             Serdes.String(),
-            spansSerde))
+            spansSerde).withLoggingDisabled())
+        // Logging disabled to avoid long starting times
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(SPAN_IDS_BY_TS_STORE_NAME),
             Serdes.Long(),
-            spanIdsSerde))
+            spanIdsSerde).withLoggingDisabled())
+        // In-memory as service names are bounded
         .addStateStore(Stores.keyValueStoreBuilder(
-            Stores.persistentKeyValueStore(SERVICE_NAMES_STORE_NAME),
+            Stores.inMemoryKeyValueStore(SERVICE_NAMES_STORE_NAME),
             Serdes.String(),
             Serdes.String()))
+        // In-memory as span names are bounded
         .addStateStore(Stores.keyValueStoreBuilder(
-            Stores.persistentKeyValueStore(SPAN_NAMES_STORE_NAME),
+            Stores.inMemoryKeyValueStore(SPAN_NAMES_STORE_NAME),
             Serdes.String(),
             namesSerde))
+        // In-memory as remote-service names are bounded
         .addStateStore(Stores.keyValueStoreBuilder(
-            Stores.persistentKeyValueStore(REMOTE_SERVICE_NAMES_STORE_NAME),
+            Stores.inMemoryKeyValueStore(REMOTE_SERVICE_NAMES_STORE_NAME),
             Serdes.String(),
             namesSerde))
+        // Persistent as values could be unbounded
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(AUTOCOMPLETE_TAGS_STORE_NAME),
             Serdes.String(),
             namesSerde));
     // Traces stream
     KStream<String, List<Span>> spansStream = builder
-        .stream(spansTopicName, Consumed.with(Serdes.String(), spansSerde));
+        .stream(
+            spansTopicName,
+            Consumed.with(Serdes.String(), spansSerde)
+                .withOffsetResetPolicy(Topology.AutoOffsetReset.LATEST));
     // Store traces
     spansStream.process(() -> new Processor<String, List<Span>>() {
-          ProcessorContext context;
-          // Actual traces store
-          KeyValueStore<String, List<Span>> tracesStore;
-          // timestamp index for trace IDs
-          KeyValueStore<Long, Set<String>> spanIdsByTsStore;
+      ProcessorContext context;
+      // Actual traces store
+      KeyValueStore<String, List<Span>> tracesStore;
+      // timestamp index for trace IDs
+      KeyValueStore<Long, Set<String>> spanIdsByTsStore;
 
-          @Override public void init(ProcessorContext context) {
-            this.context = context;
-            tracesStore =
-                (KeyValueStore<String, List<Span>>) context.getStateStore(TRACES_STORE_NAME);
-            spanIdsByTsStore =
-                (KeyValueStore<Long, Set<String>>) context.getStateStore(SPAN_IDS_BY_TS_STORE_NAME);
-            // Retention scheduling
-            context.schedule(
-                traceTtlCheckInterval,
-                PunctuationType.STREAM_TIME,
-                timestamp -> {
-                  if (traceTtl.toMillis() > 0 &&
-                      tracesStore.approximateNumEntries() > minTracesStored) {
-                    // preparing range filtering
-                    long from = 0L;
-                    long to = timestamp - traceTtl.toMillis();
-                    long toMicro = to * 1000;
-                    // query traceIds active during period
-                    try (final KeyValueIterator<Long, Set<String>> all =
-                             spanIdsByTsStore.range(from, toMicro)) {
-                      int deletions = 0; // logging purpose
-                      while (all.hasNext()) {
-                        final KeyValue<Long, Set<String>> record = all.next();
-                        spanIdsByTsStore.delete(record.key); // clean timestamp index
-                        for (String traceId : record.value) {
-                          tracesStore.delete(traceId); // clean traces store
-                          deletions++;
-                        }
-                      }
-                      if (deletions > 0) {
-                        LOG.info("Traces deletion emitted: {}, older than {}",
-                            deletions,
-                            Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()));
-                      }
+      @Override public void init(ProcessorContext context) {
+        this.context = context;
+        tracesStore =
+            (KeyValueStore<String, List<Span>>) context.getStateStore(TRACES_STORE_NAME);
+        spanIdsByTsStore =
+            (KeyValueStore<Long, Set<String>>) context.getStateStore(SPAN_IDS_BY_TS_STORE_NAME);
+        // Retention scheduling
+        context.schedule(
+            traceTtlCheckInterval,
+            PunctuationType.STREAM_TIME,
+            timestamp -> {
+              if (traceTtl.toMillis() > 0 &&
+                  tracesStore.approximateNumEntries() > minTracesStored) {
+                // preparing range filtering
+                long from = 0L;
+                long to = timestamp - traceTtl.toMillis();
+                long toMicro = to * 1000;
+                // query traceIds active during period
+                try (final KeyValueIterator<Long, Set<String>> range =
+                         spanIdsByTsStore.range(from, toMicro)) {
+                  range.forEachRemaining(record -> {
+                    spanIdsByTsStore.delete(record.key); // clean timestamp index
+                    for (String traceId : record.value) {
+                      tracesStore.delete(traceId); // clean traces store
                     }
-                  }
-                });
-          }
+                  });
+                  LOG.info("Traces deletion emitted at {}, approx. number of traces stored {}",
+                      Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()),
+                      tracesStore.approximateNumEntries());
+                }
+              }
+            });
+      }
 
-          @Override public void process(String traceId, List<Span> spans) {
-            if (!spans.isEmpty()) {
-              // Persist traces
-              List<Span> currentSpans = tracesStore.get(traceId);
-              if (currentSpans == null) currentSpans = new ArrayList<>();
-              currentSpans.addAll(spans);
-              tracesStore.put(traceId, currentSpans);
-              // Persist timestamp indexed span ids
-              long timestamp = spans.get(0).timestamp();
-              Set<String> currentSpanIds = spanIdsByTsStore.get(timestamp);
-              if (currentSpanIds == null) currentSpanIds = new HashSet<>();
-              currentSpanIds.add(traceId);
-              spanIdsByTsStore.put(timestamp, currentSpanIds);
-            }
-          }
+      @Override public void process(String traceId, List<Span> spans) {
+        if (!spans.isEmpty()) {
+          // Persist traces
+          List<Span> currentSpans = tracesStore.get(traceId);
+          if (currentSpans == null) currentSpans = new ArrayList<>();
+          currentSpans.addAll(spans);
+          tracesStore.put(traceId, currentSpans);
+          // Persist timestamp indexed span ids
+          long timestamp = spans.get(0).timestamp();
+          Set<String> currentSpanIds = spanIdsByTsStore.get(timestamp);
+          if (currentSpanIds == null) currentSpanIds = new HashSet<>();
+          currentSpanIds.add(traceId);
+          spanIdsByTsStore.put(timestamp, currentSpanIds);
+        }
+      }
 
-          @Override public void close() {
-          }
-        }, TRACES_STORE_NAME, SPAN_IDS_BY_TS_STORE_NAME);
+      @Override public void close() {
+      }
+    }, TRACES_STORE_NAME, SPAN_IDS_BY_TS_STORE_NAME);
     // Store service, span and remote service names
     spansStream.process(() -> new Processor<String, List<Span>>() {
           KeyValueStore<String, String> serviceNameStore;
