@@ -392,6 +392,7 @@ public class KafkaStorage extends StorageComponent {
       traceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, traceStoreStreamAppId);
       traceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
       traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
+      traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, "");
       // Dependency Store Stream Topology configuration
       dependencyStoreStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
           Serdes.StringSerde.class);
@@ -401,6 +402,7 @@ public class KafkaStorage extends StorageComponent {
           dependencyStoreStreamAppId);
       dependencyStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, dependencyStoreDirectory());
       dependencyStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
+      dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, "");
     }
 
     @Override
