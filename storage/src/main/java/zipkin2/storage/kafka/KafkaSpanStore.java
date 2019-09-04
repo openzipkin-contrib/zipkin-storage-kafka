@@ -13,12 +13,14 @@
  */
 package zipkin2.storage.kafka;
 
+import com.linecorp.armeria.client.HttpClient;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
@@ -180,6 +182,33 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
   }
 
+  static class GetTracesCallScatterGather extends KafkaStreamsStoreCall<List<List<Span>>> {
+    final KafkaStreams traceStoreStream;
+
+    GetTracesCallScatterGather(KafkaStreams traceStoreStream) {
+      this.traceStoreStream = traceStoreStream;
+    }
+
+    @Override protected List<List<Span>> query() {
+      List<List<Span>> all =
+          traceStoreStream.allMetadataForStore(TRACES_STORE_NAME)
+              .parallelStream()
+              .map(metadata -> {
+                //HttpClient httpClient = HttpClient.of("");
+                //TODO jeqo: in order to enable this, we could add an additional endpoint, internal
+                // for kafka storage, then all queries through that channel reply from local-scatter
+                // whether queries coming from API
+                return new ArrayList<Span>();
+              })
+              .collect(Collectors.toList());
+      return all;
+    }
+
+    @Override public Call<List<List<Span>>> clone() {
+      return null;
+    }
+  }
+
   static class GetTracesCall extends KafkaStreamsStoreCall<List<List<Span>>> {
     final ReadOnlyKeyValueStore<String, List<Span>> tracesStore;
     final ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore;
@@ -204,7 +233,8 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       long to = request.endTs() * 1000;
       int bucket = 30 * 1000 * 1000;
       long checkpoint = to - bucket; // 30 sec before upper bound
-      if (checkpoint <= from || tracesStore.approximateNumEntries() <= minTracesStored) { // do one run
+      if (checkpoint <= from
+          || tracesStore.approximateNumEntries() <= minTracesStored) { // do one run
         try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to)) {
           spanIds.forEachRemaining(keyValue -> {
             for (String traceId : keyValue.value) {
@@ -220,7 +250,8 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
         }
       } else {
         while (checkpoint > from && traces.size() < request.limit()) {
-          try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(checkpoint, to)) {
+          try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(checkpoint,
+              to)) {
             spanIds.forEachRemaining(keyValue -> {
               for (String traceId : keyValue.value) {
                 if (!traceIds.contains(traceId)) {
