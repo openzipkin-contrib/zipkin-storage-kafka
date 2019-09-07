@@ -13,6 +13,7 @@
  */
 package zipkin2.storage.kafka;
 
+import com.linecorp.armeria.server.Server;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -81,6 +82,7 @@ public class KafkaStorage extends StorageComponent {
   volatile AdminClient adminClient;
   volatile Producer<String, byte[]> producer;
   volatile KafkaStreams traceAggregationStream, traceStoreStream, dependencyStoreStream;
+  volatile Server server;
   volatile boolean closeCalled, topicsValidated;
   long minTracesStored;
 
@@ -161,6 +163,7 @@ public class KafkaStorage extends StorageComponent {
   public SpanStore spanStore() {
     checkTopics();
     if (searchEnabled) {
+      getServer();
       return new KafkaSpanStore(this);
     } else { // NoopSpanStore
       return new SpanStore() {
@@ -260,20 +263,21 @@ public class KafkaStorage extends StorageComponent {
 
   void doClose() {
     try {
-      if (adminClient != null) adminClient.close(Duration.ofSeconds(1));
+      if (adminClient != null) adminClient.close(Duration.ofSeconds(10));
       if (producer != null) {
         producer.flush();
-        producer.close(Duration.ofSeconds(1));
+        producer.close(Duration.ofSeconds(10));
       }
       if (traceStoreStream != null) {
-        traceStoreStream.close(Duration.ofSeconds(1));
+        traceStoreStream.close(Duration.ofSeconds(10));
       }
       if (dependencyStoreStream != null) {
-        dependencyStoreStream.close(Duration.ofSeconds(1));
+        dependencyStoreStream.close(Duration.ofSeconds(10));
       }
       if (traceAggregationStream != null) {
-        traceAggregationStream.close(Duration.ofSeconds(1));
+        traceAggregationStream.close(Duration.ofSeconds(10));
       }
+      if (server != null) server.close();
     } catch (Exception | Error e) {
       LOG.warn("error closing client {}", e.getMessage(), e);
     }
@@ -337,6 +341,19 @@ public class KafkaStorage extends StorageComponent {
       }
     }
     return traceAggregationStream;
+  }
+
+  Server getServer() {
+    if (server == null) {
+      synchronized (this) {
+        if (server == null) {
+          server = new KafkaStoreServerSupplier(this)
+              .get();
+          server.start();
+        }
+      }
+    }
+    return server;
   }
 
   public static class Builder extends StorageComponent.Builder {
