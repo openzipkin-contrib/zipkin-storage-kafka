@@ -13,9 +13,13 @@
  */
 package zipkin2.storage.kafka;
 
+import com.google.gson.Gson;
 import com.linecorp.armeria.client.HttpClient;
+import java.io.IOException;
+import java.nio.charset.Charset;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -29,6 +33,7 @@ import org.apache.kafka.streams.state.ReadOnlyWindowStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
+import zipkin2.Callback;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.internal.DependencyLinker;
@@ -82,9 +87,9 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   }
 
   @Deprecated @Override public Call<List<String>> getServiceNames() {
-    ReadOnlyKeyValueStore<String, String> serviceStore =
-        traceStoreStream.store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
-    return new GetServiceNamesCall(serviceStore);
+    //ReadOnlyKeyValueStore<String, String> serviceStore =
+    //    traceStoreStream.store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+    return new GetServiceNamesScatterCall(traceStoreStream);
   }
 
   @Deprecated @Override public Call<List<String>> getSpanNames(String serviceName) {
@@ -105,6 +110,48 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
         dependencyStoreStream.store(DEPENDENCIES_STORE_NAME,
             QueryableStoreTypes.windowStore());
     return new GetDependenciesCall(endTs, lookback, dependenciesStore);
+  }
+
+  static class GetServiceNamesScatterCall extends Call.Base<List<String>> {
+    static final Gson GSON = new Gson();
+
+    final KafkaStreams traceStoreStream;
+
+    GetServiceNamesScatterCall(KafkaStreams traceStoreStream) {
+      this.traceStoreStream = traceStoreStream;
+    }
+
+    @Override protected List<String> doExecute() throws IOException {
+      return traceStoreStream.allMetadataForStore(SERVICE_NAMES_STORE_NAME)
+          .parallelStream()
+          .map(metadata -> HttpClient.of(
+              String.format("http://%s:%d",
+                  metadata.hostInfo().host(),
+                  metadata.hostInfo().port())))
+          .map(httpClient -> httpClient.get("/service_names")
+              .aggregate()
+              .join()
+              .content(Charset.defaultCharset()))
+          .map(response -> {
+            Set<String> set = GSON.fromJson(response, Set.class);
+            return set;
+          })
+          .flatMap(Collection::stream)
+          .distinct()
+          .collect(Collectors.toList());
+    }
+
+    @Override protected void doEnqueue(Callback<List<String>> callback) {
+      try {
+        callback.onSuccess(doExecute());
+      } catch (IOException e) {
+        callback.onError(e);
+      }
+    }
+
+    @Override public Call<List<String>> clone() {
+      return new GetServiceNamesScatterCall(traceStoreStream);
+    }
   }
 
   static class GetServiceNamesCall extends KafkaStreamsStoreCall<List<String>> {
@@ -179,33 +226,6 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
     @Override public Call<List<String>> clone() {
       return new GetRemoteServiceNamesCall(remoteServiceNamesStore, serviceName);
-    }
-  }
-
-  static class GetTracesCallScatterGather extends KafkaStreamsStoreCall<List<List<Span>>> {
-    final KafkaStreams traceStoreStream;
-
-    GetTracesCallScatterGather(KafkaStreams traceStoreStream) {
-      this.traceStoreStream = traceStoreStream;
-    }
-
-    @Override protected List<List<Span>> query() {
-      List<List<Span>> all =
-          traceStoreStream.allMetadataForStore(TRACES_STORE_NAME)
-              .parallelStream()
-              .map(metadata -> {
-                //HttpClient httpClient = HttpClient.of("");
-                //TODO jeqo: in order to enable this, we could add an additional endpoint, internal
-                // for kafka storage, then all queries through that channel reply from local-scatter
-                // whether queries coming from API
-                return new ArrayList<Span>();
-              })
-              .collect(Collectors.toList());
-      return all;
-    }
-
-    @Override public Call<List<List<Span>>> clone() {
-      return null;
     }
   }
 

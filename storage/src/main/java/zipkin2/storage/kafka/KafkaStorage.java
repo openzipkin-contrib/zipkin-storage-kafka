@@ -14,6 +14,8 @@
 package zipkin2.storage.kafka;
 
 import com.linecorp.armeria.server.Server;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -387,6 +389,12 @@ public class KafkaStorage extends StorageComponent {
     String dependencyTopicName = "zipkin-dependency";
 
     Builder() {
+      String hostInfo = "localhost";
+      try {
+        hostInfo = InetAddress.getLocalHost().getHostName() + ":" + 9412;
+      } catch (UnknownHostException e) {
+        e.printStackTrace();
+      }
       // Kafka Producer configuration
       producerConfig.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
       producerConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
@@ -409,7 +417,7 @@ public class KafkaStorage extends StorageComponent {
       traceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, traceStoreStreamAppId);
       traceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
       traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-      traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, "");
+      traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo);
       // Dependency Store Stream Topology configuration
       dependencyStoreStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
           Serdes.StringSerde.class);
@@ -419,7 +427,7 @@ public class KafkaStorage extends StorageComponent {
           dependencyStoreStreamAppId);
       dependencyStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, dependencyStoreDirectory());
       dependencyStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-      dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, "");
+      dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo);
     }
 
     @Override
