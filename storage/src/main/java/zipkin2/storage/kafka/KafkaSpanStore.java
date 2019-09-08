@@ -15,39 +15,36 @@ package zipkin2.storage.kafka;
 
 import com.google.gson.Gson;
 import com.linecorp.armeria.client.HttpClient;
+import com.linecorp.armeria.common.HttpData;
+import com.linecorp.armeria.common.HttpMethod;
+import com.linecorp.armeria.common.RequestHeaders;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.state.KeyValueIterator;
-import org.apache.kafka.streams.state.QueryableStoreTypes;
-import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
-import org.apache.kafka.streams.state.ReadOnlyWindowStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.kafka.streams.state.StreamsMetadata;
 import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
-import zipkin2.internal.DependencyLinker;
+import zipkin2.codec.DependencyLinkBytesDecoder;
+import zipkin2.codec.SpanBytesDecoder;
 import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
-import zipkin2.storage.kafka.internal.KafkaStreamsStoreCall;
+import zipkin2.storage.kafka.internal.Traces;
 import zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier;
 import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
 
 import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_IDS_BY_TS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_STORE_NAME;
 
@@ -59,57 +56,38 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
  * for scatter gather data from different instances.
  */
 public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
-  static final Logger LOG = LoggerFactory.getLogger(KafkaSpanStore.class);
   // Kafka Streams Store provider
   final KafkaStreams traceStoreStream;
   final KafkaStreams dependencyStoreStream;
-  final long minTracesStored;
 
   KafkaSpanStore(KafkaStorage storage) {
     traceStoreStream = storage.getTraceStoreStream();
     dependencyStoreStream = storage.getDependencyStoreStream();
-    minTracesStored = storage.minTracesStored;
   }
 
   @Override public Call<List<List<Span>>> getTraces(QueryRequest request) {
-    ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
-        traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
-    ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore =
-        traceStoreStream.store(SPAN_IDS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
-    return new GetTracesCall(tracesStore, traceIdsByTsStore, request, minTracesStored);
+    return new GetTracesScatterCall(traceStoreStream, request);
   }
 
   @Override
   public Call<List<Span>> getTrace(String traceId) {
-    ReadOnlyKeyValueStore<String, List<Span>> traceStore =
-        traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
-    return new GetTraceCall(traceStore, traceId);
+    return new GetTraceScatterCall(traceStoreStream, traceId);
   }
 
   @Deprecated @Override public Call<List<String>> getServiceNames() {
-    //ReadOnlyKeyValueStore<String, String> serviceStore =
-    //    traceStoreStream.store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
     return new GetServiceNamesScatterCall(traceStoreStream);
   }
 
   @Deprecated @Override public Call<List<String>> getSpanNames(String serviceName) {
-    ReadOnlyKeyValueStore<String, Set<String>> spanNamesStore =
-        traceStoreStream.store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
-    return new GetSpanNamesCall(spanNamesStore, serviceName);
+    return new GetSpanNamesScatterCall(traceStoreStream, serviceName);
   }
 
   @Override public Call<List<String>> getRemoteServiceNames(String serviceName) {
-    ReadOnlyKeyValueStore<String, Set<String>> remoteServiceNamesStore =
-        traceStoreStream.store(REMOTE_SERVICE_NAMES_STORE_NAME,
-            QueryableStoreTypes.keyValueStore());
-    return new GetRemoteServiceNamesCall(remoteServiceNamesStore, serviceName);
+    return new GetRemoteServiceNamesScatterCall(traceStoreStream, serviceName);
   }
 
   @Override public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
-    ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore =
-        dependencyStoreStream.store(DEPENDENCIES_STORE_NAME,
-            QueryableStoreTypes.windowStore());
-    return new GetDependenciesCall(endTs, lookback, dependenciesStore);
+    return new GetDependenciesScatterCall(dependencyStoreStream, endTs, lookback);
   }
 
   static class GetServiceNamesScatterCall extends Call.Base<List<String>> {
@@ -154,196 +132,215 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
   }
 
-  static class GetServiceNamesCall extends KafkaStreamsStoreCall<List<String>> {
-    ReadOnlyKeyValueStore<String, String> serviceStore;
+  static class GetSpanNamesScatterCall extends Call.Base<List<String>> {
+    static final Gson GSON = new Gson();
 
-    GetServiceNamesCall(ReadOnlyKeyValueStore<String, String> serviceStore) {
-      this.serviceStore = serviceStore;
+    final KafkaStreams traceStoreStream;
+    final String serviceName;
+
+    GetSpanNamesScatterCall(KafkaStreams traceStoreStream, String serviceName) {
+      this.traceStoreStream = traceStoreStream;
+      this.serviceName = serviceName;
     }
 
-    @Override public List<String> query() {
-      List<String> serviceNames = new ArrayList<>();
-      try (KeyValueIterator<String, String> all = serviceStore.all()) {
-        all.forEachRemaining(keyValue -> {
-          // double check service names are unique
-          if (!serviceNames.contains(keyValue.value)) serviceNames.add(keyValue.value);
-        });
+    @Override protected List<String> doExecute() throws IOException {
+      StreamsMetadata metadata =
+          traceStoreStream.metadataForKey(SPAN_NAMES_STORE_NAME, serviceName,
+              new StringSerializer());
+      HttpClient httpClient = HttpClient.of(
+          String.format("http://%s:%d",
+              metadata.hostInfo().host(),
+              metadata.hostInfo().port()));
+      String content =
+          httpClient.get(String.format("/service_names/%s/span_names", serviceName))
+              .aggregate()
+              .join()
+              .content(Charset.defaultCharset());
+      Set<String> set = GSON.fromJson(content, Set.class);
+      return new ArrayList<>(set);
+    }
+
+    @Override protected void doEnqueue(Callback<List<String>> callback) {
+      try {
+        callback.onSuccess(doExecute());
+      } catch (IOException e) {
+        callback.onError(e);
       }
-      // comply with Zipkin API as service names are required to be ordered lexicographically
-      Collections.sort(serviceNames);
-      return serviceNames;
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetServiceNamesCall(serviceStore);
+      return new GetSpanNamesScatterCall(traceStoreStream, serviceName);
     }
   }
 
-  static class GetSpanNamesCall extends KafkaStreamsStoreCall<List<String>> {
-    final ReadOnlyKeyValueStore<String, Set<String>> spanNamesStore;
+  static class GetRemoteServiceNamesScatterCall extends Call.Base<List<String>> {
+    static final Gson GSON = new Gson();
+
+    final KafkaStreams traceStoreStream;
     final String serviceName;
 
-    GetSpanNamesCall(ReadOnlyKeyValueStore<String, Set<String>> spanNamesStore,
-        String serviceName) {
-      this.spanNamesStore = spanNamesStore;
+    GetRemoteServiceNamesScatterCall(KafkaStreams traceStoreStream, String serviceName) {
+      this.traceStoreStream = traceStoreStream;
       this.serviceName = serviceName;
     }
 
-    @Override public List<String> query() {
-      if (serviceName == null) return new ArrayList<>();
-      Set<String> spanNamesSet = spanNamesStore.get(serviceName);
-      if (spanNamesSet == null) return new ArrayList<>();
-      List<String> spanNames = new ArrayList<>(spanNamesSet);
-      // comply with Zipkin API as service names are required to be ordered lexicographically and store returns unordered values
-      Collections.sort(spanNames);
-      return spanNames;
+    @Override protected List<String> doExecute() throws IOException {
+      StreamsMetadata metadata =
+          traceStoreStream.metadataForKey(REMOTE_SERVICE_NAMES_STORE_NAME, serviceName,
+              new StringSerializer());
+      HttpClient httpClient = HttpClient.of(
+          String.format("http://%s:%d",
+              metadata.hostInfo().host(),
+              metadata.hostInfo().port()));
+      String content =
+          httpClient.get(String.format("/service_names/%s/remote_service_names", serviceName))
+              .aggregate()
+              .join()
+              .content(Charset.defaultCharset());
+      Set<String> set = GSON.fromJson(content, Set.class);
+      return new ArrayList<>(set);
+    }
+
+    @Override protected void doEnqueue(Callback<List<String>> callback) {
+      try {
+        callback.onSuccess(doExecute());
+      } catch (IOException e) {
+        callback.onError(e);
+      }
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetSpanNamesCall(spanNamesStore, serviceName);
+      return new GetRemoteServiceNamesScatterCall(traceStoreStream, serviceName);
     }
   }
 
-  static class GetRemoteServiceNamesCall extends KafkaStreamsStoreCall<List<String>> {
-    final ReadOnlyKeyValueStore<String, Set<String>> remoteServiceNamesStore;
-    final String serviceName;
+  static class GetTracesScatterCall extends Call.Base<List<List<Span>>> {
+    static final Gson GSON = new Gson();
 
-    GetRemoteServiceNamesCall(ReadOnlyKeyValueStore<String, Set<String>> remoteServiceNamesStore,
-        String serviceName) {
-      this.remoteServiceNamesStore = remoteServiceNamesStore;
-      this.serviceName = serviceName;
-    }
-
-    @Override public List<String> query() {
-      if (serviceName == null) return new ArrayList<>();
-      Set<String> remoteServiceNamesSet = remoteServiceNamesStore.get(serviceName);
-      if (remoteServiceNamesSet == null) return new ArrayList<>();
-      List<String> remoteServiceNames = new ArrayList<>(remoteServiceNamesSet);
-      // comply with Zipkin API as service names are required to be ordered lexicographically
-      Collections.sort(remoteServiceNames);
-      return remoteServiceNames;
-    }
-
-    @Override public Call<List<String>> clone() {
-      return new GetRemoteServiceNamesCall(remoteServiceNamesStore, serviceName);
-    }
-  }
-
-  static class GetTracesCall extends KafkaStreamsStoreCall<List<List<Span>>> {
-    final ReadOnlyKeyValueStore<String, List<Span>> tracesStore;
-    final ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore;
+    final KafkaStreams traceStoreStream;
     final QueryRequest request;
-    final long minTracesStored;
 
-    GetTracesCall(
-        ReadOnlyKeyValueStore<String, List<Span>> tracesStore,
-        ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore,
-        QueryRequest request, long minTracesStored) {
-      this.tracesStore = tracesStore;
-      this.traceIdsByTsStore = traceIdsByTsStore;
+    GetTracesScatterCall(KafkaStreams traceStoreStream, QueryRequest request) {
+      this.traceStoreStream = traceStoreStream;
       this.request = request;
-      this.minTracesStored = minTracesStored;
     }
 
-    @Override public List<List<Span>> query() {
-      List<List<Span>> traces = new ArrayList<>();
-      List<String> traceIds = new ArrayList<>();
-      // milliseconds to microseconds
-      long from = (request.endTs() - request.lookback()) * 1000;
-      long to = request.endTs() * 1000;
-      int bucket = 30 * 1000 * 1000;
-      long checkpoint = to - bucket; // 30 sec before upper bound
-      if (checkpoint <= from
-          || tracesStore.approximateNumEntries() <= minTracesStored) { // do one run
-        try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to)) {
-          spanIds.forEachRemaining(keyValue -> {
-            for (String traceId : keyValue.value) {
-              if (!traceIds.contains(traceId)) {
-                List<Span> spans = tracesStore.get(traceId);
-                if (spans != null && request.test(spans)) { // apply filters
-                  traceIds.add(traceId); // adding to check if we have already add it later
-                  traces.add(spans);
-                }
-              }
-            }
-          });
-        }
-      } else {
-        while (checkpoint > from && traces.size() < request.limit()) {
-          try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(checkpoint,
-              to)) {
-            spanIds.forEachRemaining(keyValue -> {
-              for (String traceId : keyValue.value) {
-                if (!traceIds.contains(traceId)) {
-                  List<Span> spans = tracesStore.get(traceId);
-                  if (spans != null && request.test(spans)) { // apply filters
-                    traceIds.add(traceId); // adding to check if we have already add it later
-                    traces.add(spans);
-                  }
-                }
-              }
-            });
-          }
-          to = checkpoint;
-          checkpoint = checkpoint - bucket; // 1 min before more
-        }
+    @Override protected List<List<Span>> doExecute() throws IOException {
+      List<List<Span>> traces = traceStoreStream.allMetadataForStore(TRACES_STORE_NAME)
+          .parallelStream()
+          .map(metadata -> HttpClient.of(
+              String.format("http://%s:%d",
+                  metadata.hostInfo().host(),
+                  metadata.hostInfo().port())))
+          .map(httpClient -> httpClient.execute(
+              RequestHeaders.of(HttpMethod.GET, "/traces"), GSON.toJson(request.toBuilder()))
+              .aggregate()
+              .join()
+              .contentUtf8())
+          .map(response -> {
+            //List<List<Span>> decoded = new ArrayList<>(encoded.size());
+            //for(List<Span> bytes : encoded) {
+            //  decoded.add(SpanBytesDecoder.JSON_V2.decodeList(ByteBuffer.wrap(bytes)));
+            //}
+            Traces result = GSON.fromJson(response, Traces.class);
+            return result.traces;
+          })
+          .flatMap(Collection::stream)
+          .distinct()
+          .collect(Collectors.toList());
+      return traces.subList(0, Math.min(request.limit(), traces.size()));
+    }
+
+    @Override protected void doEnqueue(Callback<List<List<Span>>> callback) {
+      try {
+        callback.onSuccess(doExecute());
+      } catch (IOException e) {
+        callback.onError(e);
       }
-      traces.sort(Comparator.<List<Span>>comparingLong(o -> o.get(0).timestampAsLong()).reversed());
-      LOG.debug("Traces found from query {}: {}", request, traces.size());
-      return traces.subList(0,
-          request.limit() >= traces.size() ? traceIds.size() : request.limit());
     }
 
-    @Override
-    public Call<List<List<Span>>> clone() {
-      return new GetTracesCall(tracesStore, traceIdsByTsStore, request, minTracesStored);
+    @Override public Call<List<List<Span>>> clone() {
+      return new GetTracesScatterCall(traceStoreStream, request);
     }
   }
 
-  static class GetTraceCall extends KafkaStreamsStoreCall<List<Span>> {
-    final ReadOnlyKeyValueStore<String, List<Span>> traceStore;
+  static class GetTraceScatterCall extends Call.Base<List<Span>> {
+    final KafkaStreams traceStoreStream;
     final String traceId;
 
-    GetTraceCall(ReadOnlyKeyValueStore<String, List<Span>> traceStore, String traceId) {
-      this.traceStore = traceStore;
+    GetTraceScatterCall(KafkaStreams traceStoreStream, String traceId) {
+      this.traceStoreStream = traceStoreStream;
       this.traceId = traceId;
     }
 
-    @Override public List<Span> query() {
-      final List<Span> spans = traceStore.get(traceId);
-      if (spans == null) return new ArrayList<>();
-      return spans;
+    @Override protected List<Span> doExecute() throws IOException {
+      StreamsMetadata metadata =
+          traceStoreStream.metadataForKey(TRACES_STORE_NAME, traceId, new StringSerializer());
+      HttpClient httpClient = HttpClient.of(
+          String.format("http://%s:%d",
+              metadata.hostInfo().host(),
+              metadata.hostInfo().port()));
+      HttpData content =
+          httpClient.get(String.format("/traces/%s", traceId))
+              .aggregate()
+              .join()
+              .content();
+      return SpanBytesDecoder.JSON_V2.decodeList(ByteBuffer.wrap(content.array()));
+    }
+
+    @Override protected void doEnqueue(Callback<List<Span>> callback) {
+      try {
+        callback.onSuccess(doExecute());
+      } catch (IOException e) {
+        callback.onError(e);
+      }
     }
 
     @Override public Call<List<Span>> clone() {
-      return new GetTraceCall(traceStore, traceId);
+      return new GetTraceScatterCall(traceStoreStream, traceId);
     }
   }
 
-  static class GetDependenciesCall extends KafkaStreamsStoreCall<List<DependencyLink>> {
-    final long endTs, loopback;
-    final ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore;
+  static class GetDependenciesScatterCall extends Call.Base<List<DependencyLink>> {
+    final KafkaStreams dependencyStoreStream;
+    final long endTs, lookback;
 
-    GetDependenciesCall(long endTs, long loopback,
-        ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore) {
+    GetDependenciesScatterCall(KafkaStreams dependencyStoreStream,
+        long endTs, long lookback) {
+      this.dependencyStoreStream = dependencyStoreStream;
       this.endTs = endTs;
-      this.loopback = loopback;
-      this.dependenciesStore = dependenciesStore;
+      this.lookback = lookback;
     }
 
-    @Override public List<DependencyLink> query() {
-      List<DependencyLink> links = new ArrayList<>();
-      Instant from = Instant.ofEpochMilli(endTs - loopback);
-      Instant to = Instant.ofEpochMilli(endTs);
-      dependenciesStore.fetchAll(from, to)
-          .forEachRemaining(keyValue -> links.add(keyValue.value));
-      List<DependencyLink> mergedLinks = DependencyLinker.merge(links);
-      LOG.debug("Dependencies found from={}-to={}: {}", from, to, mergedLinks.size());
-      return mergedLinks;
+    @Override protected List<DependencyLink> doExecute() throws IOException {
+      return dependencyStoreStream.allMetadataForStore(DEPENDENCIES_STORE_NAME)
+          .parallelStream()
+          .map(metadata -> HttpClient.of(
+              String.format("http://%s:%d",
+                  metadata.hostInfo().host(),
+                  metadata.hostInfo().port())))
+          .map(httpClient -> httpClient.get("/dependencies")
+              .aggregate()
+              .join()
+              .content())
+          .map(response -> {
+            return DependencyLinkBytesDecoder.JSON_V1.decodeList(response.array());
+          })
+          .flatMap(Collection::stream)
+          .distinct()
+          .collect(Collectors.toList());
+    }
+
+    @Override protected void doEnqueue(Callback<List<DependencyLink>> callback) {
+      try {
+        callback.onSuccess(doExecute());
+      } catch (IOException e) {
+        callback.onError(e);
+      }
     }
 
     @Override public Call<List<DependencyLink>> clone() {
-      return new GetDependenciesCall(endTs, loopback, dependenciesStore);
+      return new GetDependenciesScatterCall(dependencyStoreStream, endTs, lookback);
     }
   }
 }

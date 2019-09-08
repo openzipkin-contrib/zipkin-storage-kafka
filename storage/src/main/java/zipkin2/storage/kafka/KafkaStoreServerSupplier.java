@@ -14,27 +14,40 @@
 package zipkin2.storage.kafka;
 
 import com.google.gson.Gson;
+import com.linecorp.armeria.common.HttpData;
 import com.linecorp.armeria.common.HttpRequest;
 import com.linecorp.armeria.common.HttpResponse;
+import com.linecorp.armeria.common.HttpStatus;
 import com.linecorp.armeria.common.MediaType;
 import com.linecorp.armeria.server.Server;
 import com.linecorp.armeria.server.ServerBuilder;
 import com.linecorp.armeria.server.Service;
 import com.linecorp.armeria.server.annotation.ConsumesJson;
 import com.linecorp.armeria.server.annotation.Get;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
+import org.apache.kafka.streams.state.ReadOnlyWindowStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import zipkin2.DependencyLink;
 import zipkin2.Span;
+import zipkin2.codec.DependencyLinkBytesEncoder;
+import zipkin2.codec.SpanBytesEncoder;
+import zipkin2.internal.DependencyLinker;
 import zipkin2.storage.QueryRequest;
+import zipkin2.storage.kafka.internal.Traces;
 
+import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_IDS_BY_TS_STORE_NAME;
@@ -42,6 +55,7 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAME
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_STORE_NAME;
 
 public class KafkaStoreServerSupplier implements Supplier<Server> {
+  static final Logger LOG = LoggerFactory.getLogger(KafkaStoreServerSupplier.class);
   static final Gson GSON = new Gson();
 
   final KafkaStreams traceStoreStream;
@@ -69,7 +83,29 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
         getSpanNamesByServiceName()); // kv.get()
     builder.service("/service_names/:service_name/remote_service_names",
         getRemoteServiceNamesByServiceName()); // kv.get()
+    builder.service("/dependencies", getDependencies());
     return builder.build();
+  }
+
+  private Service<HttpRequest, HttpResponse> getDependencies() {
+    return (ctx, req) -> {
+      ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore =
+          dependencyStoreStream.store(DEPENDENCIES_STORE_NAME,
+              QueryableStoreTypes.windowStore());
+      long endTs = Long.parseLong(Objects.requireNonNull(ctx.pathParam("endTs")));
+      long lookback = Long.parseLong(Objects.requireNonNull(ctx.pathParam("lookback")));
+      List<DependencyLink> links = new ArrayList<>();
+      Instant from = Instant.ofEpochMilli(endTs - lookback);
+      Instant to = Instant.ofEpochMilli(endTs);
+      dependenciesStore.fetchAll(from, to)
+          .forEachRemaining(keyValue -> links.add(keyValue.value));
+      List<DependencyLink> mergedLinks = DependencyLinker.merge(links);
+      LOG.debug("Dependencies found from={}-to={}: {}", from, to, mergedLinks.size());
+      return HttpResponse.of(
+          HttpStatus.OK,
+          MediaType.JSON,
+          DependencyLinkBytesEncoder.JSON_V1.encodeList(mergedLinks));
+    };
   }
 
   private Service<HttpRequest, HttpResponse> getRemoteServiceNamesByServiceName() {
@@ -160,9 +196,12 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
         }
         traces.sort(
             Comparator.<List<Span>>comparingLong(o -> o.get(0).timestampAsLong()).reversed());
-        //LOG.debug("Traces found from query {}: {}", request, traces.size());
-        return HttpResponse.of(MediaType.JSON, GSON.toJson(traces.subList(0,
-            request.limit() >= traces.size() ? traceIds.size() : request.limit())));
+        LOG.debug("Traces found from query {}: {}", request, traces.size());
+        int size = Math.min(request.limit(), traces.size());
+        return HttpResponse.of(
+            HttpStatus.OK,
+            MediaType.JSON,
+            GSON.toJson(new Traces(traces.subList(0, size))));
       }
     };
   }
@@ -173,7 +212,10 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
       ReadOnlyKeyValueStore<String, List<Span>> store =
           traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       List<Span> spans = store.get(traceId);
-      return HttpResponse.of(MediaType.JSON, GSON.toJson(spans));
+      return HttpResponse.of(
+          HttpStatus.OK,
+          MediaType.JSON,
+          HttpData.copyOf(SpanBytesEncoder.JSON_V2.encodeList(spans)));
     };
   }
 
