@@ -3,12 +3,9 @@
 ## Goals
 
 * Provide a fast and reliable storage that enable extensibility via Kafka topics.
-* Provide full storage functionality via streaming aggregations (e.g., dependency graph).
-* Create a processing space where additional enrichment can be plugged in into the processing 
-pipeline.
+* Provide full storage functionality via streaming aggregations (e.g., spans queries, dependency graph).
+* Create a processing space where additional enrichment can be plugged-in into the tracing pipeline.
 * Remove need for additional storage when Kafka is available.
-* More focused on supporting processing than storage: traces and dependency links are emitted 
-downstream to support metrics aggregation. Storage is currently supported but in a single node.
 
 ## Kafka Zipkin Storage
 

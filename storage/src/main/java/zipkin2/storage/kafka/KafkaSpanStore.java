@@ -104,7 +104,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           .parallelStream()
           .map(KafkaSpanStore::httpClient)
           .map(httpClient -> {
-            AggregatedHttpResponse response = httpClient.get("/service_names")
+            AggregatedHttpResponse response = httpClient.get("/service-names")
                 .aggregate()
                 .join();
             if (!HttpStatus.OK.equals(response.status())) return null;
@@ -149,7 +149,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
               new StringSerializer());
       HttpClient httpClient = httpClient(metadata);
       AggregatedHttpResponse response =
-          httpClient.get(String.format("/service_names/%s/span_names", serviceName))
+          httpClient.get(String.format("/service-names/%s/span-names", serviceName))
               .aggregate()
               .join();
       if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
@@ -188,7 +188,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
               new StringSerializer());
       HttpClient httpClient = httpClient(metadata);
       AggregatedHttpResponse response =
-          httpClient.get(String.format("/service_names/%s/remote_service_names", serviceName))
+          httpClient.get(String.format("/service-names/%s/remote-service-names", serviceName))
               .aggregate()
               .join();
       if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();

@@ -13,18 +13,26 @@
  */
 package zipkin2.storage.kafka;
 
+import com.google.gson.Gson;
+import com.linecorp.armeria.client.HttpClient;
+import com.linecorp.armeria.common.AggregatedHttpResponse;
+import com.linecorp.armeria.common.HttpStatus;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.state.QueryableStoreTypes;
-import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
+import org.apache.kafka.streams.state.StreamsMetadata;
 import zipkin2.Call;
+import zipkin2.Callback;
 import zipkin2.storage.AutocompleteTags;
-import zipkin2.storage.kafka.internal.KafkaStreamsStoreCall;
 import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
 
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAMES_STORE_NAME;
 
 /**
  * Autocomplete tags query component based on Kafka Streams local store built by {@link
@@ -34,6 +42,8 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPL
  * for scatter gather data from different instances.
  */
 public class KafkaAutocompleteTags implements AutocompleteTags {
+  static final String HTTP_BASE_URL = "http://%s:%d";
+
   final KafkaStreams traceStoreStream;
 
   KafkaAutocompleteTags(KafkaStorage storage) {
@@ -41,55 +51,96 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
   }
 
   @Override public Call<List<String>> getKeys() {
-    ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-        traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
-            QueryableStoreTypes.keyValueStore());
-    return new GetKeysCall(autocompleteTagsStore);
+    return new GetTagKeysCall(traceStoreStream);
   }
 
   @Override public Call<List<String>> getValues(String key) {
-    ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-        traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
-            QueryableStoreTypes.keyValueStore());
-    return new GetValuesCall(autocompleteTagsStore, key);
+    return new GetTagValuesCall(traceStoreStream, key);
   }
 
-  static class GetKeysCall extends KafkaStreamsStoreCall<List<String>> {
-    final ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore;
+  static class GetTagKeysCall extends Call.Base<List<String>> {
+    static final Gson GSON = new Gson();
 
-    GetKeysCall(ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore) {
-      this.autocompleteTagsStore = autocompleteTagsStore;
+    final KafkaStreams traceStoreStream;
+
+    GetTagKeysCall(KafkaStreams traceStoreStream) {
+      this.traceStoreStream = traceStoreStream;
     }
 
-    @Override protected List<String> query() {
-      List<String> keys = new ArrayList<>();
-      autocompleteTagsStore.all().forEachRemaining(keyValue -> keys.add(keyValue.key));
-      return keys;
+    @Override protected List<String> doExecute() throws IOException {
+      return traceStoreStream.allMetadataForStore(AUTOCOMPLETE_TAGS_STORE_NAME)
+          .parallelStream()
+          .map(KafkaAutocompleteTags::httpClient)
+          .map(httpClient -> {
+            AggregatedHttpResponse response = httpClient.get("/autocomplete-tags")
+                .aggregate()
+                .join();
+            if (!HttpStatus.OK.equals(response.status())) return null;
+            return response.contentUtf8();
+          })
+          .map(content -> {
+            Set<String> set = GSON.fromJson(content, Set.class);
+            return set;
+          })
+          .flatMap(Collection::stream)
+          .distinct()
+          .collect(Collectors.toList());
+    }
+
+    @Override protected void doEnqueue(Callback<List<String>> callback) {
+      try {
+        callback.onSuccess(doExecute());
+      } catch (IOException e) {
+        callback.onError(e);
+      }
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetKeysCall(autocompleteTagsStore);
+      return new GetTagKeysCall(traceStoreStream);
     }
   }
 
-  static class GetValuesCall extends KafkaStreamsStoreCall<List<String>> {
-    final ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore;
-    final String key;
+  static class GetTagValuesCall extends Call.Base<List<String>> {
+    static final Gson GSON = new Gson();
 
-    GetValuesCall(
-        ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore, String key) {
-      this.autocompleteTagsStore = autocompleteTagsStore;
-      this.key = key;
+    final KafkaStreams traceStoreStream;
+    final String tagKey;
+
+    GetTagValuesCall(KafkaStreams traceStoreStream, String tagKey) {
+      this.traceStoreStream = traceStoreStream;
+      this.tagKey = tagKey;
     }
 
-    @Override protected List<String> query() {
-      Set<String> valuesSet = autocompleteTagsStore.get(key);
-      if (valuesSet == null) return new ArrayList<>();
-      return new ArrayList<>(valuesSet);
+    @Override protected List<String> doExecute() throws IOException {
+      StreamsMetadata metadata =
+          traceStoreStream.metadataForKey(SPAN_NAMES_STORE_NAME, tagKey,
+              new StringSerializer());
+      HttpClient httpClient = httpClient(metadata);
+      AggregatedHttpResponse response =
+          httpClient.get(String.format("/service-names/%s/span-names", tagKey))
+              .aggregate()
+              .join();
+      if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
+      String content = response.contentUtf8();
+      Set<String> set = GSON.fromJson(content, Set.class);
+      return new ArrayList<>(set);
+    }
+
+    @Override protected void doEnqueue(Callback<List<String>> callback) {
+      try {
+        callback.onSuccess(doExecute());
+      } catch (IOException e) {
+        callback.onError(e);
+      }
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetValuesCall(autocompleteTagsStore, key);
+      return new GetTagValuesCall(traceStoreStream, tagKey);
     }
+  }
+
+  static HttpClient httpClient(StreamsMetadata metadata) {
+    return HttpClient.of(
+        String.format(HTTP_BASE_URL, metadata.hostInfo().host(), metadata.hostInfo().port()));
   }
 }

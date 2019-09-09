@@ -48,6 +48,7 @@ import zipkin2.storage.QueryRequest;
 import zipkin2.storage.kafka.internal.Traces;
 
 import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_IDS_BY_TS_STORE_NAME;
@@ -90,13 +91,48 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
     builder.annotatedService(getTraces()); // kv.range() + foreach(kv.get()).filter()
     builder.service("/traces/:trace_id", getTrace()); // kv.get()
     // Service names related
-    builder.service("/service_names", getServiceNames()); // kv.all()
-    builder.service("/service_names/:service_name/span_names",
+    builder.service("/service-names", getServiceNames()); // kv.all()
+    builder.service("/service-names/:service_name/span-names",
         getSpanNamesByServiceName()); // kv.get()
-    builder.service("/service_names/:service_name/remote_service_names",
+    builder.service("/service-names/:service_name/remote-service-names",
         getRemoteServiceNamesByServiceName()); // kv.get()
     builder.annotatedService(getDependencies());
+    builder.service("/autocomplete-tags", getAutocompleteTagKeys());
+    builder.service("/autocomplete-tags/:key", getAutocompleteTagValues());
     return builder.build();
+  }
+
+  private Service<HttpRequest, HttpResponse> getAutocompleteTagValues() {
+    return (ctx, req) -> {
+      try {
+        String key = ctx.pathParam("key");
+        ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
+            traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
+                QueryableStoreTypes.keyValueStore());
+        Set<String> valuesSet = autocompleteTagsStore.get(key);
+        if (valuesSet == null) valuesSet = new HashSet<>();
+        return HttpResponse.of(MediaType.JSON, GSON.toJson(valuesSet));
+      } catch (InvalidStateStoreException e) {
+        LOG.warn("State store is not ready", e);
+        return HttpResponse.of(MediaType.JSON, GSON.toJson(new HashSet<>()));
+      }
+    };
+  }
+
+  private Service<HttpRequest, HttpResponse> getAutocompleteTagKeys() {
+    return (ctx, req) -> {
+      try {
+        ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
+            traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
+                QueryableStoreTypes.keyValueStore());
+        List<String> keys = new ArrayList<>();
+        autocompleteTagsStore.all().forEachRemaining(keyValue -> keys.add(keyValue.key));
+        return HttpResponse.of(MediaType.JSON, GSON.toJson(keys));
+      } catch (InvalidStateStoreException e) {
+        LOG.warn("State store is not ready", e);
+        return HttpResponse.of(MediaType.JSON, GSON.toJson(new HashSet<>()));
+      }
+    };
   }
 
   Object getDependencies() {
