@@ -38,7 +38,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String traceTopic;
   private String dependencyTopic;
 
-  private String storeDir;
+  private String storageDir;
 
   private String aggregationStreamAppId;
   private String traceStoreStreamAppId;
@@ -74,7 +74,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     if (dependencyStoreStreamAppId != null) {
       builder.aggregationStreamAppId(dependencyStoreStreamAppId);
     }
-    if (storeDir != null) builder.storeDirectory(storeDir);
+    if (storageDir != null) builder.storageDir(storageDir);
     if (spansTopic != null) builder.spansTopicName(spansTopic);
     if (traceTopic != null) builder.tracesTopicName(traceTopic);
     if (dependencyTopic != null) builder.dependenciesTopicName(dependencyTopic);
@@ -166,12 +166,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.dependencyTopic = dependencyTopic;
   }
 
-  public String getStoreDir() {
-    return storeDir;
+  public String getStorageDir() {
+    return storageDir;
   }
 
-  public void setStoreDir(String storeDir) {
-    this.storeDir = storeDir;
+  public void setStorageDir(String storageDir) {
+    this.storageDir = storageDir;
   }
 
   public Long getDependencyTtl() {

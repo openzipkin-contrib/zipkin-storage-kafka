@@ -15,11 +15,11 @@ run-docker: build docker-build docker-up
 .PHONY: kafka-topics
 kafka-topics:
 	docker-compose exec kafka-zookeeper /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand \
-		--zookeeper localhost:2181 --create --topic zipkin-spans --partitions 1 --replication-factor 1 --if-not-exists
+		--zookeeper localhost:2181 --create --topic zipkin-spans --partitions 2 --replication-factor 1 --if-not-exists
 	docker-compose exec kafka-zookeeper /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand \
-		--zookeeper localhost:2181 --create --topic zipkin-trace --partitions 1 --replication-factor 1 --if-not-exists
+		--zookeeper localhost:2181 --create --topic zipkin-trace --partitions 2 --replication-factor 1 --if-not-exists
 	docker-compose exec kafka-zookeeper /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand \
-		--zookeeper localhost:2181 --create --topic zipkin-dependency --partitions 1 --replication-factor 1 --if-not-exists
+		--zookeeper localhost:2181 --create --topic zipkin-dependency --partitions 2 --replication-factor 1 --if-not-exists
 
 .PHONY: docker-build
 docker-build:
@@ -75,10 +75,11 @@ get-zipkin:
 zipkin-test-multi:
 	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/netflix.json | \
 	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
-	${OPEN} 'http://localhost:9412/zipkin/?lookback=custom&startTs=1'
+	${OPEN} 'http://localhost:19411/zipkin/?lookback=custom&startTs=1'
 	sleep 61
 	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/messaging.json | \
 	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
+	${OPEN} 'http://localhost:29411/zipkin/?lookback=custom&startTs=1'
 
 .PHONY: zipkin-test
 zipkin-test:
@@ -87,7 +88,7 @@ zipkin-test:
 	${OPEN} 'http://localhost:9411/zipkin/?lookback=custom&startTs=1'
 	sleep 61
 	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/messaging.json | \
-	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
+	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @-
 
 .PHONY: release
 release:

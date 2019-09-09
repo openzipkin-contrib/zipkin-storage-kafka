@@ -68,7 +68,7 @@ public class KafkaStorage extends StorageComponent {
   // Autocomplete Tags
   final List<String> autocompleteKeys;
   // Kafka Storage configs
-  final String storeDir;
+  final String storageDir;
   final long minTracesStored;
   final int httpPort;
   // Kafka Topics
@@ -97,7 +97,7 @@ public class KafkaStorage extends StorageComponent {
     this.traceTopicName = builder.traceTopicName;
     this.dependencyTopicName = builder.dependencyTopicName;
     // Storage directories
-    this.storeDir = builder.storeDir;
+    this.storageDir = builder.storageDir;
     this.minTracesStored = builder.minTracesStored;
     this.httpPort = builder.httpPort;
     // Kafka Configs
@@ -320,7 +320,7 @@ public class KafkaStorage extends StorageComponent {
     long minTracesStored = 10_000;
     int httpPort = 9412;
 
-    String storeDir = "/tmp/zipkin-storage-kafka";
+    String storageDir = "/tmp/zipkin-storage-kafka";
 
     Properties adminConfig = new Properties();
     Properties producerConfig = new Properties();
@@ -497,9 +497,9 @@ public class KafkaStorage extends StorageComponent {
     /**
      * Path to root directory when aggregated and indexed data is stored.
      */
-    public Builder storeDirectory(String storeDirectory) {
-      if (storeDirectory == null) throw new NullPointerException("storageDirectory == null");
-      this.storeDir = storeDirectory;
+    public Builder storageDir(String storageDir) {
+      if (storageDir == null) throw new NullPointerException("storageDir == null");
+      this.storageDir = storageDir;
       traceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
       dependencyStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, dependencyStoreDirectory());
       return this;
@@ -535,11 +535,11 @@ public class KafkaStorage extends StorageComponent {
     }
 
     String traceStoreDirectory() {
-      return storeDir + "/traces";
+      return storageDir + "/traces";
     }
 
     String dependencyStoreDirectory() {
-      return storeDir + "/dependencies";
+      return storageDir + "/dependencies";
     }
 
     /**
@@ -657,7 +657,7 @@ public class KafkaStorage extends StorageComponent {
         "httpPort=" + httpPort +
         ", spanConsumerEnabled=" + spanConsumerEnabled +
         ", searchEnabled=" + searchEnabled +
-        ", storageDirectory='" + storeDir + '\'' +
+        ", storageDir='" + storageDir + '\'' +
         ", spansTopicName='" + spansTopicName + '\'' +
         ", traceTopicName='" + traceTopicName + '\'' +
         ", dependencyTopicName='" + dependencyTopicName + '\'' +

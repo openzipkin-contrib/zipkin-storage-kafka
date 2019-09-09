@@ -78,7 +78,7 @@ class KafkaStorageIT {
     traceTimeout = Duration.ofSeconds(5);
     storage = (KafkaStorage) new KafkaStorage.Builder()
         .bootstrapServers(kafka.getBootstrapServers())
-        .storeDirectory("target/zipkin_" + System.currentTimeMillis())
+        .storageDir("target/zipkin_" + System.currentTimeMillis())
         .traceTimeout(traceTimeout)
         .build();
 

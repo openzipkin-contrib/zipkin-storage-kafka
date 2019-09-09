@@ -19,6 +19,8 @@ ENV USER jeqo
 
 WORKDIR /zipkin
 
+#ADD autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar kafka.jar
+
 RUN apk add curl unzip && \
   curl -SL https://jitpack.io/com/github/${USER}/zipkin-storage-kafka/zipkin-autoconfigure-storage-kafka/${VERSION}/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar > kafka.jar && \
   echo > .kafka_profile && \

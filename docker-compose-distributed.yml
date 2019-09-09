@@ -31,15 +31,30 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
       KAFKA_STORAGE_SPAN_CONSUMER_ENABLED: 'true'
       QUERY_ENABLED: 'false'
-  zipkin-storage:
+  zipkin-storage-1:
     image: jeqo/zipkin-kafka
-    container_name: zipkin-storage
+    container_name: zipkin-storage-1
+    hostname: zipkin-storage-1
     ports:
-      - 9412:9411
+      - 19411:9411
+      - 19412:9412
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
       KAFKA_STORAGE_SPAN_CONSUMER_ENABLED: 'false'
     volumes:
-      - zipkin:/data
+      - zipkin1:/data
+  zipkin-storage-2:
+    image: jeqo/zipkin-kafka
+    container_name: zipkin-storage-2
+    hostname: zipkin-storage-2
+    ports:
+      - 29411:9411
+      - 29412:9412
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
+      KAFKA_STORAGE_SPAN_CONSUMER_ENABLED: 'false'
+    volumes:
+      - zipkin2:/data
 volumes:
-  zipkin:
+  zipkin1:
+  zipkin2:

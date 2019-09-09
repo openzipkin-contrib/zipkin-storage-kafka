@@ -15,8 +15,10 @@ package zipkin2.storage.kafka;
 
 import com.google.gson.Gson;
 import com.linecorp.armeria.client.HttpClient;
+import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpData;
 import com.linecorp.armeria.common.HttpMethod;
+import com.linecorp.armeria.common.HttpStatus;
 import com.linecorp.armeria.common.RequestHeaders;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -103,10 +105,13 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       return traceStoreStream.allMetadataForStore(SERVICE_NAMES_STORE_NAME)
           .parallelStream()
           .map(KafkaSpanStore::httpClient)
-          .map(httpClient -> httpClient.get("/service_names")
-              .aggregate()
-              .join()
-              .contentUtf8())
+          .map(httpClient -> {
+            AggregatedHttpResponse response = httpClient.get("/service_names")
+                .aggregate()
+                .join();
+            if (!HttpStatus.OK.equals(response.status())) return null;
+            return response.contentUtf8();
+          })
           .map(content -> {
             Set<String> set = GSON.fromJson(content, Set.class);
             return set;
@@ -145,11 +150,12 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           traceStoreStream.metadataForKey(SPAN_NAMES_STORE_NAME, serviceName,
               new StringSerializer());
       HttpClient httpClient = httpClient(metadata);
-      String content =
+      AggregatedHttpResponse response =
           httpClient.get(String.format("/service_names/%s/span_names", serviceName))
               .aggregate()
-              .join()
-              .contentUtf8();
+              .join();
+      if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
+      String content = response.contentUtf8();
       Set<String> set = GSON.fromJson(content, Set.class);
       return new ArrayList<>(set);
     }
@@ -183,11 +189,12 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           traceStoreStream.metadataForKey(REMOTE_SERVICE_NAMES_STORE_NAME, serviceName,
               new StringSerializer());
       HttpClient httpClient = httpClient(metadata);
-      String content =
+      AggregatedHttpResponse response =
           httpClient.get(String.format("/service_names/%s/remote_service_names", serviceName))
               .aggregate()
-              .join()
-              .contentUtf8();
+              .join();
+      if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
+      String content = response.contentUtf8();
       Set<String> set = GSON.fromJson(content, Set.class);
       return new ArrayList<>(set);
     }
@@ -220,11 +227,14 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       List<List<Span>> traces = traceStoreStream.allMetadataForStore(TRACES_STORE_NAME)
           .parallelStream()
           .map(KafkaSpanStore::httpClient)
-          .map(httpClient -> httpClient.execute(
-              RequestHeaders.of(HttpMethod.GET, "/traces"), GSON.toJson(request.toBuilder()))
-              .aggregate()
-              .join()
-              .contentUtf8())
+          .map(httpClient -> {
+            AggregatedHttpResponse response = httpClient.execute(
+                RequestHeaders.of(HttpMethod.GET, "/traces"), GSON.toJson(request.toBuilder()))
+                .aggregate()
+                .join();
+            if (!HttpStatus.OK.equals(response.status())) return null;
+            return response.contentUtf8();
+          })
           .map(response -> {
             Traces result = GSON.fromJson(response, Traces.class);
             return result.traces;
@@ -297,11 +307,14 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       return dependencyStoreStream.allMetadataForStore(DEPENDENCIES_STORE_NAME)
           .parallelStream()
           .map(KafkaSpanStore::httpClient)
-          .map(httpClient -> httpClient.get(
-              String.format("/dependencies?end_ts=%s&lookback=%s", endTs, lookback))
-              .aggregate()
-              .join()
-              .content())
+          .map(httpClient -> {
+            AggregatedHttpResponse response = httpClient.get(
+                String.format("/dependencies?end_ts=%s&lookback=%s", endTs, lookback))
+                .aggregate()
+                .join();
+            if (!HttpStatus.OK.equals(response.status())) return null;
+            return response.content();
+          })
           .map(response -> {
             return DependencyLinkBytesDecoder.JSON_V1.decodeList(response.array());
           })
