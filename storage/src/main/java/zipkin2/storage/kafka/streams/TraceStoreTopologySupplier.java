@@ -154,10 +154,9 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                     }
                   });
                   LOG.info(
-                      "Traces deletion emitted at {}, approx. number of traces stored {} - partition: {}",
+                      "Traces deletion emitted at {}, approx. number of traces stored {}",
                       Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()),
-                      tracesStore.approximateNumEntries(),
-                      context.partition());
+                      tracesStore.approximateNumEntries());
                 }
               }
             });
