@@ -149,14 +149,14 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
 
   Object getTraces() {
     return new Object() {
-      ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
-          traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
-      ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore =
-          traceStoreStream.store(SPAN_IDS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
 
       @Get("/traces")
       @ConsumesJson
       public HttpResponse getTraces(String requestJson) {
+        ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
+            traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+        ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore =
+            traceStoreStream.store(SPAN_IDS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
         QueryRequest request = GSON.fromJson(requestJson, QueryRequest.Builder.class).build();
         List<List<Span>> traces = new ArrayList<>();
         List<String> traceIds = new ArrayList<>();

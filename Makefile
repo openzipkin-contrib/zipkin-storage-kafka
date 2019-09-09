@@ -24,7 +24,7 @@ kafka-topics:
 .PHONY: docker-build
 docker-build:
 	docker build --no-cache --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:latest .
-	docker build --no-cache --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:${VERSION} .
+	docker build --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:${VERSION} .
 
 .PHONY: docker-push
 docker-push:
