@@ -18,11 +18,9 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
@@ -40,14 +38,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.CheckResult;
-import zipkin2.DependencyLink;
-import zipkin2.Span;
 import zipkin2.storage.AutocompleteTags;
-import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
+import zipkin2.storage.kafka.internal.NoopServiceAndSpanNames;
+import zipkin2.storage.kafka.internal.NoopSpanStore;
 import zipkin2.storage.kafka.streams.AggregationTopologySupplier;
 import zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier;
 import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
@@ -133,9 +130,8 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public SpanConsumer spanConsumer() {
-    checkTopics();
+    checkResources();
     if (spanConsumerEnabled) {
-      getAggregationStream();
       return new KafkaSpanConsumer(this);
     } else { // NoopSpanConsumer
       return list -> Call.create(null);
@@ -144,58 +140,26 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public ServiceAndSpanNames serviceAndSpanNames() {
+    checkResources();
     if (searchEnabled) {
       return new KafkaSpanStore(this);
-    } else { // NoopServiceAndSpanNames
-      return new ServiceAndSpanNames() {
-        @Override public Call<List<String>> getServiceNames() {
-          return Call.emptyList();
-        }
-
-        @Override public Call<List<String>> getRemoteServiceNames(String serviceName) {
-          return Call.emptyList();
-        }
-
-        @Override public Call<List<String>> getSpanNames(String s) {
-          return Call.emptyList();
-        }
-      };
+    } else {
+      return new NoopServiceAndSpanNames();
     }
   }
 
   @Override
   public SpanStore spanStore() {
-    checkTopics();
+    checkResources();
     if (searchEnabled) {
-      getServer();
       return new KafkaSpanStore(this);
-    } else { // NoopSpanStore
-      return new SpanStore() {
-        @Override public Call<List<List<Span>>> getTraces(QueryRequest queryRequest) {
-          return Call.emptyList();
-        }
-
-        @Override public Call<List<Span>> getTrace(String s) {
-          return Call.emptyList();
-        }
-
-        @Override @Deprecated public Call<List<String>> getServiceNames() {
-          return Call.emptyList();
-        }
-
-        @Override @Deprecated public Call<List<String>> getSpanNames(String s) {
-          return Call.emptyList();
-        }
-
-        @Override public Call<List<DependencyLink>> getDependencies(long l, long l1) {
-          return Call.emptyList();
-        }
-      };
+    } else {
+      return new NoopSpanStore();
     }
   }
 
   @Override public AutocompleteTags autocompleteTags() {
-    checkTopics();
+    checkResources();
     if (searchEnabled) {
       return new KafkaAutocompleteTags(this);
     } else {
@@ -203,31 +167,14 @@ public class KafkaStorage extends StorageComponent {
     }
   }
 
-  /**
-   * Ensure topics are created before Kafka Streams applications start.
-   * <p>
-   * It is recommended to created these topics manually though, before application is started.
-   */
-  void checkTopics() {
-    if (!topicsValidated) {
-      synchronized (this) {
-        if (!topicsValidated) {
-          try {
-            Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
-            List<String> requiredTopics =
-                Arrays.asList(spansTopicName, dependencyTopicName, traceTopicName);
-            for (String requiredTopic : requiredTopics) {
-              if (!topics.contains(requiredTopic)) {
-                LOG.error("Topic {} not found", requiredTopic);
-                throw new RuntimeException("Required topics are not created");
-              }
-            }
-            topicsValidated = true;
-          } catch (Exception e) {
-            LOG.error("Error ensuring topics are created", e);
-          }
-        }
-      }
+  void checkResources() {
+    if (spanConsumerEnabled) {
+      getAggregationStream();
+    }
+    if (searchEnabled) {
+      getTraceStoreStream();
+      getDependencyStoreStream();
+      getServer();
     }
   }
 
@@ -269,7 +216,6 @@ public class KafkaStorage extends StorageComponent {
     try {
       if (adminClient != null) adminClient.close(Duration.ofSeconds(10));
       if (producer != null) {
-        producer.flush();
         producer.close(Duration.ofSeconds(10));
       }
       if (traceStoreStream != null) {

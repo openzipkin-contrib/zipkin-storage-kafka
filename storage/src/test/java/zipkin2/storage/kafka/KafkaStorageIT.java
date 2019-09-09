@@ -88,7 +88,6 @@ class KafkaStorageIT {
       newTopics.add(new NewTopic(storage.traceTopicName, 1, (short) 1));
       newTopics.add(new NewTopic(storage.dependencyTopicName, 1, (short) 1));
       storage.getAdminClient().createTopics(newTopics).all().get();
-      storage.checkTopics();
       return storage.topicsValidated;
     });
 

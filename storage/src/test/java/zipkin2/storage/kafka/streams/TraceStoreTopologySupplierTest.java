@@ -119,7 +119,7 @@ class TraceStoreTopologySupplierTest {
         .timestamp(traceTtlCheckInterval.toMillis() * 1000 + 20000L)
         .build();
     testDriver.pipeInput(
-        factory.create(spansTopicName, c.traceId(), Collections.singletonList(c),
+        factory.create(spansTopicName, d.traceId(), Collections.singletonList(d),
             traceTtlCheckInterval.toMillis() + 1));
 
     // Then: Traces store is empty

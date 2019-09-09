@@ -28,6 +28,7 @@ import org.apache.kafka.streams.kstream.Merger;
 import org.apache.kafka.streams.kstream.Produced;
 import org.apache.kafka.streams.kstream.SessionWindows;
 import org.apache.kafka.streams.kstream.ValueMapper;
+import org.apache.kafka.streams.state.Stores;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.internal.DependencyLinker;
@@ -43,6 +44,7 @@ import static zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde.linkKey;
  * Processing of spans partitioned by trace Id, into traces and dependency links.
  */
 public class AggregationTopologySupplier implements Supplier<Topology> {
+  static final String TRACE_AGGREGATION_STORE = "trace-aggregation";
   // Kafka topics
   final String spansTopicName;
   final String traceTopicName;
@@ -75,7 +77,12 @@ public class AggregationTopologySupplier implements Supplier<Topology> {
             // how long to wait for another span
             .windowedBy(SessionWindows.with(traceTimeout).grace(Duration.ZERO))
             .aggregate(ArrayList::new, aggregateSpans(), joinAggregates(),
-                Materialized.with(Serdes.String(), spansSerde))
+                Materialized
+                    .<String, List<Span>>as(Stores.persistentSessionStore(TRACE_AGGREGATION_STORE, Duration.ofHours(1)))
+                    .withKeySerde(Serdes.String())
+                    .withValueSerde(spansSerde)
+                    .withLoggingDisabled()
+                    .withCachingEnabled())
             // hold until a new record tells that a window is closed and we can process it further
             .suppress(untilWindowCloses(unbounded()))
             .toStream()
