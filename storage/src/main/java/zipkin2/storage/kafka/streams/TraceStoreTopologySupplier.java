@@ -148,7 +148,8 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                       tracesStore.delete(traceId); // clean traces store
                     }
                   });
-                  LOG.info("Traces deletion emitted at {}, approx. number of traces stored {} - partition: {}",
+                  LOG.info(
+                      "Traces deletion emitted at {}, approx. number of traces stored {} - partition: {}",
                       Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()),
                       tracesStore.approximateNumEntries(),
                       context.partition());
@@ -201,18 +202,22 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
           public void process(String traceId, List<Span> spans) {
             for (Span span : spans) {
               if (span.localServiceName() != null) { // if service name
-                serviceNameStore.put(span.localServiceName(), span.localServiceName());
+                serviceNameStore.putIfAbsent(span.localServiceName(), span.localServiceName());
                 if (span.name() != null) { // store span names
                   Set<String> spanNames = spanNamesStore.get(span.localServiceName());
                   if (spanNames == null) spanNames = new HashSet<>();
-                  spanNames.add(span.name());
-                  spanNamesStore.put(span.localServiceName(), spanNames);
+                  if (!spanNames.contains(span.name())) {
+                    spanNames.add(span.name());
+                    spanNamesStore.put(span.localServiceName(), spanNames);
+                  }
                 }
                 if (span.remoteServiceName() != null) { // store remote service names
                   Set<String> remoteServiceNames = remoteServiceNamesStore.get(span.localServiceName());
                   if (remoteServiceNames == null) remoteServiceNames = new HashSet<>();
-                  remoteServiceNames.add(span.remoteServiceName());
-                  remoteServiceNamesStore.put(span.localServiceName(), remoteServiceNames);
+                  if (!remoteServiceNames.contains(span.remoteServiceName())) {
+                    remoteServiceNames.add(span.remoteServiceName());
+                    remoteServiceNamesStore.put(span.localServiceName(), remoteServiceNames);
+                  }
                 }
               }
               if (!span.tags().isEmpty()) {
@@ -221,8 +226,10 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                   if (value != null) {
                     Set<String> values = autocompleteTagsStore.get(tagKey);
                     if (values == null) values = new HashSet<>();
-                    values.add(value);
-                    autocompleteTagsStore.put(tagKey, values);
+                    if (!values.contains(value)) {
+                      values.add(value);
+                      autocompleteTagsStore.put(tagKey, values);
+                    }
                   }
                 });
               }
