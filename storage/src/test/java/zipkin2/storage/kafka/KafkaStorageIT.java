@@ -64,7 +64,7 @@ class KafkaStorageIT {
   private KafkaProducer<String, List<Span>> tracesProducer;
   private KafkaProducer<String, DependencyLink> dependencyProducer;
 
-  @BeforeEach void start() {
+  @BeforeEach void start() throws Exception {
     testConsumerConfig = new Properties();
     testConsumerConfig.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
     testConsumerConfig.put(ConsumerConfig.GROUP_ID_CONFIG, "test");
@@ -82,14 +82,11 @@ class KafkaStorageIT {
         .traceTimeout(traceTimeout)
         .build();
 
-    await().atMost(10, TimeUnit.SECONDS).until(() -> {
-      Collection<NewTopic> newTopics = new ArrayList<>();
-      newTopics.add(new NewTopic(storage.spansTopicName, 1, (short) 1));
-      newTopics.add(new NewTopic(storage.traceTopicName, 1, (short) 1));
-      newTopics.add(new NewTopic(storage.dependencyTopicName, 1, (short) 1));
-      storage.getAdminClient().createTopics(newTopics).all().get();
-      return storage.topicsValidated;
-    });
+    Collection<NewTopic> newTopics = new ArrayList<>();
+    newTopics.add(new NewTopic(storage.spansTopicName, 1, (short) 1));
+    newTopics.add(new NewTopic(storage.traceTopicName, 1, (short) 1));
+    newTopics.add(new NewTopic(storage.dependencyTopicName, 1, (short) 1));
+    storage.getAdminClient().createTopics(newTopics).all().get();
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> storage.check().ok());
 
@@ -234,7 +231,8 @@ class KafkaStorageIT {
       List<DependencyLink> links = new ArrayList<>();
       try {
         links =
-            storage.spanStore().getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
+            storage.spanStore()
+                .getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
                 .execute();
       } catch (InvalidStateStoreException e) { // ignoring state issues
         System.err.println(e.getMessage());

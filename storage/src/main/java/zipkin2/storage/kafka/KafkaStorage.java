@@ -84,7 +84,7 @@ public class KafkaStorage extends StorageComponent {
   volatile Producer<String, byte[]> producer;
   volatile KafkaStreams traceAggregationStream, traceStoreStream, dependencyStoreStream;
   volatile Server server;
-  volatile boolean closeCalled, topicsValidated;
+  volatile boolean closeCalled;
 
   KafkaStorage(Builder builder) {
     // Kafka Storage modes
