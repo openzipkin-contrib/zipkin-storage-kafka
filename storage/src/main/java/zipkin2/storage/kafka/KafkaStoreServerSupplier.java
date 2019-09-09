@@ -114,7 +114,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
     };
   }
 
-  private Service<HttpRequest, HttpResponse> getRemoteServiceNamesByServiceName() {
+  Service<HttpRequest, HttpResponse> getRemoteServiceNamesByServiceName() {
     return (ctx, req) -> {
       String serviceName = ctx.pathParam("service_name");
       ReadOnlyKeyValueStore<String, Set<String>> store =

@@ -20,7 +20,6 @@ import com.linecorp.armeria.common.HttpMethod;
 import com.linecorp.armeria.common.RequestHeaders;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -56,6 +55,7 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
  * for scatter gather data from different instances.
  */
 public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
+  static final String HTTP_BASE_URL = "http://%s:%d";
   // Kafka Streams Store provider
   final KafkaStreams traceStoreStream;
   final KafkaStreams dependencyStoreStream;
@@ -66,52 +66,49 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   }
 
   @Override public Call<List<List<Span>>> getTraces(QueryRequest request) {
-    return new GetTracesScatterCall(traceStoreStream, request);
+    return new GetTracesCall(traceStoreStream, request);
   }
 
   @Override
   public Call<List<Span>> getTrace(String traceId) {
-    return new GetTraceScatterCall(traceStoreStream, traceId);
+    return new GetTraceCall(traceStoreStream, traceId);
   }
 
   @Deprecated @Override public Call<List<String>> getServiceNames() {
-    return new GetServiceNamesScatterCall(traceStoreStream);
+    return new GetServiceNamesCall(traceStoreStream);
   }
 
   @Deprecated @Override public Call<List<String>> getSpanNames(String serviceName) {
-    return new GetSpanNamesScatterCall(traceStoreStream, serviceName);
+    return new GetSpanNamesCall(traceStoreStream, serviceName);
   }
 
   @Override public Call<List<String>> getRemoteServiceNames(String serviceName) {
-    return new GetRemoteServiceNamesScatterCall(traceStoreStream, serviceName);
+    return new GetRemoteServiceNamesCall(traceStoreStream, serviceName);
   }
 
   @Override public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
-    return new GetDependenciesScatterCall(dependencyStoreStream, endTs, lookback);
+    return new GetDependenciesCall(dependencyStoreStream, endTs, lookback);
   }
 
-  static class GetServiceNamesScatterCall extends Call.Base<List<String>> {
+  static class GetServiceNamesCall extends Call.Base<List<String>> {
     static final Gson GSON = new Gson();
 
     final KafkaStreams traceStoreStream;
 
-    GetServiceNamesScatterCall(KafkaStreams traceStoreStream) {
+    GetServiceNamesCall(KafkaStreams traceStoreStream) {
       this.traceStoreStream = traceStoreStream;
     }
 
     @Override protected List<String> doExecute() throws IOException {
       return traceStoreStream.allMetadataForStore(SERVICE_NAMES_STORE_NAME)
           .parallelStream()
-          .map(metadata -> HttpClient.of(
-              String.format("http://%s:%d",
-                  metadata.hostInfo().host(),
-                  metadata.hostInfo().port())))
+          .map(KafkaSpanStore::httpClient)
           .map(httpClient -> httpClient.get("/service_names")
               .aggregate()
               .join()
-              .content(Charset.defaultCharset()))
-          .map(response -> {
-            Set<String> set = GSON.fromJson(response, Set.class);
+              .contentUtf8())
+          .map(content -> {
+            Set<String> set = GSON.fromJson(content, Set.class);
             return set;
           })
           .flatMap(Collection::stream)
@@ -128,17 +125,17 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetServiceNamesScatterCall(traceStoreStream);
+      return new GetServiceNamesCall(traceStoreStream);
     }
   }
 
-  static class GetSpanNamesScatterCall extends Call.Base<List<String>> {
+  static class GetSpanNamesCall extends Call.Base<List<String>> {
     static final Gson GSON = new Gson();
 
     final KafkaStreams traceStoreStream;
     final String serviceName;
 
-    GetSpanNamesScatterCall(KafkaStreams traceStoreStream, String serviceName) {
+    GetSpanNamesCall(KafkaStreams traceStoreStream, String serviceName) {
       this.traceStoreStream = traceStoreStream;
       this.serviceName = serviceName;
     }
@@ -147,15 +144,12 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       StreamsMetadata metadata =
           traceStoreStream.metadataForKey(SPAN_NAMES_STORE_NAME, serviceName,
               new StringSerializer());
-      HttpClient httpClient = HttpClient.of(
-          String.format("http://%s:%d",
-              metadata.hostInfo().host(),
-              metadata.hostInfo().port()));
+      HttpClient httpClient = httpClient(metadata);
       String content =
           httpClient.get(String.format("/service_names/%s/span_names", serviceName))
               .aggregate()
               .join()
-              .content(Charset.defaultCharset());
+              .contentUtf8();
       Set<String> set = GSON.fromJson(content, Set.class);
       return new ArrayList<>(set);
     }
@@ -169,17 +163,17 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetSpanNamesScatterCall(traceStoreStream, serviceName);
+      return new GetSpanNamesCall(traceStoreStream, serviceName);
     }
   }
 
-  static class GetRemoteServiceNamesScatterCall extends Call.Base<List<String>> {
+  static class GetRemoteServiceNamesCall extends Call.Base<List<String>> {
     static final Gson GSON = new Gson();
 
     final KafkaStreams traceStoreStream;
     final String serviceName;
 
-    GetRemoteServiceNamesScatterCall(KafkaStreams traceStoreStream, String serviceName) {
+    GetRemoteServiceNamesCall(KafkaStreams traceStoreStream, String serviceName) {
       this.traceStoreStream = traceStoreStream;
       this.serviceName = serviceName;
     }
@@ -188,15 +182,12 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       StreamsMetadata metadata =
           traceStoreStream.metadataForKey(REMOTE_SERVICE_NAMES_STORE_NAME, serviceName,
               new StringSerializer());
-      HttpClient httpClient = HttpClient.of(
-          String.format("http://%s:%d",
-              metadata.hostInfo().host(),
-              metadata.hostInfo().port()));
+      HttpClient httpClient = httpClient(metadata);
       String content =
           httpClient.get(String.format("/service_names/%s/remote_service_names", serviceName))
               .aggregate()
               .join()
-              .content(Charset.defaultCharset());
+              .contentUtf8();
       Set<String> set = GSON.fromJson(content, Set.class);
       return new ArrayList<>(set);
     }
@@ -210,17 +201,17 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetRemoteServiceNamesScatterCall(traceStoreStream, serviceName);
+      return new GetRemoteServiceNamesCall(traceStoreStream, serviceName);
     }
   }
 
-  static class GetTracesScatterCall extends Call.Base<List<List<Span>>> {
+  static class GetTracesCall extends Call.Base<List<List<Span>>> {
     static final Gson GSON = new Gson();
 
     final KafkaStreams traceStoreStream;
     final QueryRequest request;
 
-    GetTracesScatterCall(KafkaStreams traceStoreStream, QueryRequest request) {
+    GetTracesCall(KafkaStreams traceStoreStream, QueryRequest request) {
       this.traceStoreStream = traceStoreStream;
       this.request = request;
     }
@@ -228,10 +219,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     @Override protected List<List<Span>> doExecute() throws IOException {
       List<List<Span>> traces = traceStoreStream.allMetadataForStore(TRACES_STORE_NAME)
           .parallelStream()
-          .map(metadata -> HttpClient.of(
-              String.format("http://%s:%d",
-                  metadata.hostInfo().host(),
-                  metadata.hostInfo().port())))
+          .map(KafkaSpanStore::httpClient)
           .map(httpClient -> httpClient.execute(
               RequestHeaders.of(HttpMethod.GET, "/traces"), GSON.toJson(request.toBuilder()))
               .aggregate()
@@ -256,15 +244,15 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<List<Span>>> clone() {
-      return new GetTracesScatterCall(traceStoreStream, request);
+      return new GetTracesCall(traceStoreStream, request);
     }
   }
 
-  static class GetTraceScatterCall extends Call.Base<List<Span>> {
+  static class GetTraceCall extends Call.Base<List<Span>> {
     final KafkaStreams traceStoreStream;
     final String traceId;
 
-    GetTraceScatterCall(KafkaStreams traceStoreStream, String traceId) {
+    GetTraceCall(KafkaStreams traceStoreStream, String traceId) {
       this.traceStoreStream = traceStoreStream;
       this.traceId = traceId;
     }
@@ -272,10 +260,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     @Override protected List<Span> doExecute() throws IOException {
       StreamsMetadata metadata =
           traceStoreStream.metadataForKey(TRACES_STORE_NAME, traceId, new StringSerializer());
-      HttpClient httpClient = HttpClient.of(
-          String.format("http://%s:%d",
-              metadata.hostInfo().host(),
-              metadata.hostInfo().port()));
+      HttpClient httpClient = httpClient(metadata);
       HttpData content =
           httpClient.get(String.format("/traces/%s", traceId))
               .aggregate()
@@ -293,15 +278,15 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<Span>> clone() {
-      return new GetTraceScatterCall(traceStoreStream, traceId);
+      return new GetTraceCall(traceStoreStream, traceId);
     }
   }
 
-  static class GetDependenciesScatterCall extends Call.Base<List<DependencyLink>> {
+  static class GetDependenciesCall extends Call.Base<List<DependencyLink>> {
     final KafkaStreams dependencyStoreStream;
     final long endTs, lookback;
 
-    GetDependenciesScatterCall(KafkaStreams dependencyStoreStream,
+    GetDependenciesCall(KafkaStreams dependencyStoreStream,
         long endTs, long lookback) {
       this.dependencyStoreStream = dependencyStoreStream;
       this.endTs = endTs;
@@ -311,11 +296,9 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     @Override protected List<DependencyLink> doExecute() throws IOException {
       return dependencyStoreStream.allMetadataForStore(DEPENDENCIES_STORE_NAME)
           .parallelStream()
-          .map(metadata -> HttpClient.of(
-              String.format("http://%s:%d",
-                  metadata.hostInfo().host(),
-                  metadata.hostInfo().port())))
-          .map(httpClient -> httpClient.get(String.format("/dependencies?end_ts=%s&lookback=%s", endTs, lookback))
+          .map(KafkaSpanStore::httpClient)
+          .map(httpClient -> httpClient.get(
+              String.format("/dependencies?end_ts=%s&lookback=%s", endTs, lookback))
               .aggregate()
               .join()
               .content())
@@ -336,7 +319,12 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<DependencyLink>> clone() {
-      return new GetDependenciesScatterCall(dependencyStoreStream, endTs, lookback);
+      return new GetDependenciesCall(dependencyStoreStream, endTs, lookback);
     }
+  }
+
+  static HttpClient httpClient(StreamsMetadata metadata) {
+    return HttpClient.of(
+        String.format(HTTP_BASE_URL, metadata.hostInfo().host(), metadata.hostInfo().port()));
   }
 }
