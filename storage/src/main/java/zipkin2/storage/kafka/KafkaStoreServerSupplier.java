@@ -107,7 +107,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
   }
 
   private Service<HttpRequest, HttpResponse> getMetrics() {
-    return (ctx, req) -> HttpResponse.of(MediaType.JSON, prometheusRegistry.scrape());
+    return (ctx, req) -> HttpResponse.of(MediaType.PLAIN_TEXT_UTF_8, prometheusRegistry.scrape());
   }
 
   private Service<HttpRequest, HttpResponse> getAutocompleteTagValues() {
