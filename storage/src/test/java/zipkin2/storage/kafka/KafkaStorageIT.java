@@ -165,10 +165,9 @@ class KafkaStorageIT {
         .build();
     List<Span> spans = Arrays.asList(parent, child);
     // When: and stores running
-    SpanStore spanStore = storage.spanStore();
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
     await().atMost(10, TimeUnit.SECONDS)
-        .until(() -> storage.traceStoreStream.state().equals(KafkaStreams.State.RUNNING));
+        .until(() -> storage.getTraceStoreStream().state().equals(KafkaStreams.State.RUNNING));
     // When: been published
     tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, parent.traceId(), spans));
     tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, other.traceId(),
@@ -178,6 +177,7 @@ class KafkaStorageIT {
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.spansTopicName, 1, 10000);
     // Then: services names are searchable
+    SpanStore spanStore = storage.spanStore();
     List<List<Span>> traces = spanStore.getTraces(QueryRequest.newBuilder()
         .endTs(TODAY + 1)
         .lookback(Duration.ofSeconds(30).toMillis())
@@ -230,14 +230,12 @@ class KafkaStorageIT {
     // Then: stored in topic
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         testConsumerConfig, storage.dependencyTopicName, 2, 10000);
-    // When: stores running
-    SpanStore spanStore = storage.spanStore();
     // Then:
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       List<DependencyLink> links = new ArrayList<>();
       try {
         links =
-            spanStore.getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
+            storage.spanStore().getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
                 .execute();
       } catch (InvalidStateStoreException e) { // ignoring state issues
         System.err.println(e.getMessage());

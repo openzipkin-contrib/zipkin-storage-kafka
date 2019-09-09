@@ -71,7 +71,9 @@ public class KafkaStorage extends StorageComponent {
   // Autocomplete Tags
   final List<String> autocompleteKeys;
   // Kafka Storage configs
-  final String storageDirectory;
+  final String storeDir;
+  final long minTracesStored;
+  final int httpPort;
   // Kafka Topics
   final String spansTopicName, traceTopicName, dependencyTopicName;
   // Kafka Clients config
@@ -86,7 +88,6 @@ public class KafkaStorage extends StorageComponent {
   volatile KafkaStreams traceAggregationStream, traceStoreStream, dependencyStoreStream;
   volatile Server server;
   volatile boolean closeCalled, topicsValidated;
-  long minTracesStored;
 
   KafkaStorage(Builder builder) {
     // Kafka Storage modes
@@ -98,8 +99,10 @@ public class KafkaStorage extends StorageComponent {
     this.spansTopicName = builder.spansTopicName;
     this.traceTopicName = builder.traceTopicName;
     this.dependencyTopicName = builder.dependencyTopicName;
-    // State store directories
-    this.storageDirectory = builder.storeDir;
+    // Storage directories
+    this.storeDir = builder.storeDir;
+    this.minTracesStored = builder.minTracesStored;
+    this.httpPort = builder.httpPort;
     // Kafka Configs
     this.adminConfig = builder.adminConfig;
     this.producerConfig = builder.producerConfig;
@@ -122,7 +125,6 @@ public class KafkaStorage extends StorageComponent {
         dependencyTopicName,
         builder.dependencyTtl,
         builder.dependencyWindowSize).get();
-    minTracesStored = builder.minTracesStored;
   }
 
   public static Builder newBuilder() {
@@ -349,8 +351,7 @@ public class KafkaStorage extends StorageComponent {
     if (server == null) {
       synchronized (this) {
         if (server == null) {
-          server = new KafkaStoreServerSupplier(this)
-              .get();
+          server = new KafkaStoreServerSupplier(this).get();
           server.start();
         }
       }
@@ -371,6 +372,7 @@ public class KafkaStorage extends StorageComponent {
     Duration dependencyWindowSize = Duration.ofMinutes(1);
 
     long minTracesStored = 10_000;
+    int httpPort = 9412;
 
     String storeDir = "/tmp/zipkin-storage-kafka";
 
@@ -706,9 +708,10 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public String toString() {
     return "KafkaStorage{" +
-        "spanConsumerEnabled=" + spanConsumerEnabled +
+        "httpPort=" + httpPort +
+        ", spanConsumerEnabled=" + spanConsumerEnabled +
         ", searchEnabled=" + searchEnabled +
-        ", storageDirectory='" + storageDirectory + '\'' +
+        ", storageDirectory='" + storeDir + '\'' +
         ", spansTopicName='" + spansTopicName + '\'' +
         ", traceTopicName='" + traceTopicName + '\'' +
         ", dependencyTopicName='" + dependencyTopicName + '\'' +

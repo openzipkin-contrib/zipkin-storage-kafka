@@ -24,12 +24,12 @@ import com.linecorp.armeria.server.ServerBuilder;
 import com.linecorp.armeria.server.Service;
 import com.linecorp.armeria.server.annotation.ConsumesJson;
 import com.linecorp.armeria.server.annotation.Get;
+import com.linecorp.armeria.server.annotation.Param;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.kafka.streams.KafkaStreams;
@@ -61,50 +61,56 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
   final KafkaStreams traceStoreStream;
   final KafkaStreams dependencyStoreStream;
   final long minTracesStored;
+  final int httpPort;
 
   public KafkaStoreServerSupplier(KafkaStorage storage) {
     this.traceStoreStream = storage.getTraceStoreStream();
     this.dependencyStoreStream = storage.getDependencyStoreStream();
+
     this.minTracesStored = storage.minTracesStored;
+    this.httpPort = storage.httpPort;
   }
 
   @Override public Server get() {
     ServerBuilder builder = new ServerBuilder();
-    builder.http(9412);
+    builder.http(httpPort);
     // Metadata-related services
     builder.service("/instances", getInstances());
-    builder.service("/instances/:store_name", getStoreHostNameInfo());
+    builder.service("/instances/:store_name", getInstancesByStore());
     // Traces-related services
-    builder.annotatedService(getTracesKeyValues()); // kv.range() + foreach(kv.get()).filter()
-    builder.service("/traces/:trace_id", getTraceKeyValue()); // kv.get()
+    builder.annotatedService(getTraces()); // kv.range() + foreach(kv.get()).filter()
+    builder.service("/traces/:trace_id", getTrace()); // kv.get()
     // Service names related
     builder.service("/service_names", getServiceNames()); // kv.all()
     builder.service("/service_names/:service_name/span_names",
         getSpanNamesByServiceName()); // kv.get()
     builder.service("/service_names/:service_name/remote_service_names",
         getRemoteServiceNamesByServiceName()); // kv.get()
-    builder.service("/dependencies", getDependencies());
+    builder.annotatedService(getDependencies());
     return builder.build();
   }
 
-  private Service<HttpRequest, HttpResponse> getDependencies() {
-    return (ctx, req) -> {
-      ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore =
-          dependencyStoreStream.store(DEPENDENCIES_STORE_NAME,
-              QueryableStoreTypes.windowStore());
-      long endTs = Long.parseLong(Objects.requireNonNull(ctx.pathParam("endTs")));
-      long lookback = Long.parseLong(Objects.requireNonNull(ctx.pathParam("lookback")));
-      List<DependencyLink> links = new ArrayList<>();
-      Instant from = Instant.ofEpochMilli(endTs - lookback);
-      Instant to = Instant.ofEpochMilli(endTs);
-      dependenciesStore.fetchAll(from, to)
-          .forEachRemaining(keyValue -> links.add(keyValue.value));
-      List<DependencyLink> mergedLinks = DependencyLinker.merge(links);
-      LOG.debug("Dependencies found from={}-to={}: {}", from, to, mergedLinks.size());
-      return HttpResponse.of(
-          HttpStatus.OK,
-          MediaType.JSON,
-          DependencyLinkBytesEncoder.JSON_V1.encodeList(mergedLinks));
+  Object getDependencies() {
+    return new Object() {
+      @Get("/dependencies")
+      public HttpResponse getDependencies(
+          @Param("end_ts") long endTs,
+          @Param("lookback") long lookback) {
+        ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore =
+            dependencyStoreStream.store(DEPENDENCIES_STORE_NAME,
+                QueryableStoreTypes.windowStore());
+        List<DependencyLink> links = new ArrayList<>();
+        Instant from = Instant.ofEpochMilli(endTs - lookback);
+        Instant to = Instant.ofEpochMilli(endTs);
+        dependenciesStore.fetchAll(from, to)
+            .forEachRemaining(keyValue -> links.add(keyValue.value));
+        List<DependencyLink> mergedLinks = DependencyLinker.merge(links);
+        LOG.debug("Dependencies found from={}-to={}: {}", from, to, mergedLinks.size());
+        return HttpResponse.of(
+            HttpStatus.OK,
+            MediaType.JSON,
+            DependencyLinkBytesEncoder.JSON_V1.encodeList(mergedLinks));
+      }
     };
   }
 
@@ -141,7 +147,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
     };
   }
 
-  Object getTracesKeyValues() {
+  Object getTraces() {
     return new Object() {
       ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
           traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
@@ -206,7 +212,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
     };
   }
 
-  Service<HttpRequest, HttpResponse> getTraceKeyValue() {
+  Service<HttpRequest, HttpResponse> getTrace() {
     return (ctx, req) -> {
       String traceId = ctx.pathParam("trace_id");
       ReadOnlyKeyValueStore<String, List<Span>> store =
@@ -219,7 +225,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
     };
   }
 
-  Service<HttpRequest, HttpResponse> getStoreHostNameInfo() {
+  Service<HttpRequest, HttpResponse> getInstancesByStore() {
     return (ctx, req) -> {
       String storeName = ctx.pathParam("store_name");
       return HttpResponse.of(MediaType.JSON,

@@ -157,7 +157,7 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).storageDirectory).isEqualTo("/zipkin");
+    assertThat(context.getBean(KafkaStorage.class).storeDir).isEqualTo("/zipkin");
   }
 
   @Test

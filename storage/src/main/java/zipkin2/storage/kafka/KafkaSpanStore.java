@@ -238,10 +238,6 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
               .join()
               .contentUtf8())
           .map(response -> {
-            //List<List<Span>> decoded = new ArrayList<>(encoded.size());
-            //for(List<Span> bytes : encoded) {
-            //  decoded.add(SpanBytesDecoder.JSON_V2.decodeList(ByteBuffer.wrap(bytes)));
-            //}
             Traces result = GSON.fromJson(response, Traces.class);
             return result.traces;
           })
@@ -319,7 +315,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
               String.format("http://%s:%d",
                   metadata.hostInfo().host(),
                   metadata.hostInfo().port())))
-          .map(httpClient -> httpClient.get("/dependencies")
+          .map(httpClient -> httpClient.get(String.format("/dependencies?end_ts=%s&lookback=%s", endTs, lookback))
               .aggregate()
               .join()
               .content())
