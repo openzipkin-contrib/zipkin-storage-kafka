@@ -24,6 +24,7 @@ import com.linecorp.armeria.server.Service;
 import com.linecorp.armeria.server.annotation.ConsumesJson;
 import com.linecorp.armeria.server.annotation.Get;
 import com.linecorp.armeria.server.annotation.Param;
+import io.micrometer.prometheus.PrometheusMeterRegistry;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -72,6 +73,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
   final KafkaStreams dependencyStoreStream;
   final long minTracesStored;
   final int httpPort;
+  final PrometheusMeterRegistry prometheusRegistry;
 
   public KafkaStoreServerSupplier(KafkaStorage storage) {
     this.traceStoreStream = storage.getTraceStoreStream();
@@ -79,6 +81,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
 
     this.minTracesStored = storage.minTracesStored;
     this.httpPort = storage.httpPort;
+    this.prometheusRegistry = storage.prometheusRegistry;
   }
 
   @Override public Server get() {
@@ -99,7 +102,12 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
     builder.annotatedService(getDependencies());
     builder.service("/autocomplete-tags", getAutocompleteTagKeys());
     builder.service("/autocomplete-tags/:key", getAutocompleteTagValues());
+    builder.service("/metrics", getMetrics());
     return builder.build();
+  }
+
+  private Service<HttpRequest, HttpResponse> getMetrics() {
+    return (ctx, req) -> HttpResponse.of(MediaType.JSON, prometheusRegistry.scrape());
   }
 
   private Service<HttpRequest, HttpResponse> getAutocompleteTagValues() {

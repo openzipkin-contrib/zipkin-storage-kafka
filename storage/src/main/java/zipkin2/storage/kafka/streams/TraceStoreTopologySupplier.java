@@ -13,6 +13,8 @@
  */
 package zipkin2.storage.kafka.streams;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Metrics;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -63,6 +65,8 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   final SpanIdsSerde spanIdsSerde;
   final NamesSerde namesSerde;
 
+  final Counter brokenTracesTotal;
+
   public TraceStoreTopologySupplier(String spansTopicName, List<String> autoCompleteKeys,
       Duration traceTtl, Duration traceTtlCheckInterval, long minTracesStored) {
     this.spansTopicName = spansTopicName;
@@ -73,6 +77,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
     spansSerde = new SpansSerde();
     spanIdsSerde = new SpanIdsSerde();
     namesSerde = new NamesSerde();
+    brokenTracesTotal = Metrics.counter("zipkin.storage.kafka.traces.broken");
   }
 
   @Override public Topology get() {
@@ -163,6 +168,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
           // Persist traces
           List<Span> currentSpans = tracesStore.get(traceId);
           if (currentSpans == null) currentSpans = new ArrayList<>();
+          else brokenTracesTotal.increment();
           currentSpans.addAll(spans);
           tracesStore.put(traceId, currentSpans);
           // Persist timestamp indexed span ids

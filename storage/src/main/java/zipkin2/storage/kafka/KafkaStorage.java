@@ -14,6 +14,9 @@
 package zipkin2.storage.kafka;
 
 import com.linecorp.armeria.server.Server;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.prometheus.PrometheusConfig;
+import io.micrometer.prometheus.PrometheusMeterRegistry;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;
@@ -85,6 +88,7 @@ public class KafkaStorage extends StorageComponent {
   volatile KafkaStreams traceAggregationStream, traceStoreStream, dependencyStoreStream;
   volatile Server server;
   volatile boolean closeCalled;
+  final PrometheusMeterRegistry prometheusRegistry;
 
   KafkaStorage(Builder builder) {
     // Kafka Storage modes
@@ -106,6 +110,8 @@ public class KafkaStorage extends StorageComponent {
     this.aggregationStreamConfig = builder.aggregationStreamConfig;
     this.traceStoreStreamConfig = builder.traceStoreStreamConfig;
     this.dependencyStoreStreamConfig = builder.dependencyStoreStreamConfig;
+    this.prometheusRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
+    Metrics.addRegistry(prometheusRegistry);
 
     aggregationTopology = new AggregationTopologySupplier(
         spansTopicName,
