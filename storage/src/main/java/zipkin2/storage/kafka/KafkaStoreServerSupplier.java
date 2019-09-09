@@ -54,6 +54,15 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_IDS_
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_STORE_NAME;
 
+/**
+ * Server to enable access to local stores.
+ * <p>
+ * Given the partitioned nature of local stores, a RPC layer is required to allow accessing
+ * distributed state. This component exposes access to local state via Http call from {@link
+ * KafkaSpanStore}
+ *
+ * @since 0.6.0
+ */
 public class KafkaStoreServerSupplier implements Supplier<Server> {
   static final Logger LOG = LoggerFactory.getLogger(KafkaStoreServerSupplier.class);
   static final Gson GSON = new Gson();

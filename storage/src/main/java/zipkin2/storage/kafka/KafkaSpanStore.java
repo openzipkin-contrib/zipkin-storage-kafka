@@ -50,11 +50,9 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAME
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_STORE_NAME;
 
 /**
- * Span store backed by Kafka Stream local stores built by {@link TraceStoreTopologySupplier} and
- * {@link DependencyStoreTopologySupplier}.
- * <p>
- * These stores are currently supporting only single instance as there is not mechanism implemented
- * for scatter gather data from different instances.
+ * Span store backed by Kafka Stream distributed state stores built by {@link
+ * TraceStoreTopologySupplier} and {@link DependencyStoreTopologySupplier}, and made accessible by
+ * {@link  KafkaStoreServerSupplier}.
  */
 public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   static final String HTTP_BASE_URL = "http://%s:%d";
