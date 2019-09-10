@@ -115,10 +115,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
             namesSerde).withLoggingDisabled());
     // Traces stream
     KStream<String, List<Span>> spansStream = builder
-        .stream(
-            spansTopicName,
-            Consumed.with(Serdes.String(), spansSerde)
-                .withOffsetResetPolicy(Topology.AutoOffsetReset.LATEST));
+        .stream(spansTopicName, Consumed.with(Serdes.String(), spansSerde));
     // Store traces
     spansStream.process(() -> new Processor<String, List<Span>>() {
       ProcessorContext context;

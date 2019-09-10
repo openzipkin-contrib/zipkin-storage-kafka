@@ -196,10 +196,20 @@ public class KafkaStorage extends StorageComponent {
         }
       }
       if (searchEnabled) {
-        KafkaStreams.State state = getTraceStoreStream().state();
-        if (!state.isRunning()) {
+        KafkaStreams.State stateTraceStore = getTraceStoreStream().state();
+        if (!stateTraceStore.isRunning()) {
           return CheckResult.failed(
-              new IllegalStateException("Store stream not running. " + state));
+              new IllegalStateException("Store stream not running. " + stateTraceStore));
+        }
+        KafkaStreams.State stateDependencyStore = getDependencyStoreStream().state();
+        if (!stateDependencyStore.isRunning()) {
+          return CheckResult.failed(
+              new IllegalStateException("Store stream not running. " + stateDependencyStore));
+        }
+        if (!getServer().activePort().isPresent()) {
+          return CheckResult.failed(
+              new IllegalStateException(
+                  "Storage HTTP server not running. " + stateDependencyStore));
         }
       }
       return CheckResult.OK;
@@ -220,18 +230,18 @@ public class KafkaStorage extends StorageComponent {
 
   void doClose() {
     try {
-      if (adminClient != null) adminClient.close(Duration.ofSeconds(10));
+      if (adminClient != null) adminClient.close(Duration.ofSeconds(1));
       if (producer != null) {
-        producer.close(Duration.ofSeconds(10));
+        producer.close(Duration.ofSeconds(1));
       }
       if (traceStoreStream != null) {
-        traceStoreStream.close(Duration.ofSeconds(10));
+        traceStoreStream.close(Duration.ofSeconds(1));
       }
       if (dependencyStoreStream != null) {
-        dependencyStoreStream.close(Duration.ofSeconds(10));
+        dependencyStoreStream.close(Duration.ofSeconds(1));
       }
       if (traceAggregationStream != null) {
-        traceAggregationStream.close(Duration.ofSeconds(10));
+        traceAggregationStream.close(Duration.ofSeconds(1));
       }
       if (server != null) server.close();
     } catch (Exception | Error e) {
@@ -265,8 +275,13 @@ public class KafkaStorage extends StorageComponent {
     if (traceStoreStream == null) {
       synchronized (this) {
         if (traceStoreStream == null) {
-          traceStoreStream = new KafkaStreams(traceStoreTopology, traceStoreStreamConfig);
-          traceStoreStream.start();
+          try {
+            traceStoreStream = new KafkaStreams(traceStoreTopology, traceStoreStreamConfig);
+            traceStoreStream.start();
+          } catch (Exception e) {
+            LOG.error("Error starting trace store process", e);
+            traceStoreStream = null;
+          }
         }
       }
     }
@@ -277,9 +292,14 @@ public class KafkaStorage extends StorageComponent {
     if (dependencyStoreStream == null) {
       synchronized (this) {
         if (dependencyStoreStream == null) {
-          dependencyStoreStream =
-              new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
-          dependencyStoreStream.start();
+          try {
+            dependencyStoreStream =
+                new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
+            dependencyStoreStream.start();
+          } catch (Exception e) {
+            LOG.error("Error starting dependency store", e);
+            dependencyStoreStream = null;
+          }
         }
       }
     }
@@ -290,9 +310,14 @@ public class KafkaStorage extends StorageComponent {
     if (traceAggregationStream == null) {
       synchronized (this) {
         if (traceAggregationStream == null) {
-          traceAggregationStream =
-              new KafkaStreams(aggregationTopology, aggregationStreamConfig);
-          traceAggregationStream.start();
+          try {
+            traceAggregationStream =
+                new KafkaStreams(aggregationTopology, aggregationStreamConfig);
+            traceAggregationStream.start();
+          } catch (Exception e) {
+            LOG.error("Error loading aggregation process", e);
+            traceAggregationStream = null;
+          }
         }
       }
     }
@@ -303,8 +328,13 @@ public class KafkaStorage extends StorageComponent {
     if (server == null) {
       synchronized (this) {
         if (server == null) {
-          server = new KafkaStoreServerSupplier(this).get();
-          server.start();
+          try {
+            server = new KafkaStoreServerSupplier(this).get();
+            server.start();
+          } catch (Exception e) {
+            LOG.error("Error starting http server", e);
+            server = null;
+          }
         }
       }
     }
@@ -343,12 +373,6 @@ public class KafkaStorage extends StorageComponent {
     String dependencyTopicName = "zipkin-dependency";
 
     Builder() {
-      String hostInfo = "localhost";
-      try {
-        hostInfo = InetAddress.getLocalHost().getHostName() + ":" + 9412;
-      } catch (UnknownHostException e) {
-        e.printStackTrace();
-      }
       // Kafka Producer configuration
       producerConfig.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
       producerConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
@@ -371,7 +395,7 @@ public class KafkaStorage extends StorageComponent {
       traceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, traceStoreStreamAppId);
       traceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
       traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-      traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo);
+      traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
       // Dependency Store Stream Topology configuration
       dependencyStoreStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
           Serdes.StringSerde.class);
@@ -381,7 +405,17 @@ public class KafkaStorage extends StorageComponent {
           dependencyStoreStreamAppId);
       dependencyStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, dependencyStoreDirectory());
       dependencyStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-      dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo);
+      dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
+    }
+
+    String hostInfo() {
+      String hostInfo = "localhost";
+      try {
+        hostInfo = InetAddress.getLocalHost().getHostName() + ":" + httpPort;
+      } catch (UnknownHostException e) {
+        e.printStackTrace();
+      }
+      return hostInfo;
     }
 
     @Override
@@ -410,6 +444,13 @@ public class KafkaStorage extends StorageComponent {
      */
     public Builder spanConsumerEnabled(boolean spanConsumerEnabled) {
       this.spanConsumerEnabled = spanConsumerEnabled;
+      return this;
+    }
+
+    public Builder httpPort(int httpPort) {
+      this.httpPort = httpPort;
+      traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
+      dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
       return this;
     }
 

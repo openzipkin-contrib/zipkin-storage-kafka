@@ -13,10 +13,14 @@
  */
 package zipkin2.storage.kafka;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.Metrics;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -49,12 +53,20 @@ public class KafkaSpanConsumer implements SpanConsumer {
   @Override
   public Call<Void> accept(List<Span> spans) {
     if (spans.isEmpty()) return Call.create(null);
-    List<Call<Void>> calls = new ArrayList<>();
     // Collect traceId:spans
+    Map<String, List<Span>> spansByTrace = new HashMap<>();
     for (Span span : spans) {
       String key = span.traceId();
-      byte[] value = SpanBytesEncoder.PROTO3.encodeList(Collections.singletonList(span));
-      calls.add(KafkaProducerCall.create(producer, spansTopicName, key, value));
+      List<Span> current = spansByTrace.get(key);
+      if (current == null) current = new ArrayList<>();
+      if (!current.contains(span)) current.add(span);
+      spansByTrace.put(key, current);
+    }
+    // Serialize spans by trace Id
+    List<Call<Void>> calls = new ArrayList<>();
+    for (Map.Entry<String, List<Span>> grouped : spansByTrace.entrySet()) {
+      byte[] value = SpanBytesEncoder.PROTO3.encodeList(grouped.getValue());
+      calls.add(KafkaProducerCall.create(producer, spansTopicName, grouped.getKey(), value));
     }
     return AggregateCall.newVoidCall(calls);
   }

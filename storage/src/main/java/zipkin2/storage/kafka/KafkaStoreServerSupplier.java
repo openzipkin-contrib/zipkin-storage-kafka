@@ -32,7 +32,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
-import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
@@ -69,15 +68,13 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
   static final Logger LOG = LoggerFactory.getLogger(KafkaStoreServerSupplier.class);
   static final Gson GSON = new Gson();
 
-  final KafkaStreams traceStoreStream;
-  final KafkaStreams dependencyStoreStream;
+  final KafkaStorage storage;
   final long minTracesStored;
   final int httpPort;
   final PrometheusMeterRegistry prometheusRegistry;
 
-  public KafkaStoreServerSupplier(KafkaStorage storage) {
-    this.traceStoreStream = storage.getTraceStoreStream();
-    this.dependencyStoreStream = storage.getDependencyStoreStream();
+  KafkaStoreServerSupplier(KafkaStorage storage) {
+    this.storage = storage;
 
     this.minTracesStored = storage.minTracesStored;
     this.httpPort = storage.httpPort;
@@ -115,7 +112,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
       try {
         String key = ctx.pathParam("key");
         ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-            traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
+            storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
                 QueryableStoreTypes.keyValueStore());
         Set<String> valuesSet = autocompleteTagsStore.get(key);
         if (valuesSet == null) valuesSet = new HashSet<>();
@@ -131,7 +128,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
     return (ctx, req) -> {
       try {
         ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-            traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
+            storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
                 QueryableStoreTypes.keyValueStore());
         List<String> keys = new ArrayList<>();
         autocompleteTagsStore.all().forEachRemaining(keyValue -> keys.add(keyValue.key));
@@ -151,7 +148,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
           @Param("lookback") long lookback) {
         try {
           ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore =
-              dependencyStoreStream.store(DEPENDENCIES_STORE_NAME,
+              storage.getDependencyStoreStream().store(DEPENDENCIES_STORE_NAME,
                   QueryableStoreTypes.windowStore());
           List<DependencyLink> links = new ArrayList<>();
           Instant from = Instant.ofEpochMilli(endTs - lookback);
@@ -180,7 +177,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
       try {
         String serviceName = ctx.pathParam("service_name");
         ReadOnlyKeyValueStore<String, Set<String>> store =
-            traceStoreStream.store(REMOTE_SERVICE_NAMES_STORE_NAME,
+            storage.getTraceStoreStream().store(REMOTE_SERVICE_NAMES_STORE_NAME,
                 QueryableStoreTypes.keyValueStore());
         Set<String> names = store.get(serviceName);
         return HttpResponse.of(MediaType.JSON, GSON.toJson(names));
@@ -196,7 +193,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
       try {
         String serviceName = ctx.pathParam("service_name");
         ReadOnlyKeyValueStore<String, Set<String>> store =
-            traceStoreStream.store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+            storage.getTraceStoreStream().store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
         Set<String> names = store.get(serviceName);
         return HttpResponse.of(MediaType.JSON, GSON.toJson(names));
       } catch (InvalidStateStoreException e) {
@@ -210,7 +207,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
     return (ctx, req) -> {
       try {
         ReadOnlyKeyValueStore<String, String> store =
-            traceStoreStream.store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+            storage.getTraceStoreStream().store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
         Set<String> names = new HashSet<>();
         store.all().forEachRemaining(keyValue -> names.add(keyValue.value));
         return HttpResponse.of(MediaType.JSON, GSON.toJson(names));
@@ -229,9 +226,9 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
       public HttpResponse getTraces(String requestJson) {
         try {
           ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
-              traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+              storage.getTraceStoreStream().store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
           ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore =
-              traceStoreStream.store(SPAN_IDS_BY_TS_STORE_NAME,
+              storage.getTraceStoreStream().store(SPAN_IDS_BY_TS_STORE_NAME,
                   QueryableStoreTypes.keyValueStore());
           QueryRequest request = GSON.fromJson(requestJson, QueryRequest.Builder.class).build();
           List<List<Span>> traces = new ArrayList<>();
@@ -300,7 +297,7 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
       try {
         String traceId = ctx.pathParam("trace_id");
         ReadOnlyKeyValueStore<String, List<Span>> store =
-            traceStoreStream.store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+            storage.getTraceStoreStream().store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
         List<Span> spans = store.get(traceId);
         return HttpResponse.of(
             HttpStatus.OK,
@@ -320,12 +317,12 @@ public class KafkaStoreServerSupplier implements Supplier<Server> {
     return (ctx, req) -> {
       String storeName = ctx.pathParam("store_name");
       return HttpResponse.of(MediaType.JSON,
-          GSON.toJson(traceStoreStream.allMetadataForStore(storeName)));
+          GSON.toJson(storage.getTraceStoreStream().allMetadataForStore(storeName)));
     };
   }
 
   Service<HttpRequest, HttpResponse> getInstances() {
     return (ctx, req) -> HttpResponse.of(
-        MediaType.JSON, GSON.toJson(traceStoreStream.allMetadata()));
+        MediaType.JSON, GSON.toJson(storage.getTraceStoreStream().allMetadata()));
   }
 }

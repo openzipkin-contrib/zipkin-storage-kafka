@@ -111,6 +111,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
             return response.contentUtf8();
           })
           .map(content -> {
+            if (content == null) return new ArrayList<String>();
             Set<String> set = GSON.fromJson(content, Set.class);
             return set;
           })
@@ -234,6 +235,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
             return response.contentUtf8();
           })
           .map(response -> {
+            if (response == null) return new ArrayList<List<Span>>();
             Traces result = GSON.fromJson(response, Traces.class);
             return result.traces;
           })
@@ -269,11 +271,11 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       StreamsMetadata metadata =
           traceStoreStream.metadataForKey(TRACES_STORE_NAME, traceId, new StringSerializer());
       HttpClient httpClient = httpClient(metadata);
-      HttpData content =
-          httpClient.get(String.format("/traces/%s", traceId))
-              .aggregate()
-              .join()
-              .content();
+      AggregatedHttpResponse response = httpClient.get(String.format("/traces/%s", traceId))
+          .aggregate()
+          .join();
+      if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
+      HttpData content = response.content();
       return SpanBytesDecoder.JSON_V2.decodeList(ByteBuffer.wrap(content.array()));
     }
 
@@ -313,8 +315,9 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
             if (!HttpStatus.OK.equals(response.status())) return null;
             return response.content();
           })
-          .map(response -> {
-            return DependencyLinkBytesDecoder.JSON_V1.decodeList(response.array());
+          .map(content -> {
+            if (content == null) return new ArrayList<DependencyLink>();
+            return DependencyLinkBytesDecoder.JSON_V1.decodeList(content.array());
           })
           .flatMap(Collection::stream)
           .distinct()

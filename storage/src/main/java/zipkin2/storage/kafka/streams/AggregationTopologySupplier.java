@@ -78,7 +78,7 @@ public class AggregationTopologySupplier implements Supplier<Topology> {
             .windowedBy(SessionWindows.with(traceTimeout).grace(Duration.ZERO))
             .aggregate(ArrayList::new, aggregateSpans(), joinAggregates(),
                 Materialized
-                    .<String, List<Span>>as(Stores.persistentSessionStore(TRACE_AGGREGATION_STORE, Duration.ofHours(1)))
+                    .<String, List<Span>>as(Stores.persistentSessionStore(TRACE_AGGREGATION_STORE, Duration.ofDays(1)))
                     .withKeySerde(Serdes.String())
                     .withValueSerde(spansSerde)
                     .withLoggingDisabled()
