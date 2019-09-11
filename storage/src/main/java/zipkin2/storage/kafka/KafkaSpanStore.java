@@ -112,7 +112,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
             AggregatedHttpResponse response = httpClient.get("/serviceNames")
                 .aggregate()
                 .join();
-            if (!HttpStatus.OK.equals(response.status())) return null;
+            if (!response.status().equals(HttpStatus.OK)) return null;
             return response.contentUtf8();
           })
           .map(content -> {
@@ -161,7 +161,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           httpClient.get(String.format("/serviceNames/%s/spanNames", serviceName))
               .aggregate()
               .join();
-      if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
+      if (!response.status().equals(HttpStatus.OK)) return new ArrayList<>();
       String content = response.contentUtf8();
       try {
         String[] values = MAPPER.readValue(content, String[].class);
@@ -203,7 +203,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           httpClient.get(String.format("/serviceNames/%s/remoteServiceNames", serviceName))
               .aggregate()
               .join();
-      if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
+      if (!response.status().equals(HttpStatus.OK)) return new ArrayList<>();
       String content = response.contentUtf8();
       try {
         String[] values = MAPPER.readValue(content, String[].class);
@@ -255,7 +255,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
                 "limit=" + request.limit());
             AggregatedHttpResponse response =
                 httpClient.execute(RequestHeaders.of(HttpMethod.GET, path)).aggregate().join();
-            if (!HttpStatus.OK.equals(response.status())) {
+            if (!response.status().equals(HttpStatus.OK)) {
               LOG.error("Error querying traces {}", response.contentUtf8());
               return null;
             }
@@ -310,7 +310,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       AggregatedHttpResponse response = httpClient.get(String.format("/traces/%s", traceId))
           .aggregate()
           .join();
-      if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
+      if (!response.status().equals(HttpStatus.OK)) return new ArrayList<>();
       HttpData content = response.content();
       return SpanBytesDecoder.JSON_V2.decodeList(ByteBuffer.wrap(content.array()));
     }
@@ -348,7 +348,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
                 String.format("/dependencies?endTs=%s&lookback=%s", endTs, lookback))
                 .aggregate()
                 .join();
-            if (!HttpStatus.OK.equals(response.status())) return null;
+            if (!response.status().equals(HttpStatus.OK)) return null;
             return response.content();
           })
           .map(content -> {

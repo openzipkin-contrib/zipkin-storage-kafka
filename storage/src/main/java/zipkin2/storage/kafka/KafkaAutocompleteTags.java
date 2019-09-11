@@ -40,7 +40,7 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAME
 /**
  * Autocomplete tags query component based on Kafka Streams local store built by {@link
  * TraceStoreTopologySupplier}
- *
+ * <p>
  * These stores are currently supporting only single instance as there is not mechanism implemented
  * for scatter gather data from different instances.
  */
@@ -79,7 +79,7 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
             AggregatedHttpResponse response = httpClient.get("/autocompleteTags")
                 .aggregate()
                 .join();
-            if (!HttpStatus.OK.equals(response.status())) return null;
+            if (!response.status().equals(HttpStatus.OK)) return null;
             return response.contentUtf8();
           })
           .map(content -> {
@@ -110,6 +110,7 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
   }
 
   static class GetTagValuesCall extends Call.Base<List<String>> {
+    static final StringSerializer STRING_SERIALIZER = new StringSerializer();
 
     final KafkaStreams traceStoreStream;
     final String tagKey;
@@ -121,14 +122,13 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
 
     @Override protected List<String> doExecute() throws IOException {
       StreamsMetadata metadata =
-          traceStoreStream.metadataForKey(SPAN_NAMES_STORE_NAME, tagKey,
-              new StringSerializer());
+          traceStoreStream.metadataForKey(SPAN_NAMES_STORE_NAME, tagKey, STRING_SERIALIZER);
       HttpClient httpClient = httpClient(metadata);
       AggregatedHttpResponse response =
           httpClient.get(String.format("/autocompleteTags/%s", tagKey))
               .aggregate()
               .join();
-      if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
+      if (!response.status().equals(HttpStatus.OK)) return new ArrayList<>();
       String content = response.contentUtf8();
       try {
         String[] values = MAPPER.readValue(content, String[].class);
