@@ -74,7 +74,6 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
 
   KafkaStoreHttpService(KafkaStorage storage) {
     this.storage = storage;
-
     this.minTracesStored = storage.minTracesStored;
   }
 
