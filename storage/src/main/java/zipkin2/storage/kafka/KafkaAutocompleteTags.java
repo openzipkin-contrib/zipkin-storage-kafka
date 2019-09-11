@@ -13,29 +13,16 @@
  */
 package zipkin2.storage.kafka;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.linecorp.armeria.client.HttpClient;
-import com.linecorp.armeria.common.AggregatedHttpResponse;
-import com.linecorp.armeria.common.HttpStatus;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
-import java.util.stream.Collectors;
-import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.state.StreamsMetadata;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import zipkin2.Call;
-import zipkin2.Callback;
 import zipkin2.storage.AutocompleteTags;
+import zipkin2.storage.kafka.internal.KafkaStoreScatterGatherListCall;
+import zipkin2.storage.kafka.internal.KafkaStoreSingleKeyListCall;
 import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
 
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAMES_STORE_NAME;
 
 /**
  * Autocomplete tags query component based on Kafka Streams local store built by {@link
@@ -45,10 +32,6 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAME
  * for scatter gather data from different instances.
  */
 public class KafkaAutocompleteTags implements AutocompleteTags {
-  static final Logger LOG = LoggerFactory.getLogger(KafkaAutocompleteTags.class);
-  static final ObjectMapper MAPPER = new ObjectMapper();
-  static final String HTTP_BASE_URL = "http://%s:%d";
-
   final KafkaStreams traceStoreStream;
 
   KafkaAutocompleteTags(KafkaStorage storage) {
@@ -63,45 +46,17 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
     return new GetTagValuesCall(traceStoreStream, key);
   }
 
-  static class GetTagKeysCall extends Call.Base<List<String>> {
+  static class GetTagKeysCall extends KafkaStoreScatterGatherListCall<String> {
 
     final KafkaStreams traceStoreStream;
 
     GetTagKeysCall(KafkaStreams traceStoreStream) {
+      super(traceStoreStream, AUTOCOMPLETE_TAGS_STORE_NAME, "/autocompleteTags");
       this.traceStoreStream = traceStoreStream;
     }
 
-    @Override protected List<String> doExecute() throws IOException {
-      return traceStoreStream.allMetadataForStore(AUTOCOMPLETE_TAGS_STORE_NAME)
-          .parallelStream()
-          .map(KafkaAutocompleteTags::httpClient)
-          .map(httpClient -> {
-            AggregatedHttpResponse response = httpClient.get("/autocompleteTags")
-                .aggregate()
-                .join();
-            if (!response.status().equals(HttpStatus.OK)) return null;
-            return response.contentUtf8();
-          })
-          .map(content -> {
-            try {
-              String[] values = MAPPER.readValue(content, String[].class);
-              return Arrays.asList(values);
-            } catch (IOException e) {
-              LOG.error("Error reading json response", e);
-              return Collections.<String>emptyList();
-            }
-          })
-          .flatMap(Collection::stream)
-          .distinct()
-          .collect(Collectors.toList());
-    }
-
-    @Override protected void doEnqueue(Callback<List<String>> callback) {
-      try {
-        callback.onSuccess(doExecute());
-      } catch (IOException e) {
-        callback.onError(e);
-      }
+    @Override protected String parse(JsonNode node) {
+      return node.textValue();
     }
 
     @Override public Call<List<String>> clone() {
@@ -109,51 +64,23 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
     }
   }
 
-  static class GetTagValuesCall extends Call.Base<List<String>> {
-    static final StringSerializer STRING_SERIALIZER = new StringSerializer();
-
+  static class GetTagValuesCall extends KafkaStoreSingleKeyListCall<String> {
     final KafkaStreams traceStoreStream;
     final String tagKey;
 
     GetTagValuesCall(KafkaStreams traceStoreStream, String tagKey) {
+      super(traceStoreStream, AUTOCOMPLETE_TAGS_STORE_NAME,
+          String.format("/autocompleteTags/%s", tagKey), tagKey);
       this.traceStoreStream = traceStoreStream;
       this.tagKey = tagKey;
-    }
-
-    @Override protected List<String> doExecute() throws IOException {
-      StreamsMetadata metadata =
-          traceStoreStream.metadataForKey(SPAN_NAMES_STORE_NAME, tagKey, STRING_SERIALIZER);
-      HttpClient httpClient = httpClient(metadata);
-      AggregatedHttpResponse response =
-          httpClient.get(String.format("/autocompleteTags/%s", tagKey))
-              .aggregate()
-              .join();
-      if (!response.status().equals(HttpStatus.OK)) return new ArrayList<>();
-      String content = response.contentUtf8();
-      try {
-        String[] values = MAPPER.readValue(content, String[].class);
-        return Arrays.asList(values);
-      } catch (IOException e) {
-        LOG.error("Error reading json response", e);
-        return Collections.emptyList();
-      }
-    }
-
-    @Override protected void doEnqueue(Callback<List<String>> callback) {
-      try {
-        callback.onSuccess(doExecute());
-      } catch (IOException e) {
-        callback.onError(e);
-      }
     }
 
     @Override public Call<List<String>> clone() {
       return new GetTagValuesCall(traceStoreStream, tagKey);
     }
-  }
 
-  static HttpClient httpClient(StreamsMetadata metadata) {
-    return HttpClient.of(
-        String.format(HTTP_BASE_URL, metadata.hostInfo().host(), metadata.hostInfo().port()));
+    @Override protected String parse(JsonNode node) {
+      return node.textValue();
+    }
   }
 }
