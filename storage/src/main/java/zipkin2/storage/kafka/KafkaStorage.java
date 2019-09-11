@@ -13,13 +13,8 @@
  */
 package zipkin2.storage.kafka;
 
-import com.linecorp.armeria.common.HttpResponse;
-import com.linecorp.armeria.common.MediaType;
 import com.linecorp.armeria.server.Server;
 import com.linecorp.armeria.server.ServerBuilder;
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.prometheus.PrometheusConfig;
-import io.micrometer.prometheus.PrometheusMeterRegistry;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.time.Duration;
@@ -91,7 +86,6 @@ public class KafkaStorage extends StorageComponent {
   volatile KafkaStreams traceAggregationStream, traceStoreStream, dependencyStoreStream;
   volatile Server server;
   volatile boolean closeCalled;
-  final PrometheusMeterRegistry prometheusRegistry;
 
   KafkaStorage(Builder builder) {
     // Kafka Storage modes
@@ -113,8 +107,6 @@ public class KafkaStorage extends StorageComponent {
     this.aggregationStreamConfig = builder.aggregationStreamConfig;
     this.traceStoreStreamConfig = builder.traceStoreStreamConfig;
     this.dependencyStoreStreamConfig = builder.dependencyStoreStreamConfig;
-    this.prometheusRegistry = new PrometheusMeterRegistry(PrometheusConfig.DEFAULT);
-    Metrics.addRegistry(prometheusRegistry);
 
     aggregationTopology = new AggregationTopologySupplier(
         spansTopicName,
@@ -335,8 +327,6 @@ public class KafkaStorage extends StorageComponent {
             ServerBuilder builder = new ServerBuilder();
             builder.http(httpPort);
             builder.annotatedService(new KafkaStoreHttpService(this));
-            builder.service("/metrics", (ctx, req) ->
-                    HttpResponse.of(MediaType.PLAIN_TEXT_UTF_8, prometheusRegistry.scrape()));
             server = builder.build();
             server.start();
           } catch (Exception e) {
