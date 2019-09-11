@@ -13,12 +13,10 @@
  */
 package zipkin2.storage.kafka;
 
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.Gauge;
-import io.micrometer.core.instrument.Metrics;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.kafka.clients.producer.Producer;
@@ -54,7 +52,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
   public Call<Void> accept(List<Span> spans) {
     if (spans.isEmpty()) return Call.create(null);
     // Collect traceId:spans
-    Map<String, List<Span>> spansByTrace = new HashMap<>();
+    Map<String, List<Span>> spansByTrace = new LinkedHashMap<>();
     for (Span span : spans) {
       String key = span.traceId();
       List<Span> current = spansByTrace.get(key);

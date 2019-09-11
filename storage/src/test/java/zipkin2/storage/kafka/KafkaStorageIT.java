@@ -176,7 +176,7 @@ class KafkaStorageIT {
     IntegrationTestUtils.waitUntilMinRecordsReceived(
         consumerConfig, storage.spansTopicName, 2, 10000);
     // Then: services names are searchable
-    await().atMost(10, TimeUnit.SECONDS).until(() -> {
+    await().atMost(100, TimeUnit.SECONDS).until(() -> {
       List<List<Span>> traces = storage.spanStore().getTraces(QueryRequest.newBuilder()
           .endTs(TODAY + 1)
           .lookback(Duration.ofSeconds(30).toMillis())

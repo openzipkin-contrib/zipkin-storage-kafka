@@ -13,19 +13,22 @@
  */
 package zipkin2.storage.kafka;
 
-import com.google.gson.Gson;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.linecorp.armeria.client.HttpClient;
 import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpStatus;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.storage.AutocompleteTags;
@@ -42,6 +45,8 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAME
  * for scatter gather data from different instances.
  */
 public class KafkaAutocompleteTags implements AutocompleteTags {
+  static final Logger LOG = LoggerFactory.getLogger(KafkaAutocompleteTags.class);
+  static final ObjectMapper MAPPER = new ObjectMapper();
   static final String HTTP_BASE_URL = "http://%s:%d";
 
   final KafkaStreams traceStoreStream;
@@ -59,7 +64,6 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
   }
 
   static class GetTagKeysCall extends Call.Base<List<String>> {
-    static final Gson GSON = new Gson();
 
     final KafkaStreams traceStoreStream;
 
@@ -72,15 +76,20 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
           .parallelStream()
           .map(KafkaAutocompleteTags::httpClient)
           .map(httpClient -> {
-            AggregatedHttpResponse response = httpClient.get("/autocomplete-tags")
+            AggregatedHttpResponse response = httpClient.get("/autocompleteTags")
                 .aggregate()
                 .join();
             if (!HttpStatus.OK.equals(response.status())) return null;
             return response.contentUtf8();
           })
           .map(content -> {
-            Set<String> set = GSON.fromJson(content, Set.class);
-            return set;
+            try {
+              String[] values = MAPPER.readValue(content, String[].class);
+              return Arrays.asList(values);
+            } catch (IOException e) {
+              LOG.error("Error reading json response", e);
+              return Collections.<String>emptyList();
+            }
           })
           .flatMap(Collection::stream)
           .distinct()
@@ -101,7 +110,6 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
   }
 
   static class GetTagValuesCall extends Call.Base<List<String>> {
-    static final Gson GSON = new Gson();
 
     final KafkaStreams traceStoreStream;
     final String tagKey;
@@ -117,13 +125,18 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
               new StringSerializer());
       HttpClient httpClient = httpClient(metadata);
       AggregatedHttpResponse response =
-          httpClient.get(String.format("/service-names/%s/span-names", tagKey))
+          httpClient.get(String.format("/autocompleteTags/%s", tagKey))
               .aggregate()
               .join();
       if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
       String content = response.contentUtf8();
-      Set<String> set = GSON.fromJson(content, Set.class);
-      return new ArrayList<>(set);
+      try {
+        String[] values = MAPPER.readValue(content, String[].class);
+        return Arrays.asList(values);
+      } catch (IOException e) {
+        LOG.error("Error reading json response", e);
+        return Collections.emptyList();
+      }
     }
 
     @Override protected void doEnqueue(Callback<List<String>> callback) {

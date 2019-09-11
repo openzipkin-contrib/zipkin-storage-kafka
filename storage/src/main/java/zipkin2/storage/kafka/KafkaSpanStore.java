@@ -13,7 +13,9 @@
  */
 package zipkin2.storage.kafka;
 
-import com.google.gson.Gson;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.linecorp.armeria.client.HttpClient;
 import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpData;
@@ -23,13 +25,16 @@ import com.linecorp.armeria.common.RequestHeaders;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.Callback;
 import zipkin2.DependencyLink;
@@ -52,9 +57,11 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
 /**
  * Span store backed by Kafka Stream distributed state stores built by {@link
  * TraceStoreTopologySupplier} and {@link DependencyStoreTopologySupplier}, and made accessible by
- * {@link  KafkaStoreServerSupplier}.
+ * {@link  KafkaStoreHttpService}.
  */
 public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
+  static final Logger LOG = LoggerFactory.getLogger(KafkaAutocompleteTags.class);
+  static final ObjectMapper MAPPER = new ObjectMapper();
   static final String HTTP_BASE_URL = "http://%s:%d";
   // Kafka Streams Store provider
   final KafkaStreams traceStoreStream;
@@ -91,8 +98,6 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   }
 
   static class GetServiceNamesCall extends Call.Base<List<String>> {
-    static final Gson GSON = new Gson();
-
     final KafkaStreams traceStoreStream;
 
     GetServiceNamesCall(KafkaStreams traceStoreStream) {
@@ -104,7 +109,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           .parallelStream()
           .map(KafkaSpanStore::httpClient)
           .map(httpClient -> {
-            AggregatedHttpResponse response = httpClient.get("/service-names")
+            AggregatedHttpResponse response = httpClient.get("/serviceNames")
                 .aggregate()
                 .join();
             if (!HttpStatus.OK.equals(response.status())) return null;
@@ -112,8 +117,13 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           })
           .map(content -> {
             if (content == null) return new ArrayList<String>();
-            Set<String> set = GSON.fromJson(content, Set.class);
-            return set;
+            try {
+              String[] values = MAPPER.readValue(content, String[].class);
+              return Arrays.asList(values);
+            } catch (IOException e) {
+              LOG.error("Error reading json response", e);
+              return Collections.<String>emptyList();
+            }
           })
           .flatMap(Collection::stream)
           .distinct()
@@ -134,8 +144,6 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   }
 
   static class GetSpanNamesCall extends Call.Base<List<String>> {
-    static final Gson GSON = new Gson();
-
     final KafkaStreams traceStoreStream;
     final String serviceName;
 
@@ -150,13 +158,18 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
               new StringSerializer());
       HttpClient httpClient = httpClient(metadata);
       AggregatedHttpResponse response =
-          httpClient.get(String.format("/service-names/%s/span-names", serviceName))
+          httpClient.get(String.format("/serviceNames/%s/spanNames", serviceName))
               .aggregate()
               .join();
       if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
       String content = response.contentUtf8();
-      Set<String> set = GSON.fromJson(content, Set.class);
-      return new ArrayList<>(set);
+      try {
+        String[] values = MAPPER.readValue(content, String[].class);
+        return Arrays.asList(values);
+      } catch (IOException e) {
+        LOG.error("Error reading json response", e);
+        return Collections.emptyList();
+      }
     }
 
     @Override protected void doEnqueue(Callback<List<String>> callback) {
@@ -173,8 +186,6 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   }
 
   static class GetRemoteServiceNamesCall extends Call.Base<List<String>> {
-    static final Gson GSON = new Gson();
-
     final KafkaStreams traceStoreStream;
     final String serviceName;
 
@@ -189,13 +200,18 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
               new StringSerializer());
       HttpClient httpClient = httpClient(metadata);
       AggregatedHttpResponse response =
-          httpClient.get(String.format("/service-names/%s/remote-service-names", serviceName))
+          httpClient.get(String.format("/serviceNames/%s/remoteServiceNames", serviceName))
               .aggregate()
               .join();
       if (!HttpStatus.OK.equals(response.status())) return new ArrayList<>();
       String content = response.contentUtf8();
-      Set<String> set = GSON.fromJson(content, Set.class);
-      return new ArrayList<>(set);
+      try {
+        String[] values = MAPPER.readValue(content, String[].class);
+        return Arrays.asList(values);
+      } catch (IOException e) {
+        LOG.error("Error reading json response", e);
+        return Collections.emptyList();
+      }
     }
 
     @Override protected void doEnqueue(Callback<List<String>> callback) {
@@ -212,8 +228,6 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   }
 
   static class GetTracesCall extends Call.Base<List<List<Span>>> {
-    static final Gson GSON = new Gson();
-
     final KafkaStreams traceStoreStream;
     final QueryRequest request;
 
@@ -227,17 +241,39 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           .parallelStream()
           .map(KafkaSpanStore::httpClient)
           .map(httpClient -> {
-            AggregatedHttpResponse response = httpClient.execute(
-                RequestHeaders.of(HttpMethod.GET, "/traces"), GSON.toJson(request.toBuilder()))
-                .aggregate()
-                .join();
-            if (!HttpStatus.OK.equals(response.status())) return null;
+            String path = String.format("/traces?%s%s%s%s%s%s%s%s%s",
+                request.serviceName() == null ? "" : "serviceName=" + request.serviceName() + "&",
+                request.remoteServiceName() == null ? ""
+                    : "remoteServiceName=" + request.remoteServiceName() + "&",
+                request.spanName() == null ? "" : "spanName=" + request.spanName() + "&",
+                request.annotationQueryString() == null ? ""
+                    : "annotationQuery=" + request.annotationQueryString() + "&",
+                request.minDuration() == null ? "" : "minDuration=" + request.minDuration() + "&",
+                request.maxDuration() == null ? "" : "maxDuration=" + request.maxDuration() + "&",
+                "endTs=" + request.endTs() + "&",
+                "lookback=" + request.lookback() + "&",
+                "limit=" + request.limit());
+            AggregatedHttpResponse response =
+                httpClient.execute(RequestHeaders.of(HttpMethod.GET, path)).aggregate().join();
+            if (!HttpStatus.OK.equals(response.status())) {
+              LOG.error("Error querying traces {}", response.contentUtf8());
+              return null;
+            }
             return response.contentUtf8();
           })
           .map(response -> {
             if (response == null) return new ArrayList<List<Span>>();
-            Traces result = GSON.fromJson(response, Traces.class);
-            return result.traces;
+            try {
+              ArrayNode array = (ArrayNode) MAPPER.readTree(response);
+              List<List<Span>> result = new ArrayList<>();
+              for (JsonNode node : array) {
+                result.add(SpanBytesDecoder.JSON_V2.decodeList(node.toString().getBytes()));
+              }
+              return result;
+            } catch (IOException e) {
+              LOG.error("Error parsing response from get traces", e);
+              return new ArrayList<List<Span>>();
+            }
           })
           .flatMap(Collection::stream)
           .distinct()
@@ -309,7 +345,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
           .map(KafkaSpanStore::httpClient)
           .map(httpClient -> {
             AggregatedHttpResponse response = httpClient.get(
-                String.format("/dependencies?end_ts=%s&lookback=%s", endTs, lookback))
+                String.format("/dependencies?endTs=%s&lookback=%s", endTs, lookback))
                 .aggregate()
                 .join();
             if (!HttpStatus.OK.equals(response.status())) return null;

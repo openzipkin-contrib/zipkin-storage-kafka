@@ -13,7 +13,10 @@
  */
 package zipkin2.storage.kafka;
 
+import com.linecorp.armeria.common.HttpResponse;
+import com.linecorp.armeria.common.MediaType;
 import com.linecorp.armeria.server.Server;
+import com.linecorp.armeria.server.ServerBuilder;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.prometheus.PrometheusConfig;
 import io.micrometer.prometheus.PrometheusMeterRegistry;
@@ -329,7 +332,12 @@ public class KafkaStorage extends StorageComponent {
       synchronized (this) {
         if (server == null) {
           try {
-            server = new KafkaStoreServerSupplier(this).get();
+            ServerBuilder builder = new ServerBuilder();
+            builder.http(httpPort);
+            builder.annotatedService(new KafkaStoreHttpService(this));
+            builder.service("/metrics", (ctx, req) ->
+                    HttpResponse.of(MediaType.PLAIN_TEXT_UTF_8, prometheusRegistry.scrape()));
+            server = builder.build();
             server.start();
           } catch (Exception e) {
             LOG.error("Error starting http server", e);
