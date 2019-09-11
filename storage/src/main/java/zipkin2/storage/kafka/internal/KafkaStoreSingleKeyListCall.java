@@ -8,6 +8,7 @@ import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpStatus;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
@@ -53,7 +54,7 @@ public abstract class KafkaStoreSingleKeyListCall<V> extends Call.Base<List<V>> 
       V value = parse(node);
       values.add(value);
     }
-    return values;
+    return Collections.unmodifiableList(values);
   }
 
   protected abstract V parse(JsonNode node);

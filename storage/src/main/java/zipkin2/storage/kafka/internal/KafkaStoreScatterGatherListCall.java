@@ -61,7 +61,7 @@ public abstract class KafkaStoreScatterGatherListCall<V> extends Call.Base<List<
               V value = parse(node);
               values.add(value);
             }
-            return values;
+            return Collections.unmodifiableList(values);
           } catch (IOException e) {
             LOG.error("Error reading json response", e);
             return Collections.<V>emptyList();

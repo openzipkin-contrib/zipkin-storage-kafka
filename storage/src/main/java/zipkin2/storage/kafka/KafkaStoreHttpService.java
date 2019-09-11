@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpStatus;
 import com.linecorp.armeria.common.MediaType;
+import com.linecorp.armeria.server.ServerBuilder;
 import com.linecorp.armeria.server.annotation.Default;
 import com.linecorp.armeria.server.annotation.Get;
 import com.linecorp.armeria.server.annotation.Param;
@@ -30,6 +31,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
@@ -61,7 +64,7 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
  *
  * @since 0.6.0
  */
-public class KafkaStoreHttpService {
+public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   static final Logger LOG = LoggerFactory.getLogger(KafkaStoreHttpService.class);
   static final ObjectMapper MAPPER = new ObjectMapper();
   static final String EMPTY_ARRAY = "[]";
@@ -120,7 +123,8 @@ public class KafkaStoreHttpService {
   }
 
   @Get("/serviceNames/:service_name/spanNames")
-  public AggregatedHttpResponse getSpanNames(@Param("service_name") String serviceName) throws IOException {
+  public AggregatedHttpResponse getSpanNames(@Param("service_name") String serviceName)
+      throws IOException {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> store =
           storage.getTraceStoreStream()
@@ -226,8 +230,9 @@ public class KafkaStoreHttpService {
       traces.sort(
           Comparator.<List<Span>>comparingLong(o -> o.get(0).timestampAsLong()).reversed());
       LOG.debug("Traces found from query {}: {}", request, traces.size());
-      int size = Math.min(request.limit(), traces.size());
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, writeTraces(SpanBytesEncoder.JSON_V2, traces.subList(0, size)));
+      List<List<Span>> result = traces.stream().limit(request.limit()).collect(Collectors.toList());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
+          writeTraces(SpanBytesEncoder.JSON_V2, result));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
       return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, "[]");
@@ -342,5 +347,9 @@ public class KafkaStoreHttpService {
     }
     out[pos] = ']'; // stop list of traces
     return out;
+  }
+
+  @Override public void accept(ServerBuilder serverBuilder) {
+    serverBuilder.annotatedService("/storage-kafka", this);
   }
 }
