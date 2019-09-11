@@ -16,7 +16,7 @@ package zipkin2.storage.kafka;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.linecorp.armeria.common.HttpResponse;
+import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpStatus;
 import com.linecorp.armeria.common.MediaType;
 import com.linecorp.armeria.server.annotation.Default;
@@ -76,7 +76,7 @@ public class KafkaStoreHttpService {
   }
 
   @Get("/dependencies")
-  public HttpResponse getDependencies(
+  public AggregatedHttpResponse getDependencies(
       @Param("endTs") long endTs,
       @Param("lookback") long lookback) {
     try {
@@ -90,13 +90,13 @@ public class KafkaStoreHttpService {
           .forEachRemaining(keyValue -> links.add(keyValue.value));
       List<DependencyLink> mergedLinks = DependencyLinker.merge(links);
       LOG.debug("Dependencies found from={}-to={}: {}", from, to, mergedLinks.size());
-      return HttpResponse.of(
+      return AggregatedHttpResponse.of(
           HttpStatus.OK,
           MediaType.JSON,
           DependencyLinkBytesEncoder.JSON_V1.encodeList(mergedLinks));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return HttpResponse.of(
+      return AggregatedHttpResponse.of(
           HttpStatus.OK,
           MediaType.JSON,
           DependencyLinkBytesEncoder.JSON_V1.encodeList(new ArrayList<>()));
@@ -104,7 +104,7 @@ public class KafkaStoreHttpService {
   }
 
   @Get("/serviceNames")
-  public HttpResponse getServiceNames() throws IOException {
+  public AggregatedHttpResponse getServiceNames() throws IOException {
     try {
       ReadOnlyKeyValueStore<String, String> store =
           storage.getTraceStoreStream()
@@ -112,15 +112,15 @@ public class KafkaStoreHttpService {
       //Set<String> names = new HashSet<>();
       ArrayNode array = MAPPER.createArrayNode();
       store.all().forEachRemaining(keyValue -> array.add(keyValue.value));
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON, EMPTY_ARRAY);
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, EMPTY_ARRAY);
     }
   }
 
   @Get("/serviceNames/:service_name/spanNames")
-  public HttpResponse getSpanNames(@Param("service_name") String serviceName) throws IOException {
+  public AggregatedHttpResponse getSpanNames(@Param("service_name") String serviceName) throws IOException {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> store =
           storage.getTraceStoreStream()
@@ -128,15 +128,15 @@ public class KafkaStoreHttpService {
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
       names.forEach(array::add);
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON, EMPTY_ARRAY);
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, EMPTY_ARRAY);
     }
   }
 
   @Get("/serviceNames/:service_name/remoteServiceNames")
-  public HttpResponse getRemoteServiceNames(@Param("service_name") String serviceName)
+  public AggregatedHttpResponse getRemoteServiceNames(@Param("service_name") String serviceName)
       throws IOException {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> store =
@@ -145,15 +145,15 @@ public class KafkaStoreHttpService {
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
       names.forEach(array::add);
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON, EMPTY_ARRAY);
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, EMPTY_ARRAY);
     }
   }
 
   @Get("/traces")
-  public HttpResponse getTraces(@Param("serviceName") Optional<String> serviceName,
+  public AggregatedHttpResponse getTraces(@Param("serviceName") Optional<String> serviceName,
       @Param("remoteServiceName") Optional<String> remoteServiceName,
       @Param("spanName") Optional<String> spanName,
       @Param("annotationQuery") Optional<String> annotationQuery,
@@ -227,27 +227,27 @@ public class KafkaStoreHttpService {
           Comparator.<List<Span>>comparingLong(o -> o.get(0).timestampAsLong()).reversed());
       LOG.debug("Traces found from query {}: {}", request, traces.size());
       int size = Math.min(request.limit(), traces.size());
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON, writeTraces(SpanBytesEncoder.JSON_V2, traces.subList(0, size)));
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, writeTraces(SpanBytesEncoder.JSON_V2, traces.subList(0, size)));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON, "[]");
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, "[]");
     }
   }
 
   @Get("/traces/:trace_id")
-  public HttpResponse getTrace(@Param("trace_id") String traceId) {
+  public AggregatedHttpResponse getTrace(@Param("trace_id") String traceId) {
     try {
       ReadOnlyKeyValueStore<String, List<Span>> store =
           storage.getTraceStoreStream()
               .store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       List<Span> spans = store.get(traceId);
-      return HttpResponse.of(
+      return AggregatedHttpResponse.of(
           HttpStatus.OK,
           MediaType.JSON,
           SpanBytesEncoder.JSON_V2.encodeList(spans));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return HttpResponse.of(
+      return AggregatedHttpResponse.of(
           HttpStatus.OK,
           MediaType.JSON,
           SpanBytesEncoder.JSON_V2.encodeList(new ArrayList<>()));
@@ -255,23 +255,23 @@ public class KafkaStoreHttpService {
   }
 
   @Get("/autocompleteTags")
-  public HttpResponse getAutocompleteTags() throws IOException {
+  public AggregatedHttpResponse getAutocompleteTags() throws IOException {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
           storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
               QueryableStoreTypes.keyValueStore());
       ArrayNode array = MAPPER.createArrayNode();
       autocompleteTagsStore.all().forEachRemaining(keyValue -> array.add(keyValue.key));
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON,
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
           EMPTY_ARRAY);
     }
   }
 
   @Get("/autocompleteTags/:key")
-  public HttpResponse getAutocompleteValues(@Param("key") String key) throws IOException {
+  public AggregatedHttpResponse getAutocompleteValues(@Param("key") String key) throws IOException {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
           storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
@@ -280,38 +280,38 @@ public class KafkaStoreHttpService {
       if (valuesSet == null) valuesSet = new HashSet<>();
       ArrayNode array = MAPPER.createArrayNode();
       valuesSet.forEach(array::add);
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return HttpResponse.of(HttpStatus.OK, MediaType.JSON,
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
           EMPTY_ARRAY);
     }
   }
 
   @Get("/instances/:store_name")
-  public HttpResponse getInstancesByStore(@Param("store_name") String storeName) {
+  public AggregatedHttpResponse getInstancesByStore(@Param("store_name") String storeName) {
     try {
-      return HttpResponse.of(
+      return AggregatedHttpResponse.of(
           HttpStatus.OK,
           MediaType.JSON,
           MAPPER.writeValueAsBytes(storage.getTraceStoreStream().allMetadataForStore(storeName)));
     } catch (JsonProcessingException e) {
       LOG.error("Error parsing instances info", e);
-      return HttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR, MediaType.PLAIN_TEXT_UTF_8,
+      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR, MediaType.PLAIN_TEXT_UTF_8,
           e.getMessage());
     }
   }
 
   @Get("/instances")
-  public HttpResponse getInstances() {
+  public AggregatedHttpResponse getInstances() {
     try {
-      return HttpResponse.of(
+      return AggregatedHttpResponse.of(
           HttpStatus.OK,
           MediaType.JSON,
           MAPPER.writeValueAsBytes(storage.getTraceStoreStream().allMetadata()));
     } catch (JsonProcessingException e) {
       LOG.error("Error parsing instances info", e);
-      return HttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR, MediaType.PLAIN_TEXT_UTF_8,
+      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR, MediaType.PLAIN_TEXT_UTF_8,
           e.getMessage());
     }
   }
