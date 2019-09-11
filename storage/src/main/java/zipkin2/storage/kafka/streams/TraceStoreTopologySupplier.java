@@ -83,36 +83,42 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   @Override public Topology get() {
     StreamsBuilder builder = new StreamsBuilder();
     builder
-        // Logging disabled to avoid long starting times
+        // Logging disabled to avoid long starting times, with logging disabled to process incoming
+        // spans since last restart
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(TRACES_STORE_NAME),
             Serdes.String(),
             spansSerde).withLoggingDisabled())
-        // Disabling logging to avoid long starting times
+        // Disabling logging to avoid long starting times, with logging disabled to process incoming
+        // spans since last restart
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(SPAN_IDS_BY_TS_STORE_NAME),
             Serdes.Long(),
             spanIdsSerde).withLoggingDisabled())
-        // In-memory as service names are bounded
+        // In-memory as service names are bounded, with logging enabled to build state
+        // with all values collected
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.inMemoryKeyValueStore(SERVICE_NAMES_STORE_NAME),
             Serdes.String(),
             Serdes.String()))
-        // In-memory as span names are bounded
+        // In-memory as span names are bounded, with logging enabled to build state
+        // with all values collected
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.inMemoryKeyValueStore(SPAN_NAMES_STORE_NAME),
             Serdes.String(),
             namesSerde))
-        // In-memory as remote-service names are bounded
+        // In-memory as remote-service names are bounded, with logging enabled to build state
+        // with all values collected
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.inMemoryKeyValueStore(REMOTE_SERVICE_NAMES_STORE_NAME),
             Serdes.String(),
             namesSerde))
-        // Persistent as values could be unbounded
+        // Persistent as values could be unbounded, but with logging enabled to build state
+        // with all values collected
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(AUTOCOMPLETE_TAGS_STORE_NAME),
             Serdes.String(),
-            namesSerde).withLoggingDisabled());
+            namesSerde));
     // Traces stream
     KStream<String, List<Span>> spansStream = builder
         .stream(spansTopicName, Consumed.with(Serdes.String(), spansSerde));
@@ -163,8 +169,11 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
         if (!spans.isEmpty()) {
           // Persist traces
           List<Span> currentSpans = tracesStore.get(traceId);
-          if (currentSpans == null) currentSpans = new ArrayList<>();
-          else brokenTracesTotal.increment();
+          if (currentSpans == null) {
+            currentSpans = new ArrayList<>();
+          } else {
+            brokenTracesTotal.increment();
+          }
           currentSpans.addAll(spans);
           tracesStore.put(traceId, currentSpans);
           // Persist timestamp indexed span ids
