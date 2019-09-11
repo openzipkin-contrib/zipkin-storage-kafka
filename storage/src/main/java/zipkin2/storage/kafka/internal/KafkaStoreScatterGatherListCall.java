@@ -13,9 +13,12 @@
  */
 package zipkin2.storage.kafka.internal;
 
+import com.linecorp.armeria.common.AggregatedHttpResponse;
+import com.linecorp.armeria.internal.shaded.futures.CompletableFutures;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import org.apache.kafka.streams.KafkaStreams;
 import zipkin2.Callback;
@@ -42,10 +45,15 @@ public abstract class KafkaStoreScatterGatherListCall<V> extends KafkaStoreListC
    * a scatter-gather/parallel call to all instances.
    */
   @Override protected List<V> doExecute() throws IOException {
-    return kafkaStreams.allMetadataForStore(storeName)
+    CompletableFuture<List<AggregatedHttpResponse>> futures =
+        CompletableFutures.allAsList(kafkaStreams.allMetadataForStore(storeName)
+            .parallelStream()
+            .map(this::httpClient)
+            .map(c -> c.get(httpPath).aggregate())
+            .collect(Collectors.toList()));
+    return futures.join()
         .parallelStream()
-        .map(this::httpClient)
-        .map(this::callHttpPath)
+        .map(this::content)
         .map(this::parseList)
         .flatMap(Collection::stream)
         .distinct()

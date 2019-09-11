@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
 import org.slf4j.Logger;
@@ -49,10 +50,7 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
 
   protected abstract V parse(JsonNode node);
 
-  String callHttpPath(HttpClient httpClient) {
-    AggregatedHttpResponse response = httpClient.get(httpPath)
-        .aggregate()
-        .join();
+  String content(AggregatedHttpResponse response) {
     if (!response.status().equals(HttpStatus.OK)) return null;
     return response.contentUtf8();
   }

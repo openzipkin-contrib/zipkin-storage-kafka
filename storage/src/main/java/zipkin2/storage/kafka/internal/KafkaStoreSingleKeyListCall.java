@@ -14,6 +14,8 @@
 package zipkin2.storage.kafka.internal;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.linecorp.armeria.client.HttpClient;
+import com.linecorp.armeria.common.AggregatedHttpResponse;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
@@ -40,9 +42,10 @@ public abstract class KafkaStoreSingleKeyListCall<V> extends KafkaStoreListCall<
    * where values are stored, avoiding scatter-gather/parallel calls.
    */
   @Override protected List<V> doExecute() throws IOException {
-    StreamsMetadata metadata =
-        kafkaStreams.metadataForKey(storeName, key, STRING_SERIALIZER);
-    String content = callHttpPath(httpClient(metadata));
+    StreamsMetadata metadata = kafkaStreams.metadataForKey(storeName, key, STRING_SERIALIZER);
+    HttpClient httpClient = httpClient(metadata);
+    AggregatedHttpResponse future = httpClient.get(httpPath).aggregate().join();
+    String content = content(future);
     List<V> values = parseList(content);
     return Collections.unmodifiableList(values);
   }
