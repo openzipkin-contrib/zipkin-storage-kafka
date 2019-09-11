@@ -15,9 +15,7 @@ package zipkin2.storage.kafka;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -28,11 +26,13 @@ import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.AggregateCall;
 import zipkin2.reporter.AwaitableCallback;
 import zipkin2.reporter.kafka.KafkaSender;
+import zipkin2.storage.GroupByTraceId;
 import zipkin2.storage.SpanConsumer;
 
 /**
- * Span Consumer to compensate current {@link KafkaSender} distribution of span batched without key.
- *
+ * Span Consumer to compensate current {@link KafkaSender} distribution of span batched without
+ * key.
+ * <p>
  * This component split batch into individual spans keyed by trace ID to enabled downstream
  * processing of spans as part of a trace.
  */
@@ -50,20 +50,14 @@ public class KafkaSpanConsumer implements SpanConsumer {
   @Override
   public Call<Void> accept(List<Span> spans) {
     if (spans.isEmpty()) return Call.create(null);
-    // Collect traceId:spans
-    Map<String, List<Span>> spansByTrace = new LinkedHashMap<>();
-    for (Span span : spans) {
-      String key = span.traceId();
-      List<Span> current = spansByTrace.get(key);
-      if (current == null) current = new ArrayList<>();
-      if (!current.contains(span)) current.add(span);
-      spansByTrace.put(key, current);
-    }
-    // Serialize spans by trace Id
+    List<List<Span>> groupedByTraceId = GroupByTraceId.create(true).map(spans);
     List<Call<Void>> calls = new ArrayList<>();
-    for (Map.Entry<String, List<Span>> grouped : spansByTrace.entrySet()) {
-      byte[] value = SpanBytesEncoder.PROTO3.encodeList(grouped.getValue());
-      calls.add(KafkaProducerCall.create(producer, spansTopicName, grouped.getKey(), value));
+    for (List<Span> grouped : groupedByTraceId) {
+      if (!grouped.isEmpty()) {
+        byte[] value = SpanBytesEncoder.PROTO3.encodeList(grouped);
+        String traceId = grouped.get(0).traceId();
+        calls.add(KafkaProducerCall.create(producer, spansTopicName, traceId, value));
+      }
     }
     return AggregateCall.newVoidCall(calls);
   }
