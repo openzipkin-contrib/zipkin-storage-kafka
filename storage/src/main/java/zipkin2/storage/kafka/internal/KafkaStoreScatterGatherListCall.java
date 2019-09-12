@@ -14,12 +14,13 @@
 package zipkin2.storage.kafka.internal;
 
 import com.linecorp.armeria.common.AggregatedHttpResponse;
-import com.linecorp.armeria.internal.shaded.futures.CompletableFutures;
+import com.linecorp.armeria.common.HttpStatus;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.kafka.streams.KafkaStreams;
 
 /**
@@ -39,19 +40,22 @@ public abstract class KafkaStoreScatterGatherListCall<V> extends KafkaStoreListC
   }
 
   protected CompletableFuture<List<V>> listFuture() {
-    CompletableFuture<List<AggregatedHttpResponse>> futures =
-        CompletableFutures.allAsList(kafkaStreams.allMetadataForStore(storeName)
-            .parallelStream()
+    List<CompletableFuture<AggregatedHttpResponse>> responseFutures =
+        kafkaStreams.allMetadataForStore(storeName)
+            .stream()
             .map(this::httpClient)
-            .map(c -> c.get(httpPath).aggregate())
-            .collect(Collectors.toList()));
-    return futures.thenApply(aggregatedHttpResponses ->
-        aggregatedHttpResponses
-            .parallelStream()
-            .map(this::content)
-            .map(this::parseList)
-            .flatMap(Collection::stream)
-            .distinct()
-            .collect(Collectors.toList()));
+            .map(c -> c.get(httpPath).aggregate()).collect(Collectors.toList());
+    CompletableFuture<AggregatedHttpResponse>[] futuresArray =
+        (CompletableFuture<AggregatedHttpResponse>[])
+            responseFutures.stream().toArray(CompletableFuture[]::new);
+    return CompletableFuture.allOf(futuresArray)
+        .thenApply(unused ->
+            responseFutures.stream()
+                .map(s -> s.getNow(AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR)))
+                .map(this::content)
+                .map(this::parseList)
+                .flatMap(Collection::stream)
+                .distinct()
+                .collect(Collectors.toList()));
   }
 }

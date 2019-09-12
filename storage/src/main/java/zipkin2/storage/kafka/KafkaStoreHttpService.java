@@ -227,8 +227,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
           checkpoint = checkpoint - bucket; // 1 min before more
         }
       }
-      traces.sort(
-          Comparator.<List<Span>>comparingLong(o -> o.get(0).timestampAsLong()).reversed());
+      traces.sort(Comparator.<List<Span>>comparingLong(o -> o.get(0).timestampAsLong()).reversed());
       LOG.debug("Traces found from query {}: {}", request, traces.size());
       List<List<Span>> result = traces.stream().limit(request.limit()).collect(Collectors.toList());
       return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
