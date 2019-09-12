@@ -14,9 +14,9 @@
 package zipkin2.storage.kafka.internal;
 
 import com.linecorp.armeria.client.HttpClient;
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
@@ -32,9 +32,13 @@ public abstract class KafkaStoreSingleKeyListCall<V> extends KafkaStoreListCall<
 
   final String key;
 
-  protected KafkaStoreSingleKeyListCall(KafkaStreams kafkaStreams, String storeName,
-      String httpContext, String key) {
-    super(kafkaStreams, storeName, httpContext);
+  protected KafkaStoreSingleKeyListCall(
+      KafkaStreams kafkaStreams,
+      String storeName,
+      BiFunction<String, Integer, String> httpBaseUrl,
+      String httpPath,
+      String key) {
+    super(kafkaStreams, storeName, httpBaseUrl, httpPath);
     this.key = key;
   }
 

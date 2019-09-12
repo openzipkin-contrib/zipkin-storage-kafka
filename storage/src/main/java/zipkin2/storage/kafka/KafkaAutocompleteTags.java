@@ -15,6 +15,7 @@ package zipkin2.storage.kafka;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
+import java.util.function.BiFunction;
 import org.apache.kafka.streams.KafkaStreams;
 import zipkin2.Call;
 import zipkin2.storage.AutocompleteTags;
@@ -33,26 +34,30 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPL
  */
 public class KafkaAutocompleteTags implements AutocompleteTags {
   final KafkaStreams traceStoreStream;
+  final BiFunction<String, Integer, String> httpBaseUrl;
 
   KafkaAutocompleteTags(KafkaStorage storage) {
     traceStoreStream = storage.getTraceStoreStream();
+    httpBaseUrl = storage.httpBaseUrl;
   }
 
   @Override public Call<List<String>> getKeys() {
-    return new GetTagKeysCall(traceStoreStream);
+    return new GetTagKeysCall(traceStoreStream, httpBaseUrl);
   }
 
   @Override public Call<List<String>> getValues(String key) {
-    return new GetTagValuesCall(traceStoreStream, key);
+    return new GetTagValuesCall(traceStoreStream, httpBaseUrl, key);
   }
 
   static class GetTagKeysCall extends KafkaStoreScatterGatherListCall<String> {
-
     final KafkaStreams traceStoreStream;
+    final BiFunction<String, Integer, String> httpBaseUrl;
 
-    GetTagKeysCall(KafkaStreams traceStoreStream) {
-      super(traceStoreStream, AUTOCOMPLETE_TAGS_STORE_NAME, "/autocompleteTags");
+    GetTagKeysCall(KafkaStreams traceStoreStream,
+        BiFunction<String, Integer, String> httpBaseUrl) {
+      super(traceStoreStream, AUTOCOMPLETE_TAGS_STORE_NAME, httpBaseUrl, "/autocompleteTags");
       this.traceStoreStream = traceStoreStream;
+      this.httpBaseUrl = httpBaseUrl;
     }
 
     @Override protected String parse(JsonNode node) {
@@ -60,23 +65,31 @@ public class KafkaAutocompleteTags implements AutocompleteTags {
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetTagKeysCall(traceStoreStream);
+      return new GetTagKeysCall(traceStoreStream, httpBaseUrl);
     }
   }
 
   static class GetTagValuesCall extends KafkaStoreSingleKeyListCall<String> {
     final KafkaStreams traceStoreStream;
+    final BiFunction<String, Integer, String> httpBaseUrl;
     final String tagKey;
 
-    GetTagValuesCall(KafkaStreams traceStoreStream, String tagKey) {
-      super(traceStoreStream, AUTOCOMPLETE_TAGS_STORE_NAME,
-          String.format("/autocompleteTags/%s", tagKey), tagKey);
+    GetTagValuesCall(KafkaStreams traceStoreStream,
+        BiFunction<String, Integer, String> httpBaseUrl,
+        String tagKey) {
+      super(
+          traceStoreStream,
+          AUTOCOMPLETE_TAGS_STORE_NAME,
+          httpBaseUrl,
+          "/autocompleteTags/" + tagKey,
+          tagKey);
       this.traceStoreStream = traceStoreStream;
+      this.httpBaseUrl = httpBaseUrl;
       this.tagKey = tagKey;
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetTagValuesCall(traceStoreStream, tagKey);
+      return new GetTagValuesCall(traceStoreStream, httpBaseUrl, tagKey);
     }
 
     @Override protected String parse(JsonNode node) {

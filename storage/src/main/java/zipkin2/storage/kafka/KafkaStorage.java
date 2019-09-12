@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -80,6 +81,7 @@ public class KafkaStorage extends StorageComponent {
   // Kafka Streams topology configs
   final Properties aggregationStreamConfig, traceStoreStreamConfig, dependencyStoreStreamConfig;
   final Topology aggregationTopology, traceStoreTopology, dependencyStoreTopology;
+  final BiFunction<String, Integer, String> httpBaseUrl;
   // Resources
   volatile AdminClient adminClient;
   volatile Producer<String, byte[]> producer;
@@ -101,6 +103,7 @@ public class KafkaStorage extends StorageComponent {
     this.storageDir = builder.storageDir;
     this.minTracesStored = builder.minTracesStored;
     this.httpPort = builder.httpPort;
+    this.httpBaseUrl = builder.httpBaseUrl;
     // Kafka Configs
     this.adminConfig = builder.adminConfig;
     this.producerConfig = builder.producerConfig;
@@ -353,6 +356,8 @@ public class KafkaStorage extends StorageComponent {
 
     long minTracesStored = 10_000;
     int httpPort = 9412;
+    BiFunction<String, Integer, String> httpBaseUrl =
+        (hostname, port) -> "http://" + hostname + ":" + port;
 
     String storageDir = "/tmp/zipkin-storage-kafka";
 

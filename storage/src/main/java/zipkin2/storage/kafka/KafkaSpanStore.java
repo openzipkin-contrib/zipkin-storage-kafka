@@ -16,6 +16,7 @@ package zipkin2.storage.kafka;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 import java.util.List;
+import java.util.function.BiFunction;
 import org.apache.kafka.streams.KafkaStreams;
 import zipkin2.Call;
 import zipkin2.Callback;
@@ -46,43 +47,48 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   // Kafka Streams Store provider
   final KafkaStreams traceStoreStream;
   final KafkaStreams dependencyStoreStream;
+  final BiFunction<String, Integer, String> httpBaseUrl;
 
   KafkaSpanStore(KafkaStorage storage) {
     traceStoreStream = storage.getTraceStoreStream();
     dependencyStoreStream = storage.getDependencyStoreStream();
+    httpBaseUrl = storage.httpBaseUrl;
   }
 
   @Override public Call<List<List<Span>>> getTraces(QueryRequest request) {
-    return new GetTracesCall(traceStoreStream, request);
+    return new GetTracesCall(traceStoreStream, httpBaseUrl, request);
   }
 
   @Override
   public Call<List<Span>> getTrace(String traceId) {
-    return new GetTraceCall(traceStoreStream, traceId);
+    return new GetTraceCall(traceStoreStream, httpBaseUrl, traceId);
   }
 
   @Deprecated @Override public Call<List<String>> getServiceNames() {
-    return new GetServiceNamesCall(traceStoreStream);
+    return new GetServiceNamesCall(traceStoreStream, httpBaseUrl);
   }
 
   @Deprecated @Override public Call<List<String>> getSpanNames(String serviceName) {
-    return new GetSpanNamesCall(traceStoreStream, serviceName);
+    return new GetSpanNamesCall(traceStoreStream, serviceName, httpBaseUrl);
   }
 
   @Override public Call<List<String>> getRemoteServiceNames(String serviceName) {
-    return new GetRemoteServiceNamesCall(traceStoreStream, serviceName);
+    return new GetRemoteServiceNamesCall(traceStoreStream, serviceName, httpBaseUrl);
   }
 
   @Override public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
-    return new GetDependenciesCall(dependencyStoreStream, endTs, lookback);
+    return new GetDependenciesCall(dependencyStoreStream, httpBaseUrl, endTs, lookback);
   }
 
   static class GetServiceNamesCall extends KafkaStoreScatterGatherListCall<String> {
     final KafkaStreams traceStoreStream;
+    final BiFunction<String, Integer, String> httpBaseUrl;
 
-    GetServiceNamesCall(KafkaStreams traceStoreStream) {
-      super(traceStoreStream, SERVICE_NAMES_STORE_NAME, "/serviceNames");
+    GetServiceNamesCall(KafkaStreams traceStoreStream,
+        BiFunction<String, Integer, String> httpBaseUrl) {
+      super(traceStoreStream, SERVICE_NAMES_STORE_NAME, httpBaseUrl, "/serviceNames");
       this.traceStoreStream = traceStoreStream;
+      this.httpBaseUrl = httpBaseUrl;
     }
 
     @Override protected String parse(JsonNode node) {
@@ -90,19 +96,22 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetServiceNamesCall(traceStoreStream);
+      return new GetServiceNamesCall(traceStoreStream, httpBaseUrl);
     }
   }
 
   static class GetSpanNamesCall extends KafkaStoreSingleKeyListCall<String> {
     final KafkaStreams traceStoreStream;
     final String serviceName;
+    final BiFunction<String, Integer, String> httpBaseUrl;
 
-    GetSpanNamesCall(KafkaStreams traceStoreStream, String serviceName) {
-      super(traceStoreStream, SPAN_NAMES_STORE_NAME,
-          String.format("/serviceNames/%s/spanNames", serviceName), serviceName);
+    GetSpanNamesCall(KafkaStreams traceStoreStream, String serviceName,
+        BiFunction<String, Integer, String> httpBaseUrl) {
+      super(traceStoreStream, SPAN_NAMES_STORE_NAME, httpBaseUrl,
+          "/serviceNames/" + serviceName + "/spanNames", serviceName);
       this.traceStoreStream = traceStoreStream;
       this.serviceName = serviceName;
+      this.httpBaseUrl = httpBaseUrl;
     }
 
     @Override protected String parse(JsonNode node) {
@@ -118,19 +127,22 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetSpanNamesCall(traceStoreStream, serviceName);
+      return new GetSpanNamesCall(traceStoreStream, serviceName, httpBaseUrl);
     }
   }
 
   static class GetRemoteServiceNamesCall extends KafkaStoreSingleKeyListCall<String> {
     final KafkaStreams traceStoreStream;
     final String serviceName;
+    final BiFunction<String, Integer, String> httpBaseUrl;
 
-    GetRemoteServiceNamesCall(KafkaStreams traceStoreStream, String serviceName) {
-      super(traceStoreStream, REMOTE_SERVICE_NAMES_STORE_NAME,
-          String.format("/serviceNames/%s/remoteServiceNames", serviceName), serviceName);
+    GetRemoteServiceNamesCall(KafkaStreams traceStoreStream, String serviceName,
+        BiFunction<String, Integer, String> httpBaseUrl) {
+      super(traceStoreStream, REMOTE_SERVICE_NAMES_STORE_NAME, httpBaseUrl,
+          "/serviceNames/" + serviceName + "/remoteServiceNames", serviceName);
       this.traceStoreStream = traceStoreStream;
       this.serviceName = serviceName;
+      this.httpBaseUrl = httpBaseUrl;
     }
 
     @Override protected String parse(JsonNode node) {
@@ -138,28 +150,33 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetRemoteServiceNamesCall(traceStoreStream, serviceName);
+      return new GetRemoteServiceNamesCall(traceStoreStream, serviceName, httpBaseUrl);
     }
   }
 
   static class GetTracesCall extends KafkaStoreScatterGatherListCall<List<Span>> {
     final KafkaStreams traceStoreStream;
+    final BiFunction<String, Integer, String> httpBaseUrl;
     final QueryRequest request;
 
-    GetTracesCall(KafkaStreams traceStoreStream, QueryRequest request) {
-      super(traceStoreStream, TRACES_STORE_NAME, String.format("/traces?%s%s%s%s%s%s%s%s%s",
-          request.serviceName() == null ? "" : "serviceName=" + request.serviceName() + "&",
-          request.remoteServiceName() == null ? ""
-              : "remoteServiceName=" + request.remoteServiceName() + "&",
-          request.spanName() == null ? "" : "spanName=" + request.spanName() + "&",
-          request.annotationQueryString() == null ? ""
-              : "annotationQuery=" + request.annotationQueryString() + "&",
-          request.minDuration() == null ? "" : "minDuration=" + request.minDuration() + "&",
-          request.maxDuration() == null ? "" : "maxDuration=" + request.maxDuration() + "&",
-          "endTs=" + request.endTs() + "&",
-          "lookback=" + request.lookback() + "&",
-          "limit=" + request.limit()));
+    GetTracesCall(KafkaStreams traceStoreStream,
+        BiFunction<String, Integer, String> httpBaseUrl,
+        QueryRequest request) {
+      super(traceStoreStream, TRACES_STORE_NAME, httpBaseUrl,
+          ("/traces?"
+              + (request.serviceName() == null ? "" : "serviceName=" + request.serviceName() + "&")
+              + (request.remoteServiceName() == null ? ""
+              : "remoteServiceName=" + request.remoteServiceName() + "&")
+              + (request.spanName() == null ? "" : "spanName=" + request.spanName() + "&")
+              + (request.annotationQueryString() == null ? ""
+              : "annotationQuery=" + request.annotationQueryString() + "&")
+              + (request.minDuration() == null ? "" : "minDuration=" + request.minDuration() + "&")
+              + (request.maxDuration() == null ? "" : "maxDuration=" + request.maxDuration() + "&")
+              + ("endTs=" + request.endTs() + "&")
+              + ("lookback=" + request.lookback() + "&")
+              + ("limit=" + request.limit())));
       this.traceStoreStream = traceStoreStream;
+      this.httpBaseUrl = httpBaseUrl;
       this.request = request;
     }
 
@@ -176,17 +193,22 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<List<Span>>> clone() {
-      return new GetTracesCall(traceStoreStream, request);
+      return new GetTracesCall(traceStoreStream, httpBaseUrl, request);
     }
   }
 
   static class GetTraceCall extends KafkaStoreSingleKeyListCall<Span> {
     final KafkaStreams traceStoreStream;
+    final BiFunction<String, Integer, String> httpBaseUrl;
     final String traceId;
 
-    GetTraceCall(KafkaStreams traceStoreStream, String traceId) {
-      super(traceStoreStream, TRACES_STORE_NAME, String.format("/traces/%s", traceId), traceId);
+    GetTraceCall(KafkaStreams traceStoreStream,
+        BiFunction<String, Integer, String> httpBaseUrl,
+        String traceId) {
+      super(traceStoreStream, TRACES_STORE_NAME, httpBaseUrl, String.format("/traces/%s", traceId),
+          traceId);
       this.traceStoreStream = traceStoreStream;
+      this.httpBaseUrl = httpBaseUrl;
       this.traceId = traceId;
     }
 
@@ -195,18 +217,22 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<Span>> clone() {
-      return new GetTraceCall(traceStoreStream, traceId);
+      return new GetTraceCall(traceStoreStream, httpBaseUrl, traceId);
     }
   }
 
   static class GetDependenciesCall extends KafkaStoreScatterGatherListCall<DependencyLink> {
     final KafkaStreams dependencyStoreStream;
+    final BiFunction<String, Integer, String> httpBaseUrl;
     final long endTs, lookback;
 
-    GetDependenciesCall(KafkaStreams dependencyStoreStream, long endTs, long lookback) {
+    GetDependenciesCall(KafkaStreams dependencyStoreStream,
+        BiFunction<String, Integer, String> httpBaseUrl,
+        long endTs, long lookback) {
       super(dependencyStoreStream, DEPENDENCIES_STORE_NAME,
-          String.format("/dependencies?endTs=%s&lookback=%s", endTs, lookback));
+          httpBaseUrl, "/dependencies?endTs=" + endTs + "&lookback=" + lookback);
       this.dependencyStoreStream = dependencyStoreStream;
+      this.httpBaseUrl = httpBaseUrl;
       this.endTs = endTs;
       this.lookback = lookback;
     }
@@ -216,7 +242,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
 
     @Override public Call<List<DependencyLink>> clone() {
-      return new GetDependenciesCall(dependencyStoreStream, endTs, lookback);
+      return new GetDependenciesCall(dependencyStoreStream, httpBaseUrl, endTs, lookback);
     }
   }
 }

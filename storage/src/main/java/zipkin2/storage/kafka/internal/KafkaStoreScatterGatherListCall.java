@@ -15,10 +15,10 @@ package zipkin2.storage.kafka.internal;
 
 import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.internal.shaded.futures.CompletableFutures;
-import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import org.apache.kafka.streams.KafkaStreams;
 
@@ -29,18 +29,13 @@ import org.apache.kafka.streams.KafkaStreams;
  * scatter-gather/parallel call to all instances.
  */
 public abstract class KafkaStoreScatterGatherListCall<V> extends KafkaStoreListCall<V> {
-  final KafkaStreams kafkaStreams;
-  final String storeName;
-  final String httpPath;
 
   protected KafkaStoreScatterGatherListCall(
       KafkaStreams kafkaStreams,
       String storeName,
+      BiFunction<String, Integer, String> httpBaseUrl,
       String httpPath) {
-    super(kafkaStreams, storeName, httpPath);
-    this.kafkaStreams = kafkaStreams;
-    this.storeName = storeName;
-    this.httpPath = httpPath;
+    super(kafkaStreams, storeName, httpBaseUrl, httpPath);
   }
 
   protected CompletableFuture<List<V>> listFuture() {

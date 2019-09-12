@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
+import java.util.function.BiFunction;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
 import org.slf4j.Logger;
@@ -35,16 +35,21 @@ import zipkin2.storage.kafka.KafkaAutocompleteTags;
 
 public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
   static final Logger LOG = LoggerFactory.getLogger(KafkaAutocompleteTags.class);
-  static final String HTTP_BASE_URL = "http://%s:%d";
   static final ObjectMapper MAPPER = new ObjectMapper();
 
   final KafkaStreams kafkaStreams;
   final String storeName;
+  final BiFunction<String, Integer, String> httpBaseUrl;
   final String httpPath;
 
-  KafkaStoreListCall(KafkaStreams kafkaStreams, String storeName, String httpPath) {
+  KafkaStoreListCall(
+      KafkaStreams kafkaStreams,
+      String storeName,
+      BiFunction<String, Integer, String> httpBaseUrl,
+      String httpPath) {
     this.kafkaStreams = kafkaStreams;
     this.storeName = storeName;
+    this.httpBaseUrl = httpBaseUrl;
     this.httpPath = httpPath;
   }
 
@@ -69,13 +74,13 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
   }
 
   HttpClient httpClient(StreamsMetadata metadata) {
-    return HttpClient.of(
-        String.format(HTTP_BASE_URL, metadata.hostInfo().host(), metadata.hostInfo().port()));
+    return HttpClient.of(httpBaseUrl.apply(metadata.hostInfo().host(), metadata.hostInfo().port()));
   }
 
   @Override protected List<V> doExecute() throws IOException {
     return listFuture().join();
   }
+
   @Override protected void doEnqueue(Callback<List<V>> callback) {
     listFuture().handle((response, t) -> {
       if (t != null) {
