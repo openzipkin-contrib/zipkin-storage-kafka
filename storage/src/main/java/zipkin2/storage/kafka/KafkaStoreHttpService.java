@@ -25,6 +25,7 @@ import com.linecorp.armeria.server.annotation.Get;
 import com.linecorp.armeria.server.annotation.Param;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -68,7 +69,6 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
 public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   static final Logger LOG = LoggerFactory.getLogger(KafkaStoreHttpService.class);
   static final ObjectMapper MAPPER = new ObjectMapper();
-  static final String EMPTY_ARRAY = "[]";
 
   final KafkaStorage storage;
   final long minTracesStored;
@@ -106,7 +106,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       return AggregatedHttpResponse.of(
           HttpStatus.OK,
           MediaType.JSON,
-          DependencyLinkBytesEncoder.JSON_V1.encodeList(new ArrayList<>()));
+          DependencyLinkBytesEncoder.JSON_V1.encodeList(Collections.emptyList()));
     }
   }
 
@@ -119,10 +119,14 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       //Set<String> names = new HashSet<>();
       ArrayNode array = MAPPER.createArrayNode();
       store.all().forEachRemaining(keyValue -> array.add(keyValue.value));
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
+          MAPPER.writeValueAsBytes(array));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, EMPTY_ARRAY);
+      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
+    } catch (JsonProcessingException e) {
+      LOG.error("Error parsing json", e);
+      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -135,10 +139,14 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
       names.forEach(array::add);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
+          MAPPER.writeValueAsBytes(array));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, EMPTY_ARRAY);
+      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
+    } catch (JsonProcessingException e) {
+      LOG.error("Error parsing json", e);
+      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -151,10 +159,14 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
       names.forEach(array::add);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
+          MAPPER.writeValueAsBytes(array));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, EMPTY_ARRAY);
+      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
+    } catch (JsonProcessingException e) {
+      LOG.error("Error parsing json", e);
+      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -215,7 +227,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
           writeTraces(SpanBytesEncoder.JSON_V2, result));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, "[]");
+      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
     }
   }
 
@@ -251,10 +263,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
           SpanBytesEncoder.JSON_V2.encodeList(spans));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(
-          HttpStatus.OK,
-          MediaType.JSON,
-          SpanBytesEncoder.JSON_V2.encodeList(new ArrayList<>()));
+      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
     }
   }
 
@@ -266,11 +275,14 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
               QueryableStoreTypes.keyValueStore());
       ArrayNode array = MAPPER.createArrayNode();
       autocompleteTagsStore.all().forEachRemaining(keyValue -> array.add(keyValue.key));
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
+          MAPPER.writeValueAsBytes(array));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
-          EMPTY_ARRAY);
+      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
+    } catch (JsonProcessingException e) {
+      LOG.error("Error parsing json", e);
+      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -284,11 +296,14 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       if (valuesSet == null) valuesSet = new HashSet<>();
       ArrayNode array = MAPPER.createArrayNode();
       valuesSet.forEach(array::add);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, array.toString());
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
+          MAPPER.writeValueAsBytes(array));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
-          EMPTY_ARRAY);
+      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
+    } catch (JsonProcessingException e) {
+      LOG.error("Error parsing json", e);
+      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 

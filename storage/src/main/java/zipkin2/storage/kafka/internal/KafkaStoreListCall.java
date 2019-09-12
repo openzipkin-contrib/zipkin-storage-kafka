@@ -13,6 +13,7 @@
  */
 package zipkin2.storage.kafka.internal;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -97,7 +98,7 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
     });
   }
 
-  protected abstract V parse(JsonNode node);
+  protected abstract V parse(JsonNode node) throws JsonProcessingException;
 
   protected abstract CompletableFuture<List<V>> listFuture();
 }

@@ -13,7 +13,9 @@
  */
 package zipkin2.storage.kafka;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -44,6 +46,7 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
  * {@link  KafkaStoreHttpService}.
  */
 public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
+  static final ObjectMapper MAPPER = new ObjectMapper();
   // Kafka Streams Store provider
   final KafkaStreams traceStoreStream;
   final KafkaStreams dependencyStoreStream;
@@ -180,8 +183,8 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       this.request = request;
     }
 
-    @Override protected List<Span> parse(JsonNode node) {
-      return SpanBytesDecoder.JSON_V2.decodeList(node.toString().getBytes());
+    @Override protected List<Span> parse(JsonNode node) throws JsonProcessingException {
+      return SpanBytesDecoder.JSON_V2.decodeList(MAPPER.writeValueAsBytes(node));
     }
 
     @Override protected void doEnqueue(Callback<List<List<Span>>> callback) {
@@ -212,8 +215,8 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       this.traceId = traceId;
     }
 
-    @Override protected Span parse(JsonNode node) {
-      return SpanBytesDecoder.JSON_V2.decodeOne(node.toString().getBytes());
+    @Override protected Span parse(JsonNode node) throws JsonProcessingException {
+      return SpanBytesDecoder.JSON_V2.decodeOne(MAPPER.writeValueAsBytes(node));
     }
 
     @Override public Call<List<Span>> clone() {
@@ -237,8 +240,8 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       this.lookback = lookback;
     }
 
-    @Override protected DependencyLink parse(JsonNode node) {
-      return DependencyLinkBytesDecoder.JSON_V1.decodeOne(node.toString().getBytes());
+    @Override protected DependencyLink parse(JsonNode node) throws JsonProcessingException {
+      return DependencyLinkBytesDecoder.JSON_V1.decodeOne(MAPPER.writeValueAsBytes(node));
     }
 
     @Override public Call<List<DependencyLink>> clone() {
