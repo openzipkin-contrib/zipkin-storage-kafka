@@ -47,6 +47,8 @@ import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.DependencyLinker;
 import zipkin2.storage.QueryRequest;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
@@ -186,10 +188,9 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
               QueryableStoreTypes.keyValueStore());
       List<List<Span>> traces = new ArrayList<>();
       List<String> traceIds = new ArrayList<>();
-      // milliseconds to microseconds
-      long from = (request.endTs() - request.lookback()) * 1000;
-      long to = request.endTs() * 1000;
-      int bucket = 30 * 1000 * 1000;
+      long from = MILLISECONDS.toMicros(request.endTs() - request.lookback());
+      long to = MILLISECONDS.toMicros(request.endTs());
+      long bucket = SECONDS.toMicros(30);
       long checkpoint = to - bucket; // 30 sec before upper bound
       if (checkpoint <= from
           || tracesStore.approximateNumEntries() <= minTracesStored) { // do one run

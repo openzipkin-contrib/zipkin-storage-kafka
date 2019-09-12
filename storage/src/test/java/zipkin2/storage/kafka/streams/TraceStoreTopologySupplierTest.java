@@ -33,6 +33,7 @@ import zipkin2.Endpoint;
 import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -116,7 +117,9 @@ class TraceStoreTopologySupplierTest {
     // When: clock moves forward
     Span d = Span.newBuilder()
         .traceId("d").id("d")
-        .timestamp(traceTtlCheckInterval.toMillis() * 1000 + 20000L)
+        .timestamp(
+            MILLISECONDS.toMicros(traceTtlCheckInterval.toMillis()) +
+                MILLISECONDS.toMicros(20))
         .build();
     testDriver.pipeInput(
         factory.create(spansTopicName, d.traceId(), Collections.singletonList(d),

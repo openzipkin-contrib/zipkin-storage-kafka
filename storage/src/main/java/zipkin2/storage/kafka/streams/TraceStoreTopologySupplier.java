@@ -41,6 +41,8 @@ import zipkin2.storage.kafka.streams.serdes.NamesSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanIdsSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
 /**
  * Storage of Traces, Service names and Autocomplete Tags.
  */
@@ -143,13 +145,11 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
             timestamp -> {
               if (traceTtl.toMillis() > 0 &&
                   tracesStore.approximateNumEntries() > minTracesStored) {
-                // preparing range filtering
+                // query traceIds active during period
                 long from = 0L;
                 long to = timestamp - traceTtl.toMillis();
-                long toMicro = to * 1000;
-                // query traceIds active during period
                 try (final KeyValueIterator<Long, Set<String>> range =
-                         spanIdsByTsStore.range(from, toMicro)) {
+                         spanIdsByTsStore.range(from, MILLISECONDS.toMicros(to))) {
                   range.forEachRemaining(record -> {
                     spanIdsByTsStore.delete(record.key); // clean timestamp index
                     for (String traceId : record.value) {

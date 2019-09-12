@@ -48,6 +48,7 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -116,11 +117,11 @@ class KafkaStorageIT {
     // Given: a set of incoming spans
     Span parent = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-        .timestamp(System.currentTimeMillis() * 1000).duration(10)
+        .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(10)
         .build();
     Span child = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(System.currentTimeMillis() * 1000).duration(2)
+        .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(2)
         .build();
     final SpanConsumer spanConsumer = storage.spanConsumer();
     // When: are consumed by storage
@@ -134,7 +135,7 @@ class KafkaStorageIT {
     // Given: another span to move 'event time' forward
     Span another = Span.newBuilder().traceId("c").id("d").name("op_a").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(System.currentTimeMillis() * 1000).duration(2)
+        .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(2)
         .build();
     // When: published
     spanConsumer.accept(Collections.singletonList(another)).execute();
@@ -154,15 +155,15 @@ class KafkaStorageIT {
     Span parent = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
         .remoteEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(TODAY * 1000).duration(10)
+        .timestamp(MILLISECONDS.toMicros(TODAY)).duration(10)
         .build();
     Span child = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(TODAY * 1000).duration(2)
+        .timestamp(MILLISECONDS.toMicros(TODAY)).duration(2)
         .build();
     Span other = Span.newBuilder().traceId("c").id("c").name("op_c").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_c").build())
-        .timestamp(TODAY * 1000 + 10).duration(8)
+        .timestamp(MILLISECONDS.toMicros(TODAY) + 10).duration(8)
         .build();
     List<Span> spans = Arrays.asList(parent, child);
     // When: and stores running
