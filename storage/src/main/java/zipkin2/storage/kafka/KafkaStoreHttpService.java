@@ -23,7 +23,6 @@ import com.linecorp.armeria.server.ServerBuilder;
 import com.linecorp.armeria.server.annotation.Default;
 import com.linecorp.armeria.server.annotation.Get;
 import com.linecorp.armeria.server.annotation.Param;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -79,6 +78,10 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
     this.minTracesStored = storage.minTracesStored;
   }
 
+  @Override public void accept(ServerBuilder serverBuilder) {
+    serverBuilder.annotatedService("/zipkin/storage/kafka", this);
+  }
+
   @Get("/dependencies")
   public AggregatedHttpResponse getDependencies(
       @Param("endTs") long endTs,
@@ -108,7 +111,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   }
 
   @Get("/serviceNames")
-  public AggregatedHttpResponse getServiceNames() throws IOException {
+  public AggregatedHttpResponse getServiceNames() {
     try {
       ReadOnlyKeyValueStore<String, String> store =
           storage.getTraceStoreStream()
@@ -124,8 +127,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   }
 
   @Get("/serviceNames/:service_name/spanNames")
-  public AggregatedHttpResponse getSpanNames(@Param("service_name") String serviceName)
-      throws IOException {
+  public AggregatedHttpResponse getSpanNames(@Param("service_name") String serviceName) {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> store =
           storage.getTraceStoreStream()
@@ -141,8 +143,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   }
 
   @Get("/serviceNames/:service_name/remoteServiceNames")
-  public AggregatedHttpResponse getRemoteServiceNames(@Param("service_name") String serviceName)
-      throws IOException {
+  public AggregatedHttpResponse getRemoteServiceNames(@Param("service_name") String serviceName) {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> store =
           storage.getTraceStoreStream().store(REMOTE_SERVICE_NAMES_STORE_NAME,
@@ -166,7 +167,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       @Param("maxDuration") Optional<Long> maxDuration,
       @Param("endTs") Optional<Long> endTs,
       @Default("86400000") @Param("lookback") Long lookback,
-      @Default("10") @Param("limit") int limit) throws IOException {
+      @Default("10") @Param("limit") int limit) {
     try {
       QueryRequest request =
           QueryRequest.newBuilder()
@@ -192,36 +193,16 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       long to = MILLISECONDS.toMicros(request.endTs());
       long bucket = SECONDS.toMicros(30);
       long checkpoint = to - bucket; // 30 sec before upper bound
-      if (checkpoint <= from
-          || tracesStore.approximateNumEntries() <= minTracesStored) { // do one run
+      if (checkpoint <= from ||
+          tracesStore.approximateNumEntries() <= minTracesStored) { // do one run
         try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(from, to)) {
-          spanIds.forEachRemaining(keyValue -> {
-            for (String traceId : keyValue.value) {
-              if (!traceIds.contains(traceId)) {
-                List<Span> spans = tracesStore.get(traceId);
-                if (spans != null && request.test(spans)) { // apply filters
-                  traceIds.add(traceId); // adding to check if we have already add it later
-                  traces.add(spans);
-                }
-              }
-            }
-          });
+          addResults(request, tracesStore, traces, traceIds, spanIds);
         }
       } else {
         while (checkpoint > from && traces.size() < request.limit()) {
-          try (KeyValueIterator<Long, Set<String>> spanIds = traceIdsByTsStore.range(checkpoint,
-              to)) {
-            spanIds.forEachRemaining(keyValue -> {
-              for (String traceId : keyValue.value) {
-                if (!traceIds.contains(traceId)) {
-                  List<Span> spans = tracesStore.get(traceId);
-                  if (spans != null && request.test(spans)) { // apply filters
-                    traceIds.add(traceId); // adding to check if we have already add it later
-                    traces.add(spans);
-                  }
-                }
-              }
-            });
+          try (KeyValueIterator<Long, Set<String>> spanIds =
+                   traceIdsByTsStore.range(checkpoint, to)) {
+            addResults(request, tracesStore, traces, traceIds, spanIds);
           }
           to = checkpoint;
           checkpoint = checkpoint - bucket; // 1 min before more
@@ -236,6 +217,25 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       LOG.warn("State store is not ready", e);
       return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, "[]");
     }
+  }
+
+  void addResults(
+      QueryRequest request,
+      ReadOnlyKeyValueStore<String, List<Span>> tracesStore,
+      List<List<Span>> traces,
+      List<String> traceIds,
+      KeyValueIterator<Long, Set<String>> spanIds) {
+    spanIds.forEachRemaining(keyValue -> {
+      for (String traceId : keyValue.value) {
+        if (!traceIds.contains(traceId)) {
+          List<Span> spans = tracesStore.get(traceId);
+          if (spans != null && !spans.isEmpty() && request.test(spans)) { // apply filters
+            traceIds.add(traceId); // adding to check if we have already add it later
+            traces.add(spans);
+          }
+        }
+      }
+    });
   }
 
   @Get("/traces/:trace_id")
@@ -259,7 +259,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   }
 
   @Get("/autocompleteTags")
-  public AggregatedHttpResponse getAutocompleteTags() throws IOException {
+  public AggregatedHttpResponse getAutocompleteTags() {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
           storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
@@ -275,7 +275,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   }
 
   @Get("/autocompleteTags/:key")
-  public AggregatedHttpResponse getAutocompleteValues(@Param("key") String key) throws IOException {
+  public AggregatedHttpResponse getAutocompleteValues(@Param("key") String key) {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
           storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
@@ -346,9 +346,5 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
     }
     out[pos] = ']'; // stop list of traces
     return out;
-  }
-
-  @Override public void accept(ServerBuilder serverBuilder) {
-    serverBuilder.annotatedService("/storage-kafka", this);
   }
 }
