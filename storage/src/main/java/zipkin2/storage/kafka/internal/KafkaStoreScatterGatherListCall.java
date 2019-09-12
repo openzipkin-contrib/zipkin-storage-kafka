@@ -45,10 +45,7 @@ public abstract class KafkaStoreScatterGatherListCall<V> extends KafkaStoreListC
             .stream()
             .map(this::httpClient)
             .map(c -> c.get(httpPath).aggregate()).collect(Collectors.toList());
-    CompletableFuture<AggregatedHttpResponse>[] futuresArray =
-        (CompletableFuture<AggregatedHttpResponse>[])
-            responseFutures.stream().toArray(CompletableFuture[]::new);
-    return CompletableFuture.allOf(futuresArray)
+    return CompletableFuture.allOf(responseFutures.stream().toArray(CompletableFuture[]::new))
         .thenApply(unused ->
             responseFutures.stream()
                 .map(s -> s.getNow(AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR)))
