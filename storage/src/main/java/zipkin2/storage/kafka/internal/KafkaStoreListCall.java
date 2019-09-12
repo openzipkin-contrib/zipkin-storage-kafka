@@ -23,12 +23,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
+import zipkin2.Callback;
 import zipkin2.storage.kafka.KafkaAutocompleteTags;
 
 public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
@@ -61,8 +62,6 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
     }
   }
 
-  protected abstract V parse(JsonNode node);
-
   String content(AggregatedHttpResponse response) {
     if (!response.status().equals(HttpStatus.OK)) return null;
     return response.contentUtf8();
@@ -72,4 +71,24 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
     return HttpClient.of(
         String.format(HTTP_BASE_URL, metadata.hostInfo().host(), metadata.hostInfo().port()));
   }
+
+  @Override protected void doEnqueue(Callback<List<V>> callback) {
+    listFuture().handle((response, t) -> {
+      if (t != null) {
+        callback.onError(t);
+      } else {
+        try {
+          callback.onSuccess(response);
+        } catch (Throwable t1) {
+          propagateIfFatal(t1);
+          callback.onError(t1);
+        }
+      }
+      return null;
+    });
+  }
+
+  protected abstract V parse(JsonNode node);
+
+  protected abstract CompletionStage<List<V>> listFuture();
 }

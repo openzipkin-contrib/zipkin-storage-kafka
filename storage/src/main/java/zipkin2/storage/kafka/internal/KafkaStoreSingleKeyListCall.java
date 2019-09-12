@@ -13,16 +13,14 @@
  */
 package zipkin2.storage.kafka.internal;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.linecorp.armeria.client.HttpClient;
-import com.linecorp.armeria.common.AggregatedHttpResponse;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
-import zipkin2.Callback;
 
 public abstract class KafkaStoreSingleKeyListCall<V> extends KafkaStoreListCall<V> {
   static final StringSerializer STRING_SERIALIZER = new StringSerializer();
@@ -44,19 +42,12 @@ public abstract class KafkaStoreSingleKeyListCall<V> extends KafkaStoreListCall<
   @Override protected List<V> doExecute() throws IOException {
     StreamsMetadata metadata = kafkaStreams.metadataForKey(storeName, key, STRING_SERIALIZER);
     HttpClient httpClient = httpClient(metadata);
-    AggregatedHttpResponse future = httpClient.get(httpPath).aggregate().join();
-    String content = content(future);
-    List<V> values = parseList(content);
-    return Collections.unmodifiableList(values);
-  }
-
-  protected abstract V parse(JsonNode node);
-
-  @Override protected void doEnqueue(Callback<List<V>> callback) {
-    try {
-      callback.onSuccess(doExecute());
-    } catch (IOException e) {
-      callback.onError(e);
-    }
+    CompletableFuture<List<V>> aggregateFuture = httpClient.get(httpPath)
+        .aggregate()
+        .thenApply(response -> {
+          String content = content(response);
+          return parseList(content);
+        });
+    return Collections.unmodifiableList(aggregateFuture.join());
   }
 }
