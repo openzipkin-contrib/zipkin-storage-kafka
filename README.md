@@ -8,7 +8,7 @@ Kafka-based storage for Zipkin.
 
 ```
                     +----------------------------*zipkin*----------------------------------------------
-                    |                                        [ dependency-store ]--->( dependencies   )
+                    |                                     [ dependency-store ]--->( dependencies      )
                     |                                                  ^      +-->( autocomplete-tags )
 ( collected-spans )-|->[ span-consumer ]  [ aggregation ]    [ trace-store ]--+-->( traces            )
   via http, kafka,  |       |                    ^    |         ^      |      +-->( service-names     )
