@@ -22,6 +22,12 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import org.apache.kafka.streams.KafkaStreams;
 
+/**
+ * Search for all instances containing key/value pairs and aggregate results.
+ * <p>
+ * Given that we need to collect all values and those might be spread on different instances we do a
+ * scatter-gather/parallel call to all instances.
+ */
 public abstract class KafkaStoreScatterGatherListCall<V> extends KafkaStoreListCall<V> {
   final KafkaStreams kafkaStreams;
   final String storeName;
@@ -35,16 +41,6 @@ public abstract class KafkaStoreScatterGatherListCall<V> extends KafkaStoreListC
     this.kafkaStreams = kafkaStreams;
     this.storeName = storeName;
     this.httpPath = httpPath;
-  }
-
-  /**
-   * Search for all instances containing key/value pairs and aggregate results.
-   * <p>
-   * Given that we need to collect all values and those might be spread on different instances we do
-   * a scatter-gather/parallel call to all instances.
-   */
-  @Override protected List<V> doExecute() throws IOException {
-    return listFuture().join();
   }
 
   protected CompletableFuture<List<V>> listFuture() {

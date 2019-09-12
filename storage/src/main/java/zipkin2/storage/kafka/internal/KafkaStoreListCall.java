@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
@@ -58,7 +59,7 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
       return Collections.unmodifiableList(values);
     } catch (IOException e) {
       LOG.error("Error reading json response", e);
-      return Collections.<V>emptyList();
+      return Collections.emptyList();
     }
   }
 
@@ -72,6 +73,9 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
         String.format(HTTP_BASE_URL, metadata.hostInfo().host(), metadata.hostInfo().port()));
   }
 
+  @Override protected List<V> doExecute() throws IOException {
+    return listFuture().join();
+  }
   @Override protected void doEnqueue(Callback<List<V>> callback) {
     listFuture().handle((response, t) -> {
       if (t != null) {
@@ -90,5 +94,5 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
 
   protected abstract V parse(JsonNode node);
 
-  protected abstract CompletionStage<List<V>> listFuture();
+  protected abstract CompletableFuture<List<V>> listFuture();
 }

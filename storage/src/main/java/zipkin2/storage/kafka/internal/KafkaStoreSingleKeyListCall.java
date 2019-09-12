@@ -15,13 +15,18 @@ package zipkin2.storage.kafka.internal;
 
 import com.linecorp.armeria.client.HttpClient;
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
 
+/**
+ * Search for store by key and get values.
+ * <p>
+ * Given that key/value pair is based on tag's key and values, we can get the specific instance
+ * where values are stored, avoiding scatter-gather/parallel calls.
+ */
 public abstract class KafkaStoreSingleKeyListCall<V> extends KafkaStoreListCall<V> {
   static final StringSerializer STRING_SERIALIZER = new StringSerializer();
 
@@ -33,21 +38,14 @@ public abstract class KafkaStoreSingleKeyListCall<V> extends KafkaStoreListCall<
     this.key = key;
   }
 
-  /**
-   * Search for store by key and get values.
-   * <p>
-   * Given that key/value pair is based on tag's key and values, we can get the specific instance
-   * where values are stored, avoiding scatter-gather/parallel calls.
-   */
-  @Override protected List<V> doExecute() throws IOException {
+  @Override protected CompletableFuture<List<V>> listFuture() {
     StreamsMetadata metadata = kafkaStreams.metadataForKey(storeName, key, STRING_SERIALIZER);
     HttpClient httpClient = httpClient(metadata);
-    CompletableFuture<List<V>> aggregateFuture = httpClient.get(httpPath)
+    return httpClient.get(httpPath)
         .aggregate()
         .thenApply(response -> {
           String content = content(response);
           return parseList(content);
         });
-    return Collections.unmodifiableList(aggregateFuture.join());
   }
 }
