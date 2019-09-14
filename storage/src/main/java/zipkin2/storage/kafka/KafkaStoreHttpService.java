@@ -13,7 +13,7 @@
  */
 package zipkin2.storage.kafka;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.linecorp.armeria.common.AggregatedHttpResponse;
@@ -23,9 +23,10 @@ import com.linecorp.armeria.server.ServerBuilder;
 import com.linecorp.armeria.server.annotation.Default;
 import com.linecorp.armeria.server.annotation.Get;
 import com.linecorp.armeria.server.annotation.Param;
+import com.linecorp.armeria.server.annotation.ProducesJson;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -38,6 +39,7 @@ import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.apache.kafka.streams.state.ReadOnlyWindowStore;
+import org.apache.kafka.streams.state.StreamsMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.DependencyLink;
@@ -46,6 +48,7 @@ import zipkin2.codec.DependencyLinkBytesEncoder;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.DependencyLinker;
 import zipkin2.storage.QueryRequest;
+import zipkin2.storage.kafka.streams.KafkaStreamsMetadata;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -103,35 +106,29 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
           DependencyLinkBytesEncoder.JSON_V1.encodeList(mergedLinks));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(
-          HttpStatus.OK,
-          MediaType.JSON,
-          DependencyLinkBytesEncoder.JSON_V1.encodeList(Collections.emptyList()));
+      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
     }
   }
 
   @Get("/serviceNames")
-  public AggregatedHttpResponse getServiceNames() {
+  @ProducesJson
+  public JsonNode getServiceNames() {
     try {
       ReadOnlyKeyValueStore<String, String> store =
           storage.getTraceStoreStream()
               .store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
-      //Set<String> names = new HashSet<>();
       ArrayNode array = MAPPER.createArrayNode();
       store.all().forEachRemaining(keyValue -> array.add(keyValue.value));
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
-          MAPPER.writeValueAsBytes(array));
+      return array;
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
-    } catch (JsonProcessingException e) {
-      LOG.error("Error parsing json", e);
-      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR);
+      throw e;
     }
   }
 
   @Get("/serviceNames/:service_name/spanNames")
-  public AggregatedHttpResponse getSpanNames(@Param("service_name") String serviceName) {
+  @ProducesJson
+  public JsonNode getSpanNames(@Param("service_name") String serviceName) {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> store =
           storage.getTraceStoreStream()
@@ -139,19 +136,16 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
       names.forEach(array::add);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
-          MAPPER.writeValueAsBytes(array));
+      return array;
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
-    } catch (JsonProcessingException e) {
-      LOG.error("Error parsing json", e);
-      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR);
+      throw e;
     }
   }
 
   @Get("/serviceNames/:service_name/remoteServiceNames")
-  public AggregatedHttpResponse getRemoteServiceNames(@Param("service_name") String serviceName) {
+  @ProducesJson
+  public JsonNode getRemoteServiceNames(@Param("service_name") String serviceName) {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> store =
           storage.getTraceStoreStream().store(REMOTE_SERVICE_NAMES_STORE_NAME,
@@ -159,19 +153,16 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
       names.forEach(array::add);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
-          MAPPER.writeValueAsBytes(array));
+      return (array);
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
-    } catch (JsonProcessingException e) {
-      LOG.error("Error parsing json", e);
-      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR);
+      throw e;
     }
   }
 
   @Get("/traces")
-  public AggregatedHttpResponse getTraces(@Param("serviceName") Optional<String> serviceName,
+  public AggregatedHttpResponse getTraces(
+      @Param("serviceName") Optional<String> serviceName,
       @Param("remoteServiceName") Optional<String> remoteServiceName,
       @Param("spanName") Optional<String> spanName,
       @Param("annotationQuery") Optional<String> annotationQuery,
@@ -224,7 +215,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       LOG.debug("Traces found from query {}: {}", request, traces.size());
       List<List<Span>> result = traces.stream().limit(request.limit()).collect(Collectors.toList());
       return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
-          writeTraces(SpanBytesEncoder.JSON_V2, result));
+          writeTraces(result));
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
       return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
@@ -268,26 +259,24 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   }
 
   @Get("/autocompleteTags")
-  public AggregatedHttpResponse getAutocompleteTags() {
+  @ProducesJson
+  public JsonNode getAutocompleteTags() {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
           storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
               QueryableStoreTypes.keyValueStore());
       ArrayNode array = MAPPER.createArrayNode();
       autocompleteTagsStore.all().forEachRemaining(keyValue -> array.add(keyValue.key));
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
-          MAPPER.writeValueAsBytes(array));
+      return array;
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
-    } catch (JsonProcessingException e) {
-      LOG.error("Error parsing json", e);
-      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR);
+      throw e;
     }
   }
 
   @Get("/autocompleteTags/:key")
-  public AggregatedHttpResponse getAutocompleteValues(@Param("key") String key) {
+  @ProducesJson
+  public JsonNode getAutocompleteValues(@Param("key") String key) {
     try {
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
           storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
@@ -296,47 +285,32 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       if (valuesSet == null) valuesSet = new HashSet<>();
       ArrayNode array = MAPPER.createArrayNode();
       valuesSet.forEach(array::add);
-      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
-          MAPPER.writeValueAsBytes(array));
+      return array;
     } catch (InvalidStateStoreException e) {
       LOG.warn("State store is not ready", e);
-      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
-    } catch (JsonProcessingException e) {
-      LOG.error("Error parsing json", e);
-      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR);
+      throw e;
     }
   }
 
   @Get("/instances/:store_name")
-  public AggregatedHttpResponse getInstancesByStore(@Param("store_name") String storeName) {
-    try {
-      return AggregatedHttpResponse.of(
-          HttpStatus.OK,
-          MediaType.JSON,
-          MAPPER.writeValueAsBytes(storage.getTraceStoreStream().allMetadataForStore(storeName)));
-    } catch (JsonProcessingException e) {
-      LOG.error("Error parsing instances info", e);
-      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR, MediaType.PLAIN_TEXT_UTF_8,
-          e.getMessage());
-    }
+  @ProducesJson
+  public KafkaStreamsMetadata getInstancesByStore(@Param("store_name") String storeName) {
+    Collection<StreamsMetadata> metadata =
+        storage.getTraceStoreStream().allMetadataForStore(storeName);
+    metadata.addAll(storage.getDependencyStoreStream().allMetadataForStore(storeName));
+    return KafkaStreamsMetadata.create(metadata);
   }
 
   @Get("/instances")
-  public AggregatedHttpResponse getInstances() {
-    try {
-      return AggregatedHttpResponse.of(
-          HttpStatus.OK,
-          MediaType.JSON,
-          MAPPER.writeValueAsBytes(storage.getTraceStoreStream().allMetadata()));
-    } catch (JsonProcessingException e) {
-      LOG.error("Error parsing instances info", e);
-      return AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR, MediaType.PLAIN_TEXT_UTF_8,
-          e.getMessage());
-    }
+  @ProducesJson
+  public KafkaStreamsMetadata getInstances() {
+    Collection<StreamsMetadata> metadata = storage.getTraceStoreStream().allMetadata();
+    metadata.addAll(storage.getDependencyStoreStream().allMetadata());
+    return KafkaStreamsMetadata.create(metadata);
   }
 
   //Copy-paste from ZipkinQueryApiV2
-  static byte[] writeTraces(SpanBytesEncoder codec, List<List<zipkin2.Span>> traces) {
+  static byte[] writeTraces(List<List<Span>> traces) {
     // Get the encoded size of the nested list so that we don't need to grow the buffer
     int length = traces.size();
     int sizeInBytes = 2; // []
@@ -348,7 +322,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       sizeInBytes += 2; // []
       if (jLength > 1) sizeInBytes += jLength - 1; // comma to join elements
       for (int j = 0; j < jLength; j++) {
-        sizeInBytes += codec.sizeInBytes(spans.get(j));
+        sizeInBytes += SpanBytesEncoder.JSON_V2.sizeInBytes(spans.get(j));
       }
     }
 
@@ -356,7 +330,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
     int pos = 0;
     out[pos++] = '['; // start list of traces
     for (int i = 0; i < length; i++) {
-      pos += codec.encodeList(traces.get(i), out, pos);
+      pos += SpanBytesEncoder.JSON_V2.encodeList(traces.get(i), out, pos);
       if (i + 1 < length) out[pos++] = ',';
     }
     out[pos] = ']'; // stop list of traces

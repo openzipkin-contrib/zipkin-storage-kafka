@@ -56,13 +56,14 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
 
   List<V> parseList(String content) {
     try {
+      if (content == null) return Collections.emptyList();
       ArrayNode arrayNode = (ArrayNode) MAPPER.readTree(content);
       List<V> values = new ArrayList<>();
       for (JsonNode node : arrayNode) {
         V value = parse(node);
         values.add(value);
       }
-      return Collections.unmodifiableList(values);
+      return values;
     } catch (IOException e) {
       LOG.error("Error reading json response", e);
       return Collections.emptyList();
