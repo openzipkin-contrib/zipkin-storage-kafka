@@ -1,0 +1,11 @@
+{
+  "properties": [
+    {
+      "name": "zipkin.storage.type",
+      "type": "java.lang.String",
+      "description": "Auto-configure Zipkin Forwarder component.",
+      "defaultValue": "kafka"
+    }
+  ]
+}
+
