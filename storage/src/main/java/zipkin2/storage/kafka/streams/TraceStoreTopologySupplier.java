@@ -34,8 +34,8 @@ import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.Stores;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.NamesSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanIdsSerde;
@@ -53,8 +53,8 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   public static final String SPAN_NAMES_STORE_NAME = "zipkin-span-names";
   public static final String REMOTE_SERVICE_NAMES_STORE_NAME = "zipkin-remote-service-names";
   public static final String AUTOCOMPLETE_TAGS_STORE_NAME = "zipkin-autocomplete-tags";
+  static final Logger LOG = LogManager.getLogger();
 
-  static final Logger LOG = LoggerFactory.getLogger(TraceStoreTopologySupplier.class);
   // Kafka topics
   final String spansTopicName;
   // Limits
@@ -156,7 +156,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                       tracesStore.delete(traceId); // clean traces store
                     }
                   });
-                  LOG.info(
+                  LOG.debug(
                       "Traces deletion emitted at {}, approx. number of traces stored {}",
                       Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()),
                       tracesStore.approximateNumEntries());

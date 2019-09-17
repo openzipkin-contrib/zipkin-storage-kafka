@@ -117,18 +117,31 @@
   </dependencyManagement>
 
   <dependencies>
+    <!-- Zipkin server uses log4j 2 -->
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+      <version>${log4j.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-slf4j-impl</artifactId>
+      <version>${log4j.version}</version>
+      <scope>test</scope>
+    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
       <version>${junit-jupiter.version}</version>
+      <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.junit.vintage</groupId>
       <artifactId>junit-vintage-engine</artifactId>
       <version>${junit-jupiter.version}</version>
+      <scope>test</scope>
     </dependency>
-
     <!--
     Current versions of JUnit5 provide the above junit-jupiter artifact for convenience but we may
     still have transitive dependencies on these older artifacts and have to make sure they're all
@@ -138,12 +151,13 @@
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-api</artifactId>
       <version>${junit-jupiter.version}</version>
+      <scope>test</scope>
     </dependency>
-
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-engine</artifactId>
       <version>${junit-jupiter.version}</version>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.assertj</groupId>
@@ -273,6 +287,7 @@
           <excludes>
             <exclude>.travis.yml</exclude>
             <exclude>.gitignore</exclude>
+            <exclude>.editorconfig</exclude>
             <exclude>.mvn/**</exclude>
             <exclude>mvnw*</exclude>
             <exclude>etc/header.txt</exclude>

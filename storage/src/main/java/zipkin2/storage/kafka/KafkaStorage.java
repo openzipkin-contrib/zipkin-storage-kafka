@@ -26,8 +26,8 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.Topology;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import zipkin2.Call;
 import zipkin2.CheckResult;
 import zipkin2.storage.AutocompleteTags;
@@ -53,7 +53,7 @@ import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
  * </ul>
  */
 public class KafkaStorage extends StorageComponent {
-  static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
+  static final Logger LOG = LogManager.getLogger();
 
   public static KafkaStorageBuilder newBuilder() {
     return new KafkaStorageBuilder();
@@ -230,7 +230,7 @@ public class KafkaStorage extends StorageComponent {
       }
       if (server != null) server.close();
     } catch (Exception | Error e) {
-      LOG.warn("error closing client {}", e.getMessage(), e);
+      LOG.debug("error closing client {}", e.getMessage(), e);
     }
   }
 
@@ -264,7 +264,7 @@ public class KafkaStorage extends StorageComponent {
             traceStoreStream = new KafkaStreams(traceStoreTopology, traceStoreStreamConfig);
             traceStoreStream.start();
           } catch (Exception e) {
-            LOG.error("Error starting trace store process", e);
+            LOG.debug("Error starting trace store process", e);
             traceStoreStream = null;
           }
         }
@@ -282,7 +282,7 @@ public class KafkaStorage extends StorageComponent {
                 new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
             dependencyStoreStream.start();
           } catch (Exception e) {
-            LOG.error("Error starting dependency store", e);
+            LOG.debug("Error starting dependency store", e);
             dependencyStoreStream = null;
           }
         }
@@ -300,7 +300,7 @@ public class KafkaStorage extends StorageComponent {
                 new KafkaStreams(aggregationTopology, aggregationStreamConfig);
             traceAggregationStream.start();
           } catch (Exception e) {
-            LOG.error("Error loading aggregation process", e);
+            LOG.debug("Error loading aggregation process", e);
             traceAggregationStream = null;
           }
         }

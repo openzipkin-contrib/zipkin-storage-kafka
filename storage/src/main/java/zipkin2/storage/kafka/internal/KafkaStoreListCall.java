@@ -28,19 +28,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import zipkin2.Call;
 import zipkin2.Callback;
 
 public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
+  static final Logger LOG = LogManager.getLogger();
   static final ObjectMapper MAPPER = new ObjectMapper();
 
   final KafkaStreams kafkaStreams;
   final String storeName;
   final BiFunction<String, Integer, String> httpBaseUrl;
   final String httpPath;
-  final Logger logger = LoggerFactory.getLogger(getClass()); // TODO: log4j2?
 
   KafkaStoreListCall(
       KafkaStreams kafkaStreams,
@@ -64,7 +65,7 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
       }
       return values;
     } catch (IOException e) {
-      logger.debug("Error reading json response", e);
+      LOG.debug("Error reading json response", e);
       return Collections.emptyList();
     }
   }
