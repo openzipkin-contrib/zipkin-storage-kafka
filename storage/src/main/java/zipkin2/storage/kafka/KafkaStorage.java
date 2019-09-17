@@ -13,14 +13,17 @@
  */
 package zipkin2.storage.kafka;
 
+import com.linecorp.armeria.server.Server;
+import com.linecorp.armeria.server.ServerBuilder;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -37,14 +40,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.CheckResult;
-import zipkin2.DependencyLink;
-import zipkin2.Span;
 import zipkin2.storage.AutocompleteTags;
-import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
+import zipkin2.storage.kafka.internal.NoopServiceAndSpanNames;
+import zipkin2.storage.kafka.internal.NoopSpanStore;
 import zipkin2.storage.kafka.streams.AggregationTopologySupplier;
 import zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier;
 import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
@@ -68,7 +70,9 @@ public class KafkaStorage extends StorageComponent {
   // Autocomplete Tags
   final List<String> autocompleteKeys;
   // Kafka Storage configs
-  final String storageDirectory;
+  final String storageDir;
+  final long minTracesStored;
+  final int httpPort;
   // Kafka Topics
   final String spansTopicName, traceTopicName, dependencyTopicName;
   // Kafka Clients config
@@ -77,12 +81,13 @@ public class KafkaStorage extends StorageComponent {
   // Kafka Streams topology configs
   final Properties aggregationStreamConfig, traceStoreStreamConfig, dependencyStoreStreamConfig;
   final Topology aggregationTopology, traceStoreTopology, dependencyStoreTopology;
+  final BiFunction<String, Integer, String> httpBaseUrl;
   // Resources
   volatile AdminClient adminClient;
   volatile Producer<String, byte[]> producer;
   volatile KafkaStreams traceAggregationStream, traceStoreStream, dependencyStoreStream;
-  volatile boolean closeCalled, topicsValidated;
-  long minTracesStored;
+  volatile Server server;
+  volatile boolean closeCalled;
 
   KafkaStorage(Builder builder) {
     // Kafka Storage modes
@@ -94,8 +99,11 @@ public class KafkaStorage extends StorageComponent {
     this.spansTopicName = builder.spansTopicName;
     this.traceTopicName = builder.traceTopicName;
     this.dependencyTopicName = builder.dependencyTopicName;
-    // State store directories
-    this.storageDirectory = builder.storeDir;
+    // Storage directories
+    this.storageDir = builder.storageDir;
+    this.minTracesStored = builder.minTracesStored;
+    this.httpPort = builder.httpPort;
+    this.httpBaseUrl = builder.httpBaseUrl;
     // Kafka Configs
     this.adminConfig = builder.adminConfig;
     this.producerConfig = builder.producerConfig;
@@ -118,7 +126,6 @@ public class KafkaStorage extends StorageComponent {
         dependencyTopicName,
         builder.dependencyTtl,
         builder.dependencyWindowSize).get();
-    minTracesStored = builder.minTracesStored;
   }
 
   public static Builder newBuilder() {
@@ -127,9 +134,8 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public SpanConsumer spanConsumer() {
-    checkTopics();
+    checkResources();
     if (spanConsumerEnabled) {
-      getAggregationStream();
       return new KafkaSpanConsumer(this);
     } else { // NoopSpanConsumer
       return list -> Call.create(null);
@@ -138,57 +144,26 @@ public class KafkaStorage extends StorageComponent {
 
   @Override
   public ServiceAndSpanNames serviceAndSpanNames() {
+    checkResources();
     if (searchEnabled) {
       return new KafkaSpanStore(this);
-    } else { // NoopServiceAndSpanNames
-      return new ServiceAndSpanNames() {
-        @Override public Call<List<String>> getServiceNames() {
-          return Call.emptyList();
-        }
-
-        @Override public Call<List<String>> getRemoteServiceNames(String serviceName) {
-          return Call.emptyList();
-        }
-
-        @Override public Call<List<String>> getSpanNames(String s) {
-          return Call.emptyList();
-        }
-      };
+    } else {
+      return new NoopServiceAndSpanNames();
     }
   }
 
   @Override
   public SpanStore spanStore() {
-    checkTopics();
+    checkResources();
     if (searchEnabled) {
       return new KafkaSpanStore(this);
-    } else { // NoopSpanStore
-      return new SpanStore() {
-        @Override public Call<List<List<Span>>> getTraces(QueryRequest queryRequest) {
-          return Call.emptyList();
-        }
-
-        @Override public Call<List<Span>> getTrace(String s) {
-          return Call.emptyList();
-        }
-
-        @Override @Deprecated public Call<List<String>> getServiceNames() {
-          return Call.emptyList();
-        }
-
-        @Override @Deprecated public Call<List<String>> getSpanNames(String s) {
-          return Call.emptyList();
-        }
-
-        @Override public Call<List<DependencyLink>> getDependencies(long l, long l1) {
-          return Call.emptyList();
-        }
-      };
+    } else {
+      return new NoopSpanStore();
     }
   }
 
   @Override public AutocompleteTags autocompleteTags() {
-    checkTopics();
+    checkResources();
     if (searchEnabled) {
       return new KafkaAutocompleteTags(this);
     } else {
@@ -196,31 +171,14 @@ public class KafkaStorage extends StorageComponent {
     }
   }
 
-  /**
-   * Ensure topics are created before Kafka Streams applications start.
-   * <p>
-   * It is recommended to created these topics manually though, before application is started.
-   */
-  void checkTopics() {
-    if (!topicsValidated) {
-      synchronized (this) {
-        if (!topicsValidated) {
-          try {
-            Set<String> topics = getAdminClient().listTopics().names().get(1, TimeUnit.SECONDS);
-            List<String> requiredTopics =
-                Arrays.asList(spansTopicName, dependencyTopicName, traceTopicName);
-            for (String requiredTopic : requiredTopics) {
-              if (!topics.contains(requiredTopic)) {
-                LOG.error("Topic {} not found", requiredTopic);
-                throw new RuntimeException("Required topics are not created");
-              }
-            }
-            topicsValidated = true;
-          } catch (Exception e) {
-            LOG.error("Error ensuring topics are created", e);
-          }
-        }
-      }
+  void checkResources() {
+    if (spanConsumerEnabled) {
+      getAggregationStream();
+    }
+    if (searchEnabled) {
+      getTraceStoreStream();
+      getDependencyStoreStream();
+      getServer();
     }
   }
 
@@ -236,10 +194,20 @@ public class KafkaStorage extends StorageComponent {
         }
       }
       if (searchEnabled) {
-        KafkaStreams.State state = getTraceStoreStream().state();
-        if (!state.isRunning()) {
+        KafkaStreams.State stateTraceStore = getTraceStoreStream().state();
+        if (!stateTraceStore.isRunning()) {
           return CheckResult.failed(
-              new IllegalStateException("Store stream not running. " + state));
+              new IllegalStateException("Store stream not running. " + stateTraceStore));
+        }
+        KafkaStreams.State stateDependencyStore = getDependencyStoreStream().state();
+        if (!stateDependencyStore.isRunning()) {
+          return CheckResult.failed(
+              new IllegalStateException("Store stream not running. " + stateDependencyStore));
+        }
+        if (!getServer().activePort().isPresent()) {
+          return CheckResult.failed(
+              new IllegalStateException(
+                  "Storage HTTP server not running. " + stateDependencyStore));
         }
       }
       return CheckResult.OK;
@@ -262,7 +230,6 @@ public class KafkaStorage extends StorageComponent {
     try {
       if (adminClient != null) adminClient.close(Duration.ofSeconds(1));
       if (producer != null) {
-        producer.flush();
         producer.close(Duration.ofSeconds(1));
       }
       if (traceStoreStream != null) {
@@ -274,6 +241,7 @@ public class KafkaStorage extends StorageComponent {
       if (traceAggregationStream != null) {
         traceAggregationStream.close(Duration.ofSeconds(1));
       }
+      if (server != null) server.close();
     } catch (Exception | Error e) {
       LOG.warn("error closing client {}", e.getMessage(), e);
     }
@@ -305,8 +273,13 @@ public class KafkaStorage extends StorageComponent {
     if (traceStoreStream == null) {
       synchronized (this) {
         if (traceStoreStream == null) {
-          traceStoreStream = new KafkaStreams(traceStoreTopology, traceStoreStreamConfig);
-          traceStoreStream.start();
+          try {
+            traceStoreStream = new KafkaStreams(traceStoreTopology, traceStoreStreamConfig);
+            traceStoreStream.start();
+          } catch (Exception e) {
+            LOG.error("Error starting trace store process", e);
+            traceStoreStream = null;
+          }
         }
       }
     }
@@ -317,9 +290,14 @@ public class KafkaStorage extends StorageComponent {
     if (dependencyStoreStream == null) {
       synchronized (this) {
         if (dependencyStoreStream == null) {
-          dependencyStoreStream =
-              new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
-          dependencyStoreStream.start();
+          try {
+            dependencyStoreStream =
+                new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
+            dependencyStoreStream.start();
+          } catch (Exception e) {
+            LOG.error("Error starting dependency store", e);
+            dependencyStoreStream = null;
+          }
         }
       }
     }
@@ -330,13 +308,38 @@ public class KafkaStorage extends StorageComponent {
     if (traceAggregationStream == null) {
       synchronized (this) {
         if (traceAggregationStream == null) {
-          traceAggregationStream =
-              new KafkaStreams(aggregationTopology, aggregationStreamConfig);
-          traceAggregationStream.start();
+          try {
+            traceAggregationStream =
+                new KafkaStreams(aggregationTopology, aggregationStreamConfig);
+            traceAggregationStream.start();
+          } catch (Exception e) {
+            LOG.error("Error loading aggregation process", e);
+            traceAggregationStream = null;
+          }
         }
       }
     }
     return traceAggregationStream;
+  }
+
+  Server getServer() {
+    if (server == null) {
+      synchronized (this) {
+        if (server == null) {
+          try {
+            ServerBuilder builder = new ServerBuilder();
+            builder.http(httpPort);
+            builder.annotatedService(new KafkaStoreHttpService(this));
+            server = builder.build();
+            server.start();
+          } catch (Exception e) {
+            LOG.error("Error starting http server", e);
+            server = null;
+          }
+        }
+      }
+    }
+    return server;
   }
 
   public static class Builder extends StorageComponent.Builder {
@@ -352,8 +355,11 @@ public class KafkaStorage extends StorageComponent {
     Duration dependencyWindowSize = Duration.ofMinutes(1);
 
     long minTracesStored = 10_000;
+    int httpPort = 9412;
+    BiFunction<String, Integer, String> httpBaseUrl =
+        (hostname, port) -> "http://" + hostname + ":" + port;
 
-    String storeDir = "/tmp/zipkin-storage-kafka";
+    String storageDir = "/tmp/zipkin-storage-kafka";
 
     Properties adminConfig = new Properties();
     Properties producerConfig = new Properties();
@@ -392,6 +398,7 @@ public class KafkaStorage extends StorageComponent {
       traceStoreStreamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, traceStoreStreamAppId);
       traceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
       traceStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
+      traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
       // Dependency Store Stream Topology configuration
       dependencyStoreStreamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
           Serdes.StringSerde.class);
@@ -401,6 +408,17 @@ public class KafkaStorage extends StorageComponent {
           dependencyStoreStreamAppId);
       dependencyStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, dependencyStoreDirectory());
       dependencyStoreStreamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
+      dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
+    }
+
+    String hostInfo() {
+      String hostInfo = "localhost";
+      try {
+        hostInfo = InetAddress.getLocalHost().getHostName() + ":" + httpPort;
+      } catch (UnknownHostException e) {
+        e.printStackTrace();
+      }
+      return hostInfo;
     }
 
     @Override
@@ -429,6 +447,13 @@ public class KafkaStorage extends StorageComponent {
      */
     public Builder spanConsumerEnabled(boolean spanConsumerEnabled) {
       this.spanConsumerEnabled = spanConsumerEnabled;
+      return this;
+    }
+
+    public Builder httpPort(int httpPort) {
+      this.httpPort = httpPort;
+      traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
+      dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
       return this;
     }
 
@@ -522,9 +547,9 @@ public class KafkaStorage extends StorageComponent {
     /**
      * Path to root directory when aggregated and indexed data is stored.
      */
-    public Builder storeDirectory(String storeDirectory) {
-      if (storeDirectory == null) throw new NullPointerException("storageDirectory == null");
-      this.storeDir = storeDirectory;
+    public Builder storageDir(String storageDir) {
+      if (storageDir == null) throw new NullPointerException("storageDir == null");
+      this.storageDir = storageDir;
       traceStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
       dependencyStoreStreamConfig.put(StreamsConfig.STATE_DIR_CONFIG, dependencyStoreDirectory());
       return this;
@@ -560,11 +585,11 @@ public class KafkaStorage extends StorageComponent {
     }
 
     String traceStoreDirectory() {
-      return storeDir + "/traces";
+      return storageDir + "/traces";
     }
 
     String dependencyStoreDirectory() {
-      return storeDir + "/dependencies";
+      return storageDir + "/dependencies";
     }
 
     /**
@@ -679,9 +704,10 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public String toString() {
     return "KafkaStorage{" +
-        "spanConsumerEnabled=" + spanConsumerEnabled +
+        "httpPort=" + httpPort +
+        ", spanConsumerEnabled=" + spanConsumerEnabled +
         ", searchEnabled=" + searchEnabled +
-        ", storageDirectory='" + storageDirectory + '\'' +
+        ", storageDir='" + storageDir + '\'' +
         ", spansTopicName='" + spansTopicName + '\'' +
         ", traceTopicName='" + traceTopicName + '\'' +
         ", dependencyTopicName='" + dependencyTopicName + '\'' +

@@ -31,7 +31,6 @@
     </properties>
 
     <dependencies>
-
         <dependency>
             <groupId>org.apache.kafka</groupId>
             <artifactId>kafka-clients</artifactId>
@@ -46,6 +45,12 @@
             <groupId>io.zipkin.reporter2</groupId>
             <artifactId>zipkin-sender-kafka</artifactId>
             <version>${zipkin-sender-kafka.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.linecorp.armeria</groupId>
+            <artifactId>armeria</artifactId>
+            <version>0.90.3</version>
+            <scope>provided</scope>
         </dependency>
 
         <dependency>
@@ -72,12 +77,6 @@
             <artifactId>kafka-streams</artifactId>
             <version>${kafka.version}</version>
             <classifier>test</classifier>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>no.sysco.middleware.kafka</groupId>
-            <artifactId>kafka-util-streams-graphviz</artifactId>
-            <version>0.1.3</version>
             <scope>test</scope>
         </dependency>
         <dependency>

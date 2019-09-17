@@ -13,15 +13,14 @@
  */
 package zipkin2.storage.kafka;
 
-import java.util.ArrayList;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
-import java.util.Set;
+import java.util.function.BiFunction;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.state.QueryableStoreTypes;
-import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import zipkin2.Call;
 import zipkin2.storage.AutocompleteTags;
-import zipkin2.storage.kafka.internal.KafkaStreamsStoreCall;
+import zipkin2.storage.kafka.internal.KafkaStoreScatterGatherListCall;
+import zipkin2.storage.kafka.internal.KafkaStoreSingleKeyListCall;
 import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
 
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
@@ -29,67 +28,72 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPL
 /**
  * Autocomplete tags query component based on Kafka Streams local store built by {@link
  * TraceStoreTopologySupplier}
- *
+ * <p>
  * These stores are currently supporting only single instance as there is not mechanism implemented
  * for scatter gather data from different instances.
  */
 public class KafkaAutocompleteTags implements AutocompleteTags {
   final KafkaStreams traceStoreStream;
+  final BiFunction<String, Integer, String> httpBaseUrl;
 
   KafkaAutocompleteTags(KafkaStorage storage) {
     traceStoreStream = storage.getTraceStoreStream();
+    httpBaseUrl = storage.httpBaseUrl;
   }
 
   @Override public Call<List<String>> getKeys() {
-    ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-        traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
-            QueryableStoreTypes.keyValueStore());
-    return new GetKeysCall(autocompleteTagsStore);
+    return new GetTagKeysCall(traceStoreStream, httpBaseUrl);
   }
 
   @Override public Call<List<String>> getValues(String key) {
-    ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-        traceStoreStream.store(AUTOCOMPLETE_TAGS_STORE_NAME,
-            QueryableStoreTypes.keyValueStore());
-    return new GetValuesCall(autocompleteTagsStore, key);
+    return new GetTagValuesCall(traceStoreStream, httpBaseUrl, key);
   }
 
-  static class GetKeysCall extends KafkaStreamsStoreCall<List<String>> {
-    final ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore;
+  static class GetTagKeysCall extends KafkaStoreScatterGatherListCall<String> {
+    final KafkaStreams traceStoreStream;
+    final BiFunction<String, Integer, String> httpBaseUrl;
 
-    GetKeysCall(ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore) {
-      this.autocompleteTagsStore = autocompleteTagsStore;
+    GetTagKeysCall(KafkaStreams traceStoreStream,
+        BiFunction<String, Integer, String> httpBaseUrl) {
+      super(traceStoreStream, AUTOCOMPLETE_TAGS_STORE_NAME, httpBaseUrl, "/autocompleteTags");
+      this.traceStoreStream = traceStoreStream;
+      this.httpBaseUrl = httpBaseUrl;
     }
 
-    @Override protected List<String> query() {
-      List<String> keys = new ArrayList<>();
-      autocompleteTagsStore.all().forEachRemaining(keyValue -> keys.add(keyValue.key));
-      return keys;
+    @Override protected String parse(JsonNode node) {
+      return node.textValue();
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetKeysCall(autocompleteTagsStore);
+      return new GetTagKeysCall(traceStoreStream, httpBaseUrl);
     }
   }
 
-  static class GetValuesCall extends KafkaStreamsStoreCall<List<String>> {
-    final ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore;
-    final String key;
+  static class GetTagValuesCall extends KafkaStoreSingleKeyListCall<String> {
+    final KafkaStreams traceStoreStream;
+    final BiFunction<String, Integer, String> httpBaseUrl;
+    final String tagKey;
 
-    GetValuesCall(
-        ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore, String key) {
-      this.autocompleteTagsStore = autocompleteTagsStore;
-      this.key = key;
-    }
-
-    @Override protected List<String> query() {
-      Set<String> valuesSet = autocompleteTagsStore.get(key);
-      if (valuesSet == null) return new ArrayList<>();
-      return new ArrayList<>(valuesSet);
+    GetTagValuesCall(KafkaStreams traceStoreStream,
+        BiFunction<String, Integer, String> httpBaseUrl,
+        String tagKey) {
+      super(
+          traceStoreStream,
+          AUTOCOMPLETE_TAGS_STORE_NAME,
+          httpBaseUrl,
+          "/autocompleteTags/" + tagKey,
+          tagKey);
+      this.traceStoreStream = traceStoreStream;
+      this.httpBaseUrl = httpBaseUrl;
+      this.tagKey = tagKey;
     }
 
     @Override public Call<List<String>> clone() {
-      return new GetValuesCall(autocompleteTagsStore, key);
+      return new GetTagValuesCall(traceStoreStream, httpBaseUrl, tagKey);
+    }
+
+    @Override protected String parse(JsonNode node) {
+      return node.textValue();
     }
   }
 }

@@ -13,30 +13,20 @@
  */
 package zipkin2.storage.kafka.internal;
 
-import java.io.IOException;
+import java.util.List;
 import zipkin2.Call;
-import zipkin2.Callback;
+import zipkin2.storage.ServiceAndSpanNames;
 
-public abstract class KafkaStreamsStoreCall<T> extends Call.Base<T> {
-
-  protected KafkaStreamsStoreCall() {
+public class NoopServiceAndSpanNames implements ServiceAndSpanNames {
+  @Override public Call<List<String>> getServiceNames() {
+    return Call.emptyList();
   }
 
-  @Override protected T doExecute() throws IOException {
-    try {
-      return query();
-    } catch (Exception e) {
-      throw new IOException(e);
-    }
+  @Override public Call<List<String>> getRemoteServiceNames(String serviceName) {
+    return Call.emptyList();
   }
 
-  @Override protected void doEnqueue(Callback<T> callback) {
-    try { // TODO check how to make queries async
-      callback.onSuccess(query());
-    } catch (Exception e) {
-      callback.onError(e);
-    }
+  @Override public Call<List<String>> getSpanNames(String s) {
+    return Call.emptyList();
   }
-
-  protected abstract T query();
 }

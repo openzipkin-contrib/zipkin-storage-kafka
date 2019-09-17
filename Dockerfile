@@ -19,6 +19,9 @@ ENV USER jeqo
 
 WORKDIR /zipkin
 
+#Enable this when replacing curl for local jar
+#ADD autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar kafka.jar
+
 RUN apk add curl unzip && \
   curl -SL https://jitpack.io/com/github/${USER}/zipkin-storage-kafka/zipkin-autoconfigure-storage-kafka/${VERSION}/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar > kafka.jar && \
   echo > .kafka_profile && \
@@ -31,11 +34,11 @@ COPY --from=0  --chown=zipkin /zipkin/ /zipkin/
 
 ENV MODULE_OPTS="-Dloader.path=kafka -Dspring.profiles.active=kafka"
 ENV STORAGE_TYPE=kafka
+ENV KAFKA_STORAGE_DIR /data
 
 # Prepare state dir
 USER root
 RUN mkdir /data && chown zipkin:zipkin /data
-ENV KAFKA_STORAGE_DIR /data
 VOLUME /data
-
+# back to zipkin user
 USER zipkin

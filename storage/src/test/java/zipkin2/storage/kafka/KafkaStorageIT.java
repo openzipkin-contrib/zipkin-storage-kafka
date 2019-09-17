@@ -13,6 +13,8 @@
  */
 package zipkin2.storage.kafka;
 
+import java.io.IOException;
+import java.net.ServerSocket;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,7 +30,6 @@ import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -44,10 +45,10 @@ import zipkin2.Span;
 import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanConsumer;
-import zipkin2.storage.SpanStore;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
@@ -60,46 +61,47 @@ class KafkaStorageIT {
 
   private Duration traceTimeout;
   private KafkaStorage storage;
-  private Properties testConsumerConfig;
+  private Properties consumerConfig;
   private KafkaProducer<String, List<Span>> tracesProducer;
   private KafkaProducer<String, DependencyLink> dependencyProducer;
 
-  @BeforeEach void start() {
-    testConsumerConfig = new Properties();
-    testConsumerConfig.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
-    testConsumerConfig.put(ConsumerConfig.GROUP_ID_CONFIG, "test");
-    testConsumerConfig.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-        ByteArrayDeserializer.class);
-    testConsumerConfig.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-        ByteArrayDeserializer.class);
+  @BeforeEach void start() throws Exception {
+    consumerConfig = new Properties();
+    consumerConfig.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
+    consumerConfig.put(ConsumerConfig.GROUP_ID_CONFIG, "test");
+    consumerConfig.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
+    consumerConfig.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
 
     if (!kafka.isRunning()) fail();
 
     traceTimeout = Duration.ofSeconds(5);
     storage = (KafkaStorage) new KafkaStorage.Builder()
         .bootstrapServers(kafka.getBootstrapServers())
-        .storeDirectory("target/zipkin_" + System.currentTimeMillis())
+        .storageDir("target/zipkin_" + System.currentTimeMillis())
         .traceTimeout(traceTimeout)
+        .httpPort(randomPort())
         .build();
 
-    await().atMost(10, TimeUnit.SECONDS).until(() -> {
-      Collection<NewTopic> newTopics = new ArrayList<>();
-      newTopics.add(new NewTopic(storage.spansTopicName, 1, (short) 1));
-      newTopics.add(new NewTopic(storage.traceTopicName, 1, (short) 1));
-      newTopics.add(new NewTopic(storage.dependencyTopicName, 1, (short) 1));
-      storage.getAdminClient().createTopics(newTopics).all().get();
-      storage.checkTopics();
-      return storage.topicsValidated;
-    });
+    Collection<NewTopic> newTopics = new ArrayList<>();
+    newTopics.add(new NewTopic(storage.spansTopicName, 1, (short) 1));
+    newTopics.add(new NewTopic(storage.traceTopicName, 1, (short) 1));
+    newTopics.add(new NewTopic(storage.dependencyTopicName, 1, (short) 1));
+    storage.getAdminClient().createTopics(newTopics).all().get();
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> storage.check().ok());
-
+    storage.checkResources();
     Properties producerConfig = new Properties();
     producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
     tracesProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
         new SpansSerde().serializer());
     dependencyProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
         new DependencyLinkSerde().serializer());
+  }
+
+  private int randomPort() throws IOException {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    }
   }
 
   @AfterEach void close() {
@@ -115,11 +117,11 @@ class KafkaStorageIT {
     // Given: a set of incoming spans
     Span parent = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-        .timestamp(System.currentTimeMillis() * 1000).duration(10)
+        .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(10)
         .build();
     Span child = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(System.currentTimeMillis() * 1000).duration(2)
+        .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(2)
         .build();
     final SpanConsumer spanConsumer = storage.spanConsumer();
     // When: are consumed by storage
@@ -127,25 +129,25 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: they are partitioned
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopicName, 2, 10000);
+        consumerConfig, storage.spansTopicName, 1, 10000);
     // Given: some time for stream processes to kick in
     Thread.sleep(traceTimeout.toMillis() * 2);
     // Given: another span to move 'event time' forward
     Span another = Span.newBuilder().traceId("c").id("d").name("op_a").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(System.currentTimeMillis() * 1000).duration(2)
+        .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(2)
         .build();
     // When: published
     spanConsumer.accept(Collections.singletonList(another)).execute();
     storage.getProducer().flush();
     // Then: a trace is published
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopicName, 1, 1000);
+        consumerConfig, storage.spansTopicName, 1, 1000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.traceTopicName, 1, 30000);
+        consumerConfig, storage.traceTopicName, 1, 30000);
     // Then: and a dependency link created
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.dependencyTopicName, 1, 1000);
+        consumerConfig, storage.dependencyTopicName, 1, 1000);
   }
 
   @Test void should_return_traces_query() throws Exception {
@@ -153,22 +155,19 @@ class KafkaStorageIT {
     Span parent = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
         .remoteEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(TODAY * 1000).duration(10)
+        .timestamp(MILLISECONDS.toMicros(TODAY)).duration(10)
         .build();
     Span child = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(TODAY * 1000).duration(2)
+        .timestamp(MILLISECONDS.toMicros(TODAY)).duration(2)
         .build();
     Span other = Span.newBuilder().traceId("c").id("c").name("op_c").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_c").build())
-        .timestamp(TODAY * 1000 + 10).duration(8)
+        .timestamp(MILLISECONDS.toMicros(TODAY) + 10).duration(8)
         .build();
     List<Span> spans = Arrays.asList(parent, child);
     // When: and stores running
-    SpanStore spanStore = storage.spanStore();
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
-    await().atMost(10, TimeUnit.SECONDS)
-        .until(() -> storage.traceStoreStream.state().equals(KafkaStreams.State.RUNNING));
     // When: been published
     tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, parent.traceId(), spans));
     tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, other.traceId(),
@@ -176,19 +175,21 @@ class KafkaStorageIT {
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.spansTopicName, 1, 10000);
+        consumerConfig, storage.spansTopicName, 2, 10000);
     // Then: services names are searchable
-    List<List<Span>> traces = spanStore.getTraces(QueryRequest.newBuilder()
-        .endTs(TODAY + 1)
-        .lookback(Duration.ofSeconds(30).toMillis())
-        .serviceName("svc_a")
-        .limit(10)
-        .build())
-        .execute();
-    assertEquals(1, traces.size());
-    assertEquals(traces.get(0).size(), 2); // Trace is found and has two spans
+    await().atMost(100, TimeUnit.SECONDS).until(() -> {
+      List<List<Span>> traces = storage.spanStore().getTraces(QueryRequest.newBuilder()
+          .endTs(TODAY + 1)
+          .lookback(Duration.ofSeconds(30).toMillis())
+          .serviceName("svc_a")
+          .limit(10)
+          .build())
+          .execute();
+      return (1 == traces.size()) &&
+          (traces.get(0).size() == 2); // Trace is found and has two spans
+    });
     List<List<Span>> filteredTraces =
-        spanStore.getTraces(QueryRequest.newBuilder()
+        storage.spanStore().getTraces(QueryRequest.newBuilder()
             .endTs(TODAY + 1)
             .lookback(Duration.ofMinutes(1).toMillis())
             .limit(1)
@@ -229,15 +230,14 @@ class KafkaStorageIT {
     dependencyProducer.flush();
     // Then: stored in topic
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        testConsumerConfig, storage.dependencyTopicName, 2, 10000);
-    // When: stores running
-    SpanStore spanStore = storage.spanStore();
+        consumerConfig, storage.dependencyTopicName, 2, 10000);
     // Then:
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       List<DependencyLink> links = new ArrayList<>();
       try {
         links =
-            spanStore.getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
+            storage.spanStore()
+                .getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
                 .execute();
       } catch (InvalidStateStoreException e) { // ignoring state issues
         System.err.println(e.getMessage());

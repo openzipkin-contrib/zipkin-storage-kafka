@@ -64,6 +64,12 @@
       <version>${spring-boot.version}</version>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>com.linecorp.armeria</groupId>
+      <artifactId>armeria</artifactId>
+      <version>0.90.3</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>

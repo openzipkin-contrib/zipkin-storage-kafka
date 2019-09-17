@@ -13,6 +13,8 @@
  */
 package zipkin2.storage.kafka.streams;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Metrics;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -39,6 +41,8 @@ import zipkin2.storage.kafka.streams.serdes.NamesSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanIdsSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
 /**
  * Storage of Traces, Service names and Autocomplete Tags.
  */
@@ -63,6 +67,8 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   final SpanIdsSerde spanIdsSerde;
   final NamesSerde namesSerde;
 
+  final Counter brokenTracesTotal;
+
   public TraceStoreTopologySupplier(String spansTopicName, List<String> autoCompleteKeys,
       Duration traceTtl, Duration traceTtlCheckInterval, long minTracesStored) {
     this.spansTopicName = spansTopicName;
@@ -73,47 +79,51 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
     spansSerde = new SpansSerde();
     spanIdsSerde = new SpanIdsSerde();
     namesSerde = new NamesSerde();
+    brokenTracesTotal = Metrics.counter("zipkin.storage.kafka.traces.broken");
   }
 
   @Override public Topology get() {
     StreamsBuilder builder = new StreamsBuilder();
     builder
-        // Logging disabled to avoid long starting times
+        // Logging disabled to avoid long starting times, with logging disabled to process incoming
+        // spans since last restart
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(TRACES_STORE_NAME),
             Serdes.String(),
             spansSerde).withLoggingDisabled())
-        // Disabling logging to avoid long starting times
+        // Disabling logging to avoid long starting times, with logging disabled to process incoming
+        // spans since last restart
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(SPAN_IDS_BY_TS_STORE_NAME),
             Serdes.Long(),
             spanIdsSerde).withLoggingDisabled())
-        // In-memory as service names are bounded
+        // In-memory as service names are bounded, with logging enabled to build state
+        // with all values collected
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.inMemoryKeyValueStore(SERVICE_NAMES_STORE_NAME),
             Serdes.String(),
             Serdes.String()))
-        // In-memory as span names are bounded
+        // In-memory as span names are bounded, with logging enabled to build state
+        // with all values collected
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.inMemoryKeyValueStore(SPAN_NAMES_STORE_NAME),
             Serdes.String(),
             namesSerde))
-        // In-memory as remote-service names are bounded
+        // In-memory as remote-service names are bounded, with logging enabled to build state
+        // with all values collected
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.inMemoryKeyValueStore(REMOTE_SERVICE_NAMES_STORE_NAME),
             Serdes.String(),
             namesSerde))
-        // Persistent as values could be unbounded
+        // Persistent as values could be unbounded, but with logging enabled to build state
+        // with all values collected
         .addStateStore(Stores.keyValueStoreBuilder(
             Stores.persistentKeyValueStore(AUTOCOMPLETE_TAGS_STORE_NAME),
             Serdes.String(),
-            namesSerde).withLoggingDisabled());
+            namesSerde));
     // Traces stream
     KStream<String, List<Span>> spansStream = builder
-        .stream(
-            spansTopicName,
-            Consumed.with(Serdes.String(), spansSerde)
-                .withOffsetResetPolicy(Topology.AutoOffsetReset.LATEST));
+        .stream(spansTopicName, Consumed.with(Serdes.String(), spansSerde));
     // Store traces
     spansStream.process(() -> new Processor<String, List<Span>>() {
       ProcessorContext context;
@@ -135,13 +145,11 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
             timestamp -> {
               if (traceTtl.toMillis() > 0 &&
                   tracesStore.approximateNumEntries() > minTracesStored) {
-                // preparing range filtering
+                // query traceIds active during period
                 long from = 0L;
                 long to = timestamp - traceTtl.toMillis();
-                long toMicro = to * 1000;
-                // query traceIds active during period
                 try (final KeyValueIterator<Long, Set<String>> range =
-                         spanIdsByTsStore.range(from, toMicro)) {
+                         spanIdsByTsStore.range(from, MILLISECONDS.toMicros(to))) {
                   range.forEachRemaining(record -> {
                     spanIdsByTsStore.delete(record.key); // clean timestamp index
                     for (String traceId : record.value) {
@@ -149,10 +157,9 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                     }
                   });
                   LOG.info(
-                      "Traces deletion emitted at {}, approx. number of traces stored {} - partition: {}",
+                      "Traces deletion emitted at {}, approx. number of traces stored {}",
                       Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()),
-                      tracesStore.approximateNumEntries(),
-                      context.partition());
+                      tracesStore.approximateNumEntries());
                 }
               }
             });
@@ -162,7 +169,11 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
         if (!spans.isEmpty()) {
           // Persist traces
           List<Span> currentSpans = tracesStore.get(traceId);
-          if (currentSpans == null) currentSpans = new ArrayList<>();
+          if (currentSpans == null) {
+            currentSpans = new ArrayList<>();
+          } else {
+            brokenTracesTotal.increment();
+          }
           currentSpans.addAll(spans);
           tracesStore.put(traceId, currentSpans);
           // Persist timestamp indexed span ids
