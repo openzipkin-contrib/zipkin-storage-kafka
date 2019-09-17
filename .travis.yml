@@ -12,4 +12,4 @@ language: java
 jdk: openjdk11
 
 # Override default travis to use the maven wrapper; skip license on travis due to #1512
-install: ./mvnw install -DskipTests=true -Dlicense.skip=true -Dmaven.javadoc.skip=true -B -V
+install: ./mvnw verify -Dlicense.skip=true -B
