@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -14,8 +14,7 @@
 package zipkin2.storage.kafka.streams.serdes;
 
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
@@ -23,60 +22,27 @@ import org.apache.kafka.common.serialization.Serializer;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-public class NamesSerde implements Serde<Set<String>> {
-  @Override
-  public void configure(Map<String, ?> configs, boolean isKey) {
-    //Nothing to do.
-  }
-
-  @Override
-  public void close() {
-  }
-
-  @Override
-  public Serializer<Set<String>> serializer() {
+public final class NamesSerde implements Serde<Set<String>> {
+  @Override public Serializer<Set<String>> serializer() {
     return new SpanNamesSerializer();
   }
 
-  @Override
-  public Deserializer<Set<String>> deserializer() {
+  @Override public Deserializer<Set<String>> deserializer() {
     return new SpanNamesDeserializer();
   }
 
-  public static class SpanNamesSerializer implements Serializer<Set<String>> {
-
-    @Override
-    public void configure(Map<String, ?> configs, boolean isKey) {
-      //Nothing to do.
-    }
-
-    @Override
-    public byte[] serialize(String topic, Set<String> data) {
+  static final class SpanNamesSerializer implements Serializer<Set<String>> {
+    @Override public byte[] serialize(String topic, Set<String> data) {
       String values = String.join("|", data);
       return values.getBytes(UTF_8);
     }
-
-    @Override
-    public void close() {
-    }
   }
 
-  public static class SpanNamesDeserializer implements Deserializer<Set<String>> {
-
-    @Override
-    public void configure(Map<String, ?> configs, boolean isKey) {
-      //Nothing to do.
-    }
-
-    @Override
-    public Set<String> deserialize(String topic, byte[] data) {
+  static final class SpanNamesDeserializer implements Deserializer<Set<String>> {
+    @Override public Set<String> deserialize(String topic, byte[] data) {
       String decoded = new String(data, UTF_8);
       String[] values = decoded.split("\\|");
-      return new HashSet<>(Arrays.asList(values));
-    }
-
-    @Override
-    public void close() {
+      return new LinkedHashSet<>(Arrays.asList(values));
     }
   }
 }

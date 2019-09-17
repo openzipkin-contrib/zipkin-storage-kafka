@@ -1,8 +1,8 @@
 # Zipkin Storage: Kafka *[EXPERIMENTAL]*
 
-[![Build Status](https://www.travis-ci.org/jeqo/zipkin-storage-kafka.svg?branch=master)](https://www.travis-ci.org/jeqo/zipkin-storage-kafka)
-[![](https://jitpack.io/v/jeqo/zipkin-storage-kafka.svg)](https://jitpack.io/#jeqo/zipkin-storage-kafka)
-[![](https://images.microbadger.com/badges/version/jeqo/zipkin-kafka.svg)](https://microbadger.com/images/jeqo/zipkin-kafka "Get your own version badge on microbadger.com")
+[![Build Status](https://www.travis-ci.org/openzipkin-contrib/zipkin-storage-kafka.svg?branch=master)](https://www.travis-ci.org/openzipkin-contrib/zipkin-storage-kafka)
+[![](https://jitpack.io/v/openzipkin-contrib/zipkin-storage-kafka.svg)](https://jitpack.io/#openzipkin-contrib/zipkin-storage-kafka)
+[![](https://images.microbadger.com/badges/version/openzipkin-contrib/zipkin-storage-kafka.svg)](https://microbadger.com/images/openzipkin-contrib/zipkin-storage-kafka "Get your own version badge on microbadger.com")
 
 Kafka-based storage for Zipkin.
 

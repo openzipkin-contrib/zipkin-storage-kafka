@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -34,9 +34,7 @@ import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_IDS_BY_TS_STORE_NAME;
@@ -44,7 +42,6 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAME
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_STORE_NAME;
 
 class TraceStoreTopologySupplierTest {
-
   @Test void should_persist_stores() {
     // Given: configs
     String spansTopicName = "zipkin-spans";
@@ -60,9 +57,8 @@ class TraceStoreTopologySupplierTest {
         traceTtlCheckInterval,
         0).get();
     TopologyDescription description = topology.describe();
-    System.out.println("Topology: \n" + description);
     // Then: 2 threads prepared
-    assertEquals(1, description.subtopologies().size());
+    assertThat(description.subtopologies()).hasSize(1);
     // Given: streams config
     Properties props = new Properties();
     props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
@@ -93,27 +89,27 @@ class TraceStoreTopologySupplierTest {
     // Then: trace stores are filled
     KeyValueStore<String, List<Span>> traces =
         testDriver.getKeyValueStore(TRACES_STORE_NAME);
-    assertEquals(traces.get(a.traceId()), spans);
+    assertThat(traces.get(a.traceId())).containsExactlyElementsOf(spans);
     KeyValueStore<Long, Set<String>> spanIdsByTs =
         testDriver.getKeyValueStore(SPAN_IDS_BY_TS_STORE_NAME);
     KeyValueIterator<Long, Set<String>> ids = spanIdsByTs.all();
-    assertTrue(ids.hasNext());
-    assertEquals(ids.next().value, Collections.singleton(a.traceId()));
+    assertThat(ids).hasNext();
+    assertThat(ids.next().value).containsExactly(a.traceId());
     // Then: service name stores are filled
     KeyValueStore<String, String> serviceNames =
         testDriver.getKeyValueStore(SERVICE_NAMES_STORE_NAME);
     List<String> serviceNameList = new ArrayList<>();
     serviceNames.all().forEachRemaining(serviceName -> serviceNameList.add(serviceName.value));
-    assertEquals(2, serviceNameList.size());
-    assertEquals("svc_a", serviceNames.get("svc_a"));
-    assertEquals("svc_b", serviceNames.get("svc_b"));
+    assertThat(serviceNameList).hasSize(2);
+    assertThat(serviceNames.get("svc_a")).isEqualTo("svc_a");
+    assertThat(serviceNames.get("svc_b")).isEqualTo("svc_b");
     KeyValueStore<String, Set<String>> spanNames =
         testDriver.getKeyValueStore(SPAN_NAMES_STORE_NAME);
-    assertEquals(Collections.singleton("op_a"), spanNames.get("svc_a"));
-    assertEquals(Collections.singleton("op_b"), spanNames.get("svc_b"));
+    assertThat(spanNames.get("svc_a")).containsExactly("op_a");
+    assertThat(spanNames.get("svc_b")).containsExactly("op_b");
     KeyValueStore<String, Set<String>> autocompleteTags =
         testDriver.getKeyValueStore(AUTOCOMPLETE_TAGS_STORE_NAME);
-    assertEquals(Collections.singleton("dev"), autocompleteTags.get("environment"));
+    assertThat(autocompleteTags.get("environment")).containsExactly("dev");
     // When: clock moves forward
     Span d = Span.newBuilder()
         .traceId("d").id("d")
@@ -126,6 +122,6 @@ class TraceStoreTopologySupplierTest {
             traceTtlCheckInterval.toMillis() + 1));
 
     // Then: Traces store is empty
-    assertNull(traces.get(a.traceId()));
+    assertThat(traces.get(a.traceId())).isNull();
   }
 }

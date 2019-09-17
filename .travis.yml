@@ -1,15 +1,15 @@
----
+# Run `travis lint` when changing this file to avoid breaking the build.
+
 cache:
   directories:
     - $HOME/.m2
 
-language: java
-
-jdk:
-  - oraclejdk8
-
 services:
   - docker
 
-script:
-  - mvn test verify -B
+language: java
+
+jdk: openjdk11
+
+# Override default travis to use the maven wrapper; skip license on travis due to #1512
+install: ./mvnw install -DskipTests=true -Dlicense.skip=true -Dmaven.javadoc.skip=true -B -V

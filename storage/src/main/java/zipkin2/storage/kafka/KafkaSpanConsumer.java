@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -13,7 +13,6 @@
  */
 package zipkin2.storage.kafka;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.kafka.clients.producer.Producer;
@@ -24,19 +23,18 @@ import zipkin2.Callback;
 import zipkin2.Span;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.AggregateCall;
-import zipkin2.reporter.AwaitableCallback;
-import zipkin2.reporter.kafka.KafkaSender;
 import zipkin2.storage.GroupByTraceId;
 import zipkin2.storage.SpanConsumer;
+import zipkin2.storage.kafka.internal.AwaitableCallback;
 
 /**
- * Span Consumer to compensate current {@link KafkaSender} distribution of span batched without
- * key.
- * <p>
- * This component split batch into individual spans keyed by trace ID to enabled downstream
+ * Span Consumer to compensate current {@code zipkin2.reporter.kafka.KafkaSender} distribution of
+ * span batched without key.
+ *
+ * <p> This component split batch into individual spans keyed by trace ID to enabled downstream
  * processing of spans as part of a trace.
  */
-public class KafkaSpanConsumer implements SpanConsumer {
+final class KafkaSpanConsumer implements SpanConsumer {
   // Topic names
   final String spansTopicName;
   // Kafka producers
@@ -47,8 +45,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
     producer = storage.getProducer();
   }
 
-  @Override
-  public Call<Void> accept(List<Span> spans) {
+  @Override public Call<Void> accept(List<Span> spans) {
     if (spans.isEmpty()) return Call.create(null);
     List<List<Span>> groupedByTraceId = GroupByTraceId.create(true).map(spans);
     List<Call<Void>> calls = new ArrayList<>();
@@ -89,7 +86,7 @@ public class KafkaSpanConsumer implements SpanConsumer {
 
     @Override
     @SuppressWarnings("FutureReturnValueIgnored")
-    protected Void doExecute() throws IOException {
+    protected Void doExecute() {
       AwaitableCallback callback = new AwaitableCallback();
       kafkaProducer.send(new ProducerRecord<>(topic, key, value), new CallbackAdapter(callback));
       callback.await();

@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -49,21 +49,21 @@ import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 
 @Testcontainers
 class KafkaStorageIT {
-  private static final long TODAY = System.currentTimeMillis();
+  static final long TODAY = System.currentTimeMillis();
 
-  @Container private KafkaContainer kafka = new KafkaContainer("5.3.0");
+  // TODO: does this need to be confluent container?
+  @Container KafkaContainer kafka = new KafkaContainer("5.3.0");
 
-  private Duration traceTimeout;
-  private KafkaStorage storage;
-  private Properties consumerConfig;
-  private KafkaProducer<String, List<Span>> tracesProducer;
-  private KafkaProducer<String, DependencyLink> dependencyProducer;
+  Duration traceTimeout;
+  KafkaStorage storage;
+  Properties consumerConfig;
+  KafkaProducer<String, List<Span>> tracesProducer;
+  KafkaProducer<String, DependencyLink> dependencyProducer;
 
   @BeforeEach void start() throws Exception {
     consumerConfig = new Properties();
@@ -72,10 +72,10 @@ class KafkaStorageIT {
     consumerConfig.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
     consumerConfig.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
 
-    if (!kafka.isRunning()) fail();
+    assertThat(kafka.isRunning()).isTrue();
 
     traceTimeout = Duration.ofSeconds(5);
-    storage = (KafkaStorage) new KafkaStorage.Builder()
+    storage = (KafkaStorage) KafkaStorage.newBuilder()
         .bootstrapServers(kafka.getBootstrapServers())
         .storageDir("target/zipkin_" + System.currentTimeMillis())
         .traceTimeout(traceTimeout)
@@ -96,12 +96,6 @@ class KafkaStorageIT {
         new SpansSerde().serializer());
     dependencyProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
         new DependencyLinkSerde().serializer());
-  }
-
-  private int randomPort() throws IOException {
-    try (ServerSocket socket = new ServerSocket(0)) {
-      return socket.getLocalPort();
-    }
   }
 
   @AfterEach void close() {
@@ -195,16 +189,15 @@ class KafkaStorageIT {
             .limit(1)
             .build())
             .execute();
-    assertEquals(1, filteredTraces.size());
-    assertEquals(1, filteredTraces.get(0).size()); // last trace is returned first
-    List<String> services = serviceAndSpanNames.getServiceNames().execute();
-    assertEquals(3, services.size()); // There are two service names
-    List<String> spanNames = serviceAndSpanNames.getSpanNames("svc_a")
-        .execute();
-    assertEquals(1, spanNames.size());// Service names have one span name
 
+    assertThat(filteredTraces).hasSize(1);
+    assertThat(filteredTraces.get(0)).hasSize(1); // last trace is returned first
+    List<String> services = serviceAndSpanNames.getServiceNames().execute();
+    assertThat(services).hasSize(3);
+    List<String> spanNames = serviceAndSpanNames.getSpanNames("svc_a").execute();
+    assertThat(spanNames).hasSize(1); // Service names have one span name
     List<String> remoteServices = serviceAndSpanNames.getRemoteServiceNames("svc_a").execute();
-    assertEquals(1, remoteServices.size());// And one remote service name
+    assertThat(remoteServices).hasSize(1); // And one remote service name
   }
 
   @Test void should_find_dependencies() throws Exception {
@@ -235,10 +228,9 @@ class KafkaStorageIT {
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       List<DependencyLink> links = new ArrayList<>();
       try {
-        links =
-            storage.spanStore()
-                .getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
-                .execute();
+        links = storage.spanStore()
+            .getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
+            .execute();
       } catch (InvalidStateStoreException e) { // ignoring state issues
         System.err.println(e.getMessage());
       } catch (Exception e) {
@@ -251,7 +243,7 @@ class KafkaStorageIT {
 
   @Test void shouldFailWhenKafkaNotAvailable() {
     CheckResult checked = storage.check();
-    assertEquals(CheckResult.OK, checked);
+    assertThat(checked.ok()).isTrue();
 
     kafka.stop();
     await().atMost(5, TimeUnit.SECONDS)
@@ -260,5 +252,11 @@ class KafkaStorageIT {
           return check != CheckResult.OK;
         });
     storage.close();
+  }
+
+  static int randomPort() throws IOException {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    }
   }
 }

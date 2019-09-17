@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -32,7 +32,7 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPL
  * These stores are currently supporting only single instance as there is not mechanism implemented
  * for scatter gather data from different instances.
  */
-public class KafkaAutocompleteTags implements AutocompleteTags {
+final class KafkaAutocompleteTags implements AutocompleteTags {
   final KafkaStreams traceStoreStream;
   final BiFunction<String, Integer, String> httpBaseUrl;
 

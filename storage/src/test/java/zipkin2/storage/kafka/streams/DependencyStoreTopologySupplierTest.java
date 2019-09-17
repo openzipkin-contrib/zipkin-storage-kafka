@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -29,12 +29,10 @@ import org.junit.jupiter.api.Test;
 import zipkin2.DependencyLink;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.assertj.core.api.Assertions.assertThat;
 import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
 
 class DependencyStoreTopologySupplierTest {
-
   @Test void should_store_dependencies() {
     // Given: configs
     String dependencyTopicName = "zipkin-dependency";
@@ -48,9 +46,8 @@ class DependencyStoreTopologySupplierTest {
         dependenciesWindowSize
     ).get();
     TopologyDescription description = topology.describe();
-    System.out.println("Topology: \n" + description);
-    // Then: 2 threads prepared
-    assertEquals(1, description.subtopologies().size());
+    // Then: 2 threads prepared ;;; TODO: is this comment lying?
+    assertThat(description.subtopologies()).hasSize(1);
     // Given: streams configuration
     Properties props = new Properties();
     props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
@@ -72,22 +69,22 @@ class DependencyStoreTopologySupplierTest {
         testDriver.getWindowStore(DEPENDENCIES_STORE_NAME);
     // Then: dependency link created
     WindowStoreIterator<DependencyLink> fetch1 = links.fetch(dependencyLinkId, 0L, 100L);
-    assertTrue(fetch1.hasNext());
-    assertEquals(fetch1.next().value, dependencyLink);
+    assertThat(fetch1).hasNext();
+    assertThat(fetch1.next().value).isEqualTo(dependencyLink);
     // When: new links appear
     testDriver.pipeInput(
         factory.create(dependencyTopicName, dependencyLinkId, dependencyLink, 90L));
     // Then: dependency link increases
     WindowStoreIterator<DependencyLink> fetch2 = links.fetch(dependencyLinkId, 0L, 100L);
-    assertTrue(fetch2.hasNext());
-    assertEquals(fetch2.next().value.callCount(), 2);
+    assertThat(fetch2).hasNext();
+    assertThat(fetch2.next().value.callCount()).isEqualTo(2);
     // When: time moves forward
     testDriver.advanceWallClockTime(dependenciesRetentionPeriod.toMillis() + 91L);
     testDriver.pipeInput(
         factory.create(dependencyTopicName, dependencyLinkId, dependencyLink));
     // Then: dependency link is removed and restarted
     KeyValueIterator<Windowed<String>, DependencyLink> fetch3 = links.all();
-    assertTrue(fetch3.hasNext());
-    assertEquals(fetch3.next().value.callCount(), 1);
+    assertThat(fetch3).hasNext();
+    assertThat(fetch3.next().value.callCount()).isEqualTo(1);
   }
 }

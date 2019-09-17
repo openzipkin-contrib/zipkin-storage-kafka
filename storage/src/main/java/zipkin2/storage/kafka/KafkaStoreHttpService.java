@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -28,7 +28,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -48,7 +48,6 @@ import zipkin2.codec.DependencyLinkBytesEncoder;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.DependencyLinker;
 import zipkin2.storage.QueryRequest;
-import zipkin2.storage.kafka.streams.KafkaStreamsMetadata;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -62,14 +61,12 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
 
 /**
  * Server to enable access to local stores.
- * <p>
- * Given the partitioned nature of local stores, a RPC layer is required to allow accessing
+ *
+ * <p>Given the partitioned nature of local stores, a RPC layer is required to allow accessing
  * distributed state. This component exposes access to local state via Http call from {@link
  * KafkaSpanStore}
- *
- * @since 0.6.0
  */
-public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
+final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   static final Logger LOG = LoggerFactory.getLogger(KafkaStoreHttpService.class);
   static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -282,7 +279,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
           storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
               QueryableStoreTypes.keyValueStore());
       Set<String> valuesSet = autocompleteTagsStore.get(key);
-      if (valuesSet == null) valuesSet = new HashSet<>();
+      if (valuesSet == null) valuesSet = new LinkedHashSet<>();
       ArrayNode array = MAPPER.createArrayNode();
       valuesSet.forEach(array::add);
       return array;

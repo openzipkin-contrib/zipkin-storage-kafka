@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -13,7 +13,6 @@
  */
 package zipkin2.storage.kafka.streams.serdes;
 
-import java.util.Map;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
@@ -21,73 +20,32 @@ import zipkin2.DependencyLink;
 import zipkin2.codec.DependencyLinkBytesDecoder;
 import zipkin2.codec.DependencyLinkBytesEncoder;
 
-public class DependencyLinkSerde implements Serde<DependencyLink> {
+public final class DependencyLinkSerde implements Serde<DependencyLink> {
   static final String KEY_PATTERN = "%s:%s";
 
   public static String linkKey(DependencyLink link) {
     return String.format(KEY_PATTERN, link.parent(), link.child());
   }
 
-  @Override
-  public void configure(Map<String, ?> configs, boolean isKey) {
-    // Nothing to configure
-  }
-
-  @Override
-  public void close() {
-    // No resources to close
-  }
-
-  @Override
-  public Serializer<DependencyLink> serializer() {
+  @Override public Serializer<DependencyLink> serializer() {
     return new DependencyLinkSerializer();
   }
 
-  @Override
-  public Deserializer<DependencyLink> deserializer() {
+  @Override public Deserializer<DependencyLink> deserializer() {
     return new DependencyLinkDeserializer();
   }
 
-  public static class DependencyLinkDeserializer
-      implements Deserializer<DependencyLink> {
-
-    @Override
-    public void configure(Map<String, ?> configs, boolean isKey) {
-      // Nothing to configure
-    }
-
-    @Override
-    public DependencyLink deserialize(String topic, byte[] data) {
-      if (data == null) {
-        return null;
-      }
+  static final class DependencyLinkDeserializer implements Deserializer<DependencyLink> {
+    @Override public DependencyLink deserialize(String topic, byte[] data) {
+      if (data == null) return null;
       return DependencyLinkBytesDecoder.JSON_V1.decodeOne(data);
-    }
-
-    @Override
-    public void close() {
-      // No resources to close
     }
   }
 
-  public static class DependencyLinkSerializer implements Serializer<DependencyLink> {
-
-    @Override
-    public void configure(Map<String, ?> configs, boolean isKey) {
-      // Nothing to configure
-    }
-
-    @Override
-    public byte[] serialize(String topic, DependencyLink data) {
-      if (data == null) {
-        return null;
-      }
+  static final class DependencyLinkSerializer implements Serializer<DependencyLink> {
+    @Override public byte[] serialize(String topic, DependencyLink data) {
+      if (data == null) return null;
       return DependencyLinkBytesEncoder.JSON_V1.encode(data);
-    }
-
-    @Override
-    public void close() {
-      // No resources to close
     }
   }
 }

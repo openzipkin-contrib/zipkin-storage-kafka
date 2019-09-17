@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -29,10 +29,8 @@ import org.apache.kafka.streams.state.WindowStoreIterator;
 import zipkin2.DependencyLink;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 
-/**
- * Windowed storage of dependency links.
- */
-public class DependencyStoreTopologySupplier implements Supplier<Topology> {
+/** Windowed storage of dependency links. */
+public final class DependencyStoreTopologySupplier implements Supplier<Topology> {
   public static final String DEPENDENCIES_STORE_NAME = "zipkin-dependencies";
 
   // Kafka topics
@@ -73,16 +71,14 @@ public class DependencyStoreTopologySupplier implements Supplier<Topology> {
           ProcessorContext context;
           WindowStore<String, DependencyLink> dependenciesStore;
 
-          @Override
-          public void init(ProcessorContext context) {
+          @Override public void init(ProcessorContext context) {
             this.context = context;
             dependenciesStore =
                 (WindowStore<String, DependencyLink>) context.getStateStore(
                     DEPENDENCIES_STORE_NAME);
           }
 
-          @Override
-          public void process(String linkKey, DependencyLink link) {
+          @Override public void process(String linkKey, DependencyLink link) {
             // Event time
             Instant now = Instant.ofEpochMilli(context.timestamp());
             Instant from = now.minus(dependencyWindowSize);
@@ -105,8 +101,7 @@ public class DependencyStoreTopologySupplier implements Supplier<Topology> {
             }
           }
 
-          @Override
-          public void close() {
+          @Override public void close() {
           }
         }, DEPENDENCIES_STORE_NAME);
 

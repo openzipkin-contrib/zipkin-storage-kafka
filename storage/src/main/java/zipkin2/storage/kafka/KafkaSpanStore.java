@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -16,12 +16,10 @@ package zipkin2.storage.kafka;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.io.IOException;
 import java.util.List;
 import java.util.function.BiFunction;
 import org.apache.kafka.streams.KafkaStreams;
 import zipkin2.Call;
-import zipkin2.Callback;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.codec.DependencyLinkBytesDecoder;
@@ -31,7 +29,6 @@ import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.kafka.internal.KafkaStoreScatterGatherListCall;
 import zipkin2.storage.kafka.internal.KafkaStoreSingleKeyListCall;
-import zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier;
 import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
 
 import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
@@ -45,7 +42,7 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
  * TraceStoreTopologySupplier} and {@link DependencyStoreTopologySupplier}, and made accessible by
  * {@link  KafkaStoreHttpService}.
  */
-public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
+final class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   static final ObjectMapper MAPPER = new ObjectMapper();
   // Kafka Streams Store provider
   final KafkaStreams traceStoreStream;
@@ -62,8 +59,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     return new GetTracesCall(traceStoreStream, httpBaseUrl, request);
   }
 
-  @Override
-  public Call<List<Span>> getTrace(String traceId) {
+  @Override public Call<List<Span>> getTrace(String traceId) {
     return new GetTraceCall(traceStoreStream, httpBaseUrl, traceId);
   }
 
@@ -83,7 +79,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     return new GetDependenciesCall(dependencyStoreStream, httpBaseUrl, endTs, lookback);
   }
 
-  static class GetServiceNamesCall extends KafkaStoreScatterGatherListCall<String> {
+  static final class GetServiceNamesCall extends KafkaStoreScatterGatherListCall<String> {
     final KafkaStreams traceStoreStream;
     final BiFunction<String, Integer, String> httpBaseUrl;
 
@@ -103,7 +99,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
   }
 
-  static class GetSpanNamesCall extends KafkaStoreSingleKeyListCall<String> {
+  static final class GetSpanNamesCall extends KafkaStoreSingleKeyListCall<String> {
     final KafkaStreams traceStoreStream;
     final String serviceName;
     final BiFunction<String, Integer, String> httpBaseUrl;
@@ -121,20 +117,12 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       return node.textValue();
     }
 
-    @Override protected void doEnqueue(Callback<List<String>> callback) {
-      try {
-        callback.onSuccess(doExecute());
-      } catch (IOException e) {
-        callback.onError(e);
-      }
-    }
-
     @Override public Call<List<String>> clone() {
       return new GetSpanNamesCall(traceStoreStream, serviceName, httpBaseUrl);
     }
   }
 
-  static class GetRemoteServiceNamesCall extends KafkaStoreSingleKeyListCall<String> {
+  static final class GetRemoteServiceNamesCall extends KafkaStoreSingleKeyListCall<String> {
     final KafkaStreams traceStoreStream;
     final String serviceName;
     final BiFunction<String, Integer, String> httpBaseUrl;
@@ -157,7 +145,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
   }
 
-  static class GetTracesCall extends KafkaStoreScatterGatherListCall<List<Span>> {
+  static final class GetTracesCall extends KafkaStoreScatterGatherListCall<List<Span>> {
     final KafkaStreams traceStoreStream;
     final BiFunction<String, Integer, String> httpBaseUrl;
     final QueryRequest request;
@@ -187,20 +175,12 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
       return SpanBytesDecoder.JSON_V2.decodeList(MAPPER.writeValueAsBytes(node));
     }
 
-    @Override protected void doEnqueue(Callback<List<List<Span>>> callback) {
-      try {
-        callback.onSuccess(doExecute());
-      } catch (IOException e) {
-        callback.onError(e);
-      }
-    }
-
     @Override public Call<List<List<Span>>> clone() {
       return new GetTracesCall(traceStoreStream, httpBaseUrl, request);
     }
   }
 
-  static class GetTraceCall extends KafkaStoreSingleKeyListCall<Span> {
+  static final class GetTraceCall extends KafkaStoreSingleKeyListCall<Span> {
     final KafkaStreams traceStoreStream;
     final BiFunction<String, Integer, String> httpBaseUrl;
     final String traceId;
@@ -224,7 +204,7 @@ public class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
     }
   }
 
-  static class GetDependenciesCall extends KafkaStoreScatterGatherListCall<DependencyLink> {
+  static final class GetDependenciesCall extends KafkaStoreScatterGatherListCall<DependencyLink> {
     final KafkaStreams dependencyStoreStream;
     final BiFunction<String, Integer, String> httpBaseUrl;
     final long endTs, lookback;

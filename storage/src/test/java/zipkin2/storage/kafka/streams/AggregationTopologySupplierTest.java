@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -34,11 +34,9 @@ import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class AggregationTopologySupplierTest {
-
   @Test void should_aggregate_spans_and_map_dependencies() {
     // Given: configuration
     String spansTopicName = "spans";
@@ -51,9 +49,8 @@ class AggregationTopologySupplierTest {
     Topology topology = new AggregationTopologySupplier(
         spansTopicName, tracesTopicName, dependencyLinksTopicName, traceTimeout).get();
     TopologyDescription description = topology.describe();
-    System.out.println("Topology: \n" + description);
     // Then: single threaded topology
-    assertEquals(1, description.subtopologies().size());
+    assertThat(description.subtopologies()).hasSize(1);
     // Given: test driver
     Properties props = new Properties();
     props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
@@ -61,32 +58,35 @@ class AggregationTopologySupplierTest {
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     // When: two related spans coming on the same Session window
     ConsumerRecordFactory<String, List<Span>> factory =
-        new ConsumerRecordFactory<>(spansTopicName, new StringSerializer(), spansSerde.serializer());
+        new ConsumerRecordFactory<>(spansTopicName, new StringSerializer(),
+            spansSerde.serializer());
     Span a = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
         .build();
     Span b = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
         .build();
-    testDriver.pipeInput(factory.create(spansTopicName, a.traceId(), Collections.singletonList(a), 0L));
-    testDriver.pipeInput(factory.create(spansTopicName, b.traceId(), Collections.singletonList(b), 0L));
+    testDriver.pipeInput(
+        factory.create(spansTopicName, a.traceId(), Collections.singletonList(a), 0L));
+    testDriver.pipeInput(
+        factory.create(spansTopicName, b.traceId(), Collections.singletonList(b), 0L));
     // When: and new record arrive, moving the event clock further than inactivity gap
     Span c = Span.newBuilder().traceId("c").id("c").build();
-    testDriver.pipeInput(factory.create(spansTopicName, c.traceId(), Collections.singletonList(c), traceTimeout.toMillis() + 1));
+    testDriver.pipeInput(factory.create(spansTopicName, c.traceId(), Collections.singletonList(c),
+        traceTimeout.toMillis() + 1));
     // Then: a trace is aggregated.1
     ProducerRecord<String, List<Span>> trace =
         testDriver.readOutput(tracesTopicName, new StringDeserializer(), spansSerde.deserializer());
-    assertNotNull(trace);
+    assertThat(trace).isNotNull();
     OutputVerifier.compareKeyValue(trace, a.traceId(), Arrays.asList(a, b));
     // Then: a dependency link is created
     ProducerRecord<String, DependencyLink> linkRecord =
         testDriver.readOutput(dependencyLinksTopicName, new StringDeserializer(),
             dependencyLinkSerde.deserializer());
-    assertNotNull(linkRecord);
+    assertThat(linkRecord).isNotNull();
     DependencyLink link = DependencyLink.newBuilder()
         .parent("svc_a").child("svc_b").callCount(1).errorCount(0)
         .build();
     OutputVerifier.compareKeyValue(linkRecord, "svc_a:svc_b", link);
   }
-
 }
