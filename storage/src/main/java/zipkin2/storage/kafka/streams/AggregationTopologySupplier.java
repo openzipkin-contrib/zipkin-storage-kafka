@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -40,10 +40,8 @@ import static org.apache.kafka.streams.kstream.Suppressed.BufferConfig.unbounded
 import static org.apache.kafka.streams.kstream.Suppressed.untilWindowCloses;
 import static zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde.linkKey;
 
-/**
- * Processing of spans partitioned by trace Id, into traces and dependency links.
- */
-public class AggregationTopologySupplier implements Supplier<Topology> {
+/** Processing of spans partitioned by trace Id, into traces and dependency links. */
+public final class AggregationTopologySupplier implements Supplier<Topology> {
   static final String TRACE_AGGREGATION_STORE = "trace-aggregation";
   // Kafka topics
   final String spansTopicName;
@@ -78,7 +76,8 @@ public class AggregationTopologySupplier implements Supplier<Topology> {
             .windowedBy(SessionWindows.with(traceTimeout).grace(Duration.ZERO))
             .aggregate(ArrayList::new, aggregateSpans(), joinAggregates(),
                 Materialized
-                    .<String, List<Span>>as(Stores.persistentSessionStore(TRACE_AGGREGATION_STORE, Duration.ofDays(1)))
+                    .<String, List<Span>>as(
+                        Stores.persistentSessionStore(TRACE_AGGREGATION_STORE, Duration.ofDays(1)))
                     .withKeySerde(Serdes.String())
                     .withValueSerde(spansSerde)
                     .withLoggingDisabled()

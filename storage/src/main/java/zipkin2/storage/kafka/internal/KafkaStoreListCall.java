@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -28,14 +28,14 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.StreamsMetadata;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import zipkin2.Call;
 import zipkin2.Callback;
-import zipkin2.storage.kafka.KafkaAutocompleteTags;
 
 public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
-  static final Logger LOG = LoggerFactory.getLogger(KafkaAutocompleteTags.class);
+  static final Logger LOG = LogManager.getLogger();
   static final ObjectMapper MAPPER = new ObjectMapper();
 
   final KafkaStreams kafkaStreams;
@@ -65,7 +65,7 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
       }
       return values;
     } catch (IOException e) {
-      LOG.error("Error reading json response", e);
+      LOG.debug("Error reading json response", e);
       return Collections.emptyList();
     }
   }
@@ -79,7 +79,7 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
     return HttpClient.of(httpBaseUrl.apply(metadata.hostInfo().host(), metadata.hostInfo().port()));
   }
 
-  @Override protected List<V> doExecute() throws IOException {
+  @Override protected List<V> doExecute() {
     return listFuture().join();
   }
 

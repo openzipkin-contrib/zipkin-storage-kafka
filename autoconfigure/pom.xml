@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright 2019 jeqo
+    Copyright 2019 The OpenZipkin Authors
 
     Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
     in compliance with the License. You may obtain a copy of the License at
@@ -14,12 +14,14 @@
     the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>io.github.jeqo.zipkin</groupId>
+    <groupId>io.github.openzipkin-contrib.zipkin-storage-kafka</groupId>
     <artifactId>zipkin-storage-kafka-parent</artifactId>
-    <version>0.5.5-SNAPSHOT</version>
+    <version>0.6.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>zipkin-autoconfigure-storage-kafka</artifactId>
@@ -27,10 +29,6 @@
 
   <properties>
     <main.basedir>${project.basedir}/..</main.basedir>
-
-    <!-- Server is Java 8+ -->
-    <main.java.version>1.8</main.java.version>
-    <main.signature.artifact>java18</main.signature.artifact>
   </properties>
 
   <dependencies>
@@ -38,26 +36,13 @@
       <groupId>${project.groupId}</groupId>
       <artifactId>zipkin-storage-kafka</artifactId>
     </dependency>
-
-
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>test</scope>
-      <version>4.12</version>
-    </dependency>
-    <dependency>
-      <groupId>org.assertj</groupId>
-      <artifactId>assertj-core</artifactId>
-      <version>3.13.2</version>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-autoconfigure</artifactId>
       <version>${spring-boot.version}</version>
       <scope>provided</scope>
     </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-test</artifactId>
@@ -65,9 +50,8 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.linecorp.armeria</groupId>
+      <groupId>${armeria.groupId}</groupId>
       <artifactId>armeria</artifactId>
-      <version>0.90.3</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -77,12 +61,55 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+        <version>${spring-boot.version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>repackage</goal>
+            </goals>
+          </execution>
+        </executions>
         <configuration>
+          <layoutFactory implementation="zipkin.layout.ZipkinLayoutFactory">
+            <name>zipkin</name>
+          </layoutFactory>
+          <classifier>module</classifier>
           <!-- https://github.com/spring-projects/spring-boot/issues/3426 transitive exclude doesn't work -->
+          <!--
+          Not excluding guava right now eventhough there is an overlap to avoid the following conflict
+
+          java.lang.NoSuchMethodError: com.google.common.base.Preconditions.checkArgument(ZLjava/lang/String;CLjava/lang/Object;)V
+             at io.grpc.Metadata$Key.validateName(Metadata.java:629) ~[grpc-core-1.20.0.jar!/:1.20.0]
+          -->
           <excludeGroupIds>
-            io.zipkin.zipkin2,io.zipkin.reporter2,org.springframework.boot,org.springframework,com.fasterxml.jackson.core,com.google.auto.value,com.google.gson
+            ${zipkin.groupId},org.springframework.boot,org.springframework,com.fasterxml.jackson.core,com.google.auto.value,com.google.code.gson,org.reactivestreams,com.google.code.findbugs,javax.annotation,org.slf4j,io.netty,io.micrometer,org.hdrhistogram,org.latencyutils,org.apache.logging.log4j,com.github.luben,org.lz4,org.xerial.snappy
           </excludeGroupIds>
+          <!-- currently cannot exclude io.opencensus due to https://github.com/googleapis/google-http-java-client/issues/621 -->
+          <excludes>
+            <!-- zipkin-server depends on armeria-->
+            <exclude>
+              <groupId>${armeria.groupId}</groupId>
+              <artifactId>armeria</artifactId>
+            </exclude>
+            <!-- See https://github.com/line/armeria/issues/1679 -->
+            <exclude>
+              <groupId>net.bytebuddy</groupId>
+              <artifactId>byte-buddy</artifactId>
+            </exclude>
+            <!-- zipkin-server depends on kafka-clients-->
+            <exclude>
+              <groupId>org.apache.kafka</groupId>
+              <artifactId>kafka-clients</artifactId>
+            </exclude>
+          </excludes>
         </configuration>
+        <dependencies>
+          <dependency>
+            <groupId>io.zipkin.layout</groupId>
+            <artifactId>zipkin-layout-factory</artifactId>
+            <version>0.0.5</version>
+          </dependency>
+        </dependencies>
       </plugin>
     </plugins>
   </build>

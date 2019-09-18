@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -19,6 +19,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import zipkin2.storage.kafka.KafkaStorage;
+import zipkin2.storage.kafka.KafkaStorageBuilder;
 
 @ConfigurationProperties("zipkin.storage.kafka")
 public class ZipkinKafkaStorageProperties implements Serializable {
@@ -53,15 +54,15 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private Map<String, String> traceStoreStreamOverrides = new LinkedHashMap<>();
   private Map<String, String> dependencyStoreStreamOverrides = new LinkedHashMap<>();
 
-  KafkaStorage.Builder toBuilder() {
-    KafkaStorage.Builder builder = KafkaStorage.newBuilder();
+  KafkaStorageBuilder toBuilder() {
+    KafkaStorageBuilder builder = KafkaStorage.newBuilder();
     if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
     if (traceTimeout != null) {
       builder.traceTimeout(Duration.ofMillis(traceTimeout));
     }
     if (traceTtlCheckInterval != null) {
-        builder.traceTtlCheckInterval(Duration.ofMillis(traceTtlCheckInterval));
+      builder.traceTtlCheckInterval(Duration.ofMillis(traceTtlCheckInterval));
     }
     if (traceTtl != null) {
       builder.traceTtl(Duration.ofMillis(traceTtl));

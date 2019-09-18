@@ -1,15 +1,17 @@
----
+# Run `travis lint` when changing this file to avoid breaking the build.
+
 cache:
   directories:
     - $HOME/.m2
 
+services: docker
+
 language: java
 
-jdk:
-  - oraclejdk8
+jdk: openjdk11
 
-services:
-  - docker
+# Disable testcontainers checks
+before_install: echo checks.disable=true > ~/.testcontainers.properties
 
-script:
-  - mvn test verify -B
+# Override default travis to use the maven wrapper; skip license on travis due to #1512
+install: ./mvnw verify -Dlicense.skip=true -B

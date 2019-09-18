@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -34,8 +34,8 @@ import org.apache.kafka.streams.processor.PunctuationType;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
 import org.apache.kafka.streams.state.Stores;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.NamesSerde;
 import zipkin2.storage.kafka.streams.serdes.SpanIdsSerde;
@@ -53,8 +53,8 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   public static final String SPAN_NAMES_STORE_NAME = "zipkin-span-names";
   public static final String REMOTE_SERVICE_NAMES_STORE_NAME = "zipkin-remote-service-names";
   public static final String AUTOCOMPLETE_TAGS_STORE_NAME = "zipkin-autocomplete-tags";
+  static final Logger LOG = LogManager.getLogger();
 
-  static final Logger LOG = LoggerFactory.getLogger(TraceStoreTopologySupplier.class);
   // Kafka topics
   final String spansTopicName;
   // Limits
@@ -156,7 +156,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                       tracesStore.delete(traceId); // clean traces store
                     }
                   });
-                  LOG.info(
+                  LOG.debug(
                       "Traces deletion emitted at {}, approx. number of traces stored {}",
                       Instant.ofEpochMilli(to).atZone(ZoneId.systemDefault()),
                       tracesStore.approximateNumEntries());
@@ -179,7 +179,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
           // Persist timestamp indexed span ids
           long timestamp = spans.get(0).timestamp();
           Set<String> currentSpanIds = spanIdsByTsStore.get(timestamp);
-          if (currentSpanIds == null) currentSpanIds = new HashSet<>();
+          if (currentSpanIds == null) currentSpanIds = new LinkedHashSet<>();
           currentSpanIds.add(traceId);
           spanIdsByTsStore.put(timestamp, currentSpanIds);
         }
@@ -216,7 +216,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                 serviceNameStore.putIfAbsent(span.localServiceName(), span.localServiceName());
                 if (span.name() != null) { // store span names
                   Set<String> spanNames = spanNamesStore.get(span.localServiceName());
-                  if (spanNames == null) spanNames = new HashSet<>();
+                  if (spanNames == null) spanNames = new LinkedHashSet<>();
                   if (!spanNames.contains(span.name())) {
                     spanNames.add(span.name());
                     spanNamesStore.put(span.localServiceName(), spanNames);
@@ -224,7 +224,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                 }
                 if (span.remoteServiceName() != null) { // store remote service names
                   Set<String> remoteServiceNames = remoteServiceNamesStore.get(span.localServiceName());
-                  if (remoteServiceNames == null) remoteServiceNames = new HashSet<>();
+                  if (remoteServiceNames == null) remoteServiceNames = new LinkedHashSet<>();
                   if (!remoteServiceNames.contains(span.remoteServiceName())) {
                     remoteServiceNames.add(span.remoteServiceName());
                     remoteServiceNamesStore.put(span.localServiceName(), remoteServiceNames);
@@ -236,7 +236,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
                   String value = span.tags().get(tagKey);
                   if (value != null) {
                     Set<String> values = autocompleteTagsStore.get(tagKey);
-                    if (values == null) values = new HashSet<>();
+                    if (values == null) values = new LinkedHashSet<>();
                     if (!values.contains(value)) {
                       values.add(value);
                       autocompleteTagsStore.put(tagKey, values);

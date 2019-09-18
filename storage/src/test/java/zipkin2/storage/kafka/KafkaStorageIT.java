@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -32,6 +32,8 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,21 +51,23 @@ import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 
 @Testcontainers
 class KafkaStorageIT {
-  private static final long TODAY = System.currentTimeMillis();
+  static final Logger LOG = LogManager.getLogger();
 
-  @Container private KafkaContainer kafka = new KafkaContainer("5.3.0");
+  static final long TODAY = System.currentTimeMillis();
 
-  private Duration traceTimeout;
-  private KafkaStorage storage;
-  private Properties consumerConfig;
-  private KafkaProducer<String, List<Span>> tracesProducer;
-  private KafkaProducer<String, DependencyLink> dependencyProducer;
+  // TODO: does this need to be confluent container?
+  @Container KafkaContainer kafka = new KafkaContainer("5.3.0");
+
+  Duration traceTimeout;
+  KafkaStorage storage;
+  Properties consumerConfig;
+  KafkaProducer<String, List<Span>> tracesProducer;
+  KafkaProducer<String, DependencyLink> dependencyProducer;
 
   @BeforeEach void start() throws Exception {
     consumerConfig = new Properties();
@@ -72,15 +76,15 @@ class KafkaStorageIT {
     consumerConfig.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
     consumerConfig.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
 
-    if (!kafka.isRunning()) fail();
+    assertThat(kafka.isRunning()).isTrue();
 
     traceTimeout = Duration.ofSeconds(5);
-    storage = (KafkaStorage) new KafkaStorage.Builder()
-        .bootstrapServers(kafka.getBootstrapServers())
-        .storageDir("target/zipkin_" + System.currentTimeMillis())
-        .traceTimeout(traceTimeout)
-        .httpPort(randomPort())
-        .build();
+    storage = (KafkaStorage) KafkaStorage.newBuilder()
+      .bootstrapServers(kafka.getBootstrapServers())
+      .storageDir("target/zipkin_" + System.currentTimeMillis())
+      .traceTimeout(traceTimeout)
+      .httpPort(randomPort())
+      .build();
 
     Collection<NewTopic> newTopics = new ArrayList<>();
     newTopics.add(new NewTopic(storage.spansTopicName, 1, (short) 1));
@@ -93,15 +97,9 @@ class KafkaStorageIT {
     Properties producerConfig = new Properties();
     producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
     tracesProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
-        new SpansSerde().serializer());
+      new SpansSerde().serializer());
     dependencyProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
-        new DependencyLinkSerde().serializer());
-  }
-
-  private int randomPort() throws IOException {
-    try (ServerSocket socket = new ServerSocket(0)) {
-      return socket.getLocalPort();
-    }
+      new DependencyLinkSerde().serializer());
   }
 
   @AfterEach void close() {
@@ -116,149 +114,153 @@ class KafkaStorageIT {
   @Test void should_aggregate() throws Exception {
     // Given: a set of incoming spans
     Span parent = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-        .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(10)
-        .build();
+      .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+      .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(10)
+      .build();
     Span child = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(2)
-        .build();
+      .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+      .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(2)
+      .build();
     final SpanConsumer spanConsumer = storage.spanConsumer();
     // When: are consumed by storage
     spanConsumer.accept(Arrays.asList(parent, child)).execute();
     storage.getProducer().flush();
     // Then: they are partitioned
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        consumerConfig, storage.spansTopicName, 1, 10000);
+      consumerConfig, storage.spansTopicName, 1, 10000);
     // Given: some time for stream processes to kick in
     Thread.sleep(traceTimeout.toMillis() * 2);
     // Given: another span to move 'event time' forward
     Span another = Span.newBuilder().traceId("c").id("d").name("op_a").kind(Span.Kind.SERVER)
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(2)
-        .build();
+      .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+      .timestamp(MILLISECONDS.toMicros(System.currentTimeMillis())).duration(2)
+      .build();
     // When: published
     spanConsumer.accept(Collections.singletonList(another)).execute();
     storage.getProducer().flush();
     // Then: a trace is published
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        consumerConfig, storage.spansTopicName, 1, 1000);
+      consumerConfig, storage.spansTopicName, 1, 1000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        consumerConfig, storage.traceTopicName, 1, 30000);
+      consumerConfig, storage.traceTopicName, 1, 30000);
     // Then: and a dependency link created
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        consumerConfig, storage.dependencyTopicName, 1, 1000);
+      consumerConfig, storage.dependencyTopicName, 1, 1000);
   }
 
   @Test void should_return_traces_query() throws Exception {
     // Given: a trace prepared to be published
     Span parent = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
-        .remoteEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(MILLISECONDS.toMicros(TODAY)).duration(10)
-        .build();
+      .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+      .remoteEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+      .timestamp(MILLISECONDS.toMicros(TODAY)).duration(10)
+      .build();
     Span child = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
-        .timestamp(MILLISECONDS.toMicros(TODAY)).duration(2)
-        .build();
+      .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+      .timestamp(MILLISECONDS.toMicros(TODAY)).duration(2)
+      .build();
     Span other = Span.newBuilder().traceId("c").id("c").name("op_c").kind(Span.Kind.SERVER)
-        .localEndpoint(Endpoint.newBuilder().serviceName("svc_c").build())
-        .timestamp(MILLISECONDS.toMicros(TODAY) + 10).duration(8)
-        .build();
+      .localEndpoint(Endpoint.newBuilder().serviceName("svc_c").build())
+      .timestamp(MILLISECONDS.toMicros(TODAY) + 10).duration(8)
+      .build();
     List<Span> spans = Arrays.asList(parent, child);
     // When: and stores running
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
     // When: been published
     tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, parent.traceId(), spans));
     tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, other.traceId(),
-        Collections.singletonList(other)));
+      Collections.singletonList(other)));
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        consumerConfig, storage.spansTopicName, 2, 10000);
+      consumerConfig, storage.spansTopicName, 2, 10000);
     // Then: services names are searchable
     await().atMost(100, TimeUnit.SECONDS).until(() -> {
       List<List<Span>> traces = storage.spanStore().getTraces(QueryRequest.newBuilder()
-          .endTs(TODAY + 1)
-          .lookback(Duration.ofSeconds(30).toMillis())
-          .serviceName("svc_a")
-          .limit(10)
-          .build())
-          .execute();
+        .endTs(TODAY + 1)
+        .lookback(Duration.ofSeconds(30).toMillis())
+        .serviceName("svc_a")
+        .limit(10)
+        .build())
+        .execute();
       return (1 == traces.size()) &&
-          (traces.get(0).size() == 2); // Trace is found and has two spans
+        (traces.get(0).size() == 2); // Trace is found and has two spans
     });
     List<List<Span>> filteredTraces =
-        storage.spanStore().getTraces(QueryRequest.newBuilder()
-            .endTs(TODAY + 1)
-            .lookback(Duration.ofMinutes(1).toMillis())
-            .limit(1)
-            .build())
-            .execute();
-    assertEquals(1, filteredTraces.size());
-    assertEquals(1, filteredTraces.get(0).size()); // last trace is returned first
-    List<String> services = serviceAndSpanNames.getServiceNames().execute();
-    assertEquals(3, services.size()); // There are two service names
-    List<String> spanNames = serviceAndSpanNames.getSpanNames("svc_a")
+      storage.spanStore().getTraces(QueryRequest.newBuilder()
+        .endTs(TODAY + 1)
+        .lookback(Duration.ofMinutes(1).toMillis())
+        .limit(1)
+        .build())
         .execute();
-    assertEquals(1, spanNames.size());// Service names have one span name
 
+    assertThat(filteredTraces).hasSize(1);
+    assertThat(filteredTraces.get(0)).hasSize(1); // last trace is returned first
+    List<String> services = serviceAndSpanNames.getServiceNames().execute();
+    assertThat(services).hasSize(3);
+    List<String> spanNames = serviceAndSpanNames.getSpanNames("svc_a").execute();
+    assertThat(spanNames).hasSize(1); // Service names have one span name
     List<String> remoteServices = serviceAndSpanNames.getRemoteServiceNames("svc_a").execute();
-    assertEquals(1, remoteServices.size());// And one remote service name
+    assertThat(remoteServices).hasSize(1); // And one remote service name
   }
 
   @Test void should_find_dependencies() throws Exception {
     //Given: two related dependency links
     // When: sent first one
     dependencyProducer.send(
-        new ProducerRecord<>(storage.dependencyTopicName, "svc_a:svc_b",
-            DependencyLink.newBuilder()
-                .parent("svc_a")
-                .child("svc_b")
-                .callCount(1)
-                .errorCount(0)
-                .build()));
+      new ProducerRecord<>(storage.dependencyTopicName, "svc_a:svc_b",
+        DependencyLink.newBuilder()
+          .parent("svc_a")
+          .child("svc_b")
+          .callCount(1)
+          .errorCount(0)
+          .build()));
     // When: and another one
     dependencyProducer.send(
-        new ProducerRecord<>(storage.dependencyTopicName, "svc_a:svc_b",
-            DependencyLink.newBuilder()
-                .parent("svc_a")
-                .child("svc_b")
-                .callCount(1)
-                .errorCount(0)
-                .build()));
+      new ProducerRecord<>(storage.dependencyTopicName, "svc_a:svc_b",
+        DependencyLink.newBuilder()
+          .parent("svc_a")
+          .child("svc_b")
+          .callCount(1)
+          .errorCount(0)
+          .build()));
     dependencyProducer.flush();
     // Then: stored in topic
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-        consumerConfig, storage.dependencyTopicName, 2, 10000);
+      consumerConfig, storage.dependencyTopicName, 2, 10000);
     // Then:
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       List<DependencyLink> links = new ArrayList<>();
       try {
-        links =
-            storage.spanStore()
-                .getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
-                .execute();
+        links = storage.spanStore()
+          .getDependencies(System.currentTimeMillis(), Duration.ofMinutes(2).toMillis())
+          .execute();
       } catch (InvalidStateStoreException e) { // ignoring state issues
         System.err.println(e.getMessage());
       } catch (Exception e) {
         e.printStackTrace();
       }
       return links.size() == 1
-          && links.get(0).callCount() == 2; // link stored and call count aggregated.
+        && links.get(0).callCount() == 2; // link stored and call count aggregated.
     });
   }
 
   @Test void shouldFailWhenKafkaNotAvailable() {
     CheckResult checked = storage.check();
-    assertEquals(CheckResult.OK, checked);
+    assertThat(checked.ok()).isTrue();
 
     kafka.stop();
     await().atMost(5, TimeUnit.SECONDS)
-        .until(() -> {
-          CheckResult check = storage.check();
-          return check != CheckResult.OK;
-        });
+      .until(() -> {
+        CheckResult check = storage.check();
+        return check != CheckResult.OK;
+      });
     storage.close();
+  }
+
+  static int randomPort() throws IOException {
+    try (ServerSocket socket = new ServerSocket(0)) {
+      return socket.getLocalPort();
+    }
   }
 }

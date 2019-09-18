@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 jeqo
+ * Copyright 2019 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -28,7 +28,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -40,15 +40,14 @@ import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.apache.kafka.streams.state.ReadOnlyWindowStore;
 import org.apache.kafka.streams.state.StreamsMetadata;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.codec.DependencyLinkBytesEncoder;
 import zipkin2.codec.SpanBytesEncoder;
 import zipkin2.internal.DependencyLinker;
 import zipkin2.storage.QueryRequest;
-import zipkin2.storage.kafka.streams.KafkaStreamsMetadata;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -62,15 +61,13 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
 
 /**
  * Server to enable access to local stores.
- * <p>
- * Given the partitioned nature of local stores, a RPC layer is required to allow accessing
+ *
+ * <p>Given the partitioned nature of local stores, a RPC layer is required to allow accessing
  * distributed state. This component exposes access to local state via Http call from {@link
  * KafkaSpanStore}
- *
- * @since 0.6.0
  */
-public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
-  static final Logger LOG = LoggerFactory.getLogger(KafkaStoreHttpService.class);
+final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
+  static final Logger LOG = LogManager.getLogger();
   static final ObjectMapper MAPPER = new ObjectMapper();
 
   final KafkaStorage storage;
@@ -105,7 +102,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
           MediaType.JSON,
           DependencyLinkBytesEncoder.JSON_V1.encodeList(mergedLinks));
     } catch (InvalidStateStoreException e) {
-      LOG.warn("State store is not ready", e);
+      LOG.debug("State store is not ready", e);
       return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
     }
   }
@@ -121,7 +118,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       store.all().forEachRemaining(keyValue -> array.add(keyValue.value));
       return array;
     } catch (InvalidStateStoreException e) {
-      LOG.warn("State store is not ready", e);
+      LOG.debug("State store is not ready", e);
       throw e;
     }
   }
@@ -138,7 +135,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       names.forEach(array::add);
       return array;
     } catch (InvalidStateStoreException e) {
-      LOG.warn("State store is not ready", e);
+      LOG.debug("State store is not ready", e);
       throw e;
     }
   }
@@ -155,7 +152,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       names.forEach(array::add);
       return (array);
     } catch (InvalidStateStoreException e) {
-      LOG.warn("State store is not ready", e);
+      LOG.debug("State store is not ready", e);
       throw e;
     }
   }
@@ -217,7 +214,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON,
           writeTraces(result));
     } catch (InvalidStateStoreException e) {
-      LOG.warn("State store is not ready", e);
+      LOG.debug("State store is not ready", e);
       return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
     }
   }
@@ -253,7 +250,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
           MediaType.JSON,
           SpanBytesEncoder.JSON_V2.encodeList(spans));
     } catch (InvalidStateStoreException e) {
-      LOG.warn("State store is not ready", e);
+      LOG.debug("State store is not ready", e);
       return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
     }
   }
@@ -269,7 +266,7 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       autocompleteTagsStore.all().forEachRemaining(keyValue -> array.add(keyValue.key));
       return array;
     } catch (InvalidStateStoreException e) {
-      LOG.warn("State store is not ready", e);
+      LOG.debug("State store is not ready", e);
       throw e;
     }
   }
@@ -282,12 +279,12 @@ public class KafkaStoreHttpService implements Consumer<ServerBuilder> {
           storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
               QueryableStoreTypes.keyValueStore());
       Set<String> valuesSet = autocompleteTagsStore.get(key);
-      if (valuesSet == null) valuesSet = new HashSet<>();
+      if (valuesSet == null) valuesSet = new LinkedHashSet<>();
       ArrayNode array = MAPPER.createArrayNode();
       valuesSet.forEach(array::add);
       return array;
     } catch (InvalidStateStoreException e) {
-      LOG.warn("State store is not ready", e);
+      LOG.debug("State store is not ready", e);
       throw e;
     }
   }
