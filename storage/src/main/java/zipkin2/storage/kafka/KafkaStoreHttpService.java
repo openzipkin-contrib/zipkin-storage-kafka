@@ -255,6 +255,24 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
     }
   }
 
+  @Get("/api/v2/traceMany")
+  public AggregatedHttpResponse getTraces(@Param("traceIds") String traceIds) {
+    try {
+      ReadOnlyKeyValueStore<String, List<Span>> store =
+        storage.getTraceStoreStream().store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+
+      List<List<Span>> result = new ArrayList<>();
+      for (String traceId : traceIds.split(",", 1000)) {
+        result.add(store.get(traceId));
+      }
+
+      return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, writeTraces(result));
+    } catch (InvalidStateStoreException e) {
+      LOG.debug("State store is not ready", e);
+      return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+  }
+
   @Get("/autocompleteTags")
   @ProducesJson
   public JsonNode getAutocompleteTags() {

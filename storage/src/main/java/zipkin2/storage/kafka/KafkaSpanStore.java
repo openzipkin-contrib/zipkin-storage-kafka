@@ -17,6 +17,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
+import java.util.StringJoiner;
 import java.util.function.BiFunction;
 import org.apache.kafka.streams.KafkaStreams;
 import zipkin2.Call;
@@ -27,6 +28,7 @@ import zipkin2.codec.SpanBytesDecoder;
 import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
+import zipkin2.storage.Traces;
 import zipkin2.storage.kafka.internal.KafkaStoreScatterGatherListCall;
 import zipkin2.storage.kafka.internal.KafkaStoreSingleKeyListCall;
 import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
@@ -42,7 +44,7 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
  * TraceStoreTopologySupplier} and {@link DependencyStoreTopologySupplier}, and made accessible by
  * {@link  KafkaStoreHttpService}.
  */
-final class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
+final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
   static final ObjectMapper MAPPER = new ObjectMapper();
   // Kafka Streams Store provider
   final KafkaStreams traceStoreStream;
@@ -60,7 +62,17 @@ final class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
   }
 
   @Override public Call<List<Span>> getTrace(String traceId) {
-    return new GetTraceCall(traceStoreStream, httpBaseUrl, traceId);
+    return new GetTraceCall(traceStoreStream, httpBaseUrl, Span.normalizeTraceId(traceId));
+  }
+
+  @Override public Call<List<List<Span>>> getTraces(Iterable<String> traceIds) {
+    StringJoiner joiner = new StringJoiner(",");
+    for (String traceId : traceIds) {
+      joiner.add(Span.normalizeTraceId(traceId));
+    }
+
+    if (joiner.length() == 0) return Call.emptyList();
+    return new GetTraceManyCall(traceStoreStream, httpBaseUrl, joiner.toString());
   }
 
   @Deprecated @Override public Call<List<String>> getServiceNames() {
@@ -201,6 +213,29 @@ final class KafkaSpanStore implements SpanStore, ServiceAndSpanNames {
 
     @Override public Call<List<Span>> clone() {
       return new GetTraceCall(traceStoreStream, httpBaseUrl, traceId);
+    }
+  }
+
+  static final class GetTraceManyCall extends KafkaStoreScatterGatherListCall<List<Span>> {
+    final KafkaStreams traceStoreStream;
+    final BiFunction<String, Integer, String> httpBaseUrl;
+    final String traceIds;
+
+    GetTraceManyCall(KafkaStreams traceStoreStream,
+      BiFunction<String, Integer, String> httpBaseUrl,
+      String traceIds) {
+      super(traceStoreStream, TRACES_STORE_NAME, httpBaseUrl, "/traceMany?traceIds=" + traceIds);
+      this.traceStoreStream = traceStoreStream;
+      this.httpBaseUrl = httpBaseUrl;
+      this.traceIds = traceIds;
+    }
+
+    @Override protected List<Span> parse(JsonNode node) throws JsonProcessingException {
+      return SpanBytesDecoder.JSON_V2.decodeList(MAPPER.writeValueAsBytes(node));
+    }
+
+    @Override public Call<List<List<Span>>> clone() {
+      return new GetTraceManyCall(traceStoreStream, httpBaseUrl, traceIds);
     }
   }
 
