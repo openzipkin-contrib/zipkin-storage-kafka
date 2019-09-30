@@ -36,8 +36,8 @@
     <main.basedir>${project.basedir}</main.basedir>
 
     <!-- groupId overrinds allow testing feature branches with jitpack -->
-    <zipkin.groupId>com.github.openzipkin.zipkin</zipkin.groupId>
-    <zipkin.version>traceMany-SNAPSHOT</zipkin.version>
+    <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
+    <zipkin.version>2.17.0</zipkin.version>
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
     <armeria.version>0.91.0</armeria.version>
     <spring-boot.version>2.1.8.RELEASE</spring-boot.version>
