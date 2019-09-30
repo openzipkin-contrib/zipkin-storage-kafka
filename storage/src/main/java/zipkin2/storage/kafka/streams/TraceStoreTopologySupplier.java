@@ -131,6 +131,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
       // timestamp index for trace IDs
       KeyValueStore<Long, Set<String>> spanIdsByTsStore;
 
+      @SuppressWarnings("unchecked")
       @Override public void init(ProcessorContext context) {
         tracesStore =
             (KeyValueStore<String, List<Span>>) context.getStateStore(TRACES_STORE_NAME);
@@ -193,8 +194,8 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
           KeyValueStore<String, Set<String>> remoteServiceNamesStore;
           KeyValueStore<String, Set<String>> autocompleteTagsStore;
 
-          @Override
-          public void init(ProcessorContext context) {
+          @SuppressWarnings("unchecked")
+          @Override public void init(ProcessorContext context) {
             serviceNameStore =
                 (KeyValueStore<String, String>) context.getStateStore(SERVICE_NAMES_STORE_NAME);
             spanNamesStore =

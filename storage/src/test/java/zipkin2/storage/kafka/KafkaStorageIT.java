@@ -68,6 +68,8 @@ class KafkaStorageIT {
   Properties consumerConfig;
   KafkaProducer<String, List<Span>> tracesProducer;
   KafkaProducer<String, DependencyLink> dependencyProducer;
+  SpansSerde spansSerde = new SpansSerde();
+  DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
 
   @BeforeEach void start() throws Exception {
     consumerConfig = new Properties();
@@ -97,9 +99,9 @@ class KafkaStorageIT {
     Properties producerConfig = new Properties();
     producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
     tracesProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
-      new SpansSerde().serializer());
+      spansSerde.serializer());
     dependencyProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
-      new DependencyLinkSerde().serializer());
+      dependencyLinkSerde.serializer());
   }
 
   @AfterEach void close() {
@@ -109,6 +111,8 @@ class KafkaStorageIT {
     tracesProducer = null;
     storage.close();
     storage = null;
+    spansSerde.close();
+    dependencyLinkSerde.close();
   }
 
   @Test void should_aggregate() throws Exception {

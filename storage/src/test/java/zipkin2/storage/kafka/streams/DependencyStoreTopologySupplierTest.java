@@ -46,7 +46,7 @@ class DependencyStoreTopologySupplierTest {
         dependenciesWindowSize
     ).get();
     TopologyDescription description = topology.describe();
-    // Then: 2 threads prepared ;;; TODO: is this comment lying?
+    // Then: topology with 1 thread
     assertThat(description.subtopologies()).hasSize(1);
     // Given: streams configuration
     Properties props = new Properties();
@@ -86,5 +86,8 @@ class DependencyStoreTopologySupplierTest {
     KeyValueIterator<Windowed<String>, DependencyLink> fetch3 = links.all();
     assertThat(fetch3).hasNext();
     assertThat(fetch3.next().value.callCount()).isEqualTo(1);
+    // Close resources
+    testDriver.close();
+    dependencyLinkSerde.close();
   }
 }
