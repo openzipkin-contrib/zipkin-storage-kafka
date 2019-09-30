@@ -126,14 +126,12 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
         .stream(spansTopicName, Consumed.with(Serdes.String(), spansSerde));
     // Store traces
     spansStream.process(() -> new Processor<String, List<Span>>() {
-      ProcessorContext context;
       // Actual traces store
       KeyValueStore<String, List<Span>> tracesStore;
       // timestamp index for trace IDs
       KeyValueStore<Long, Set<String>> spanIdsByTsStore;
 
       @Override public void init(ProcessorContext context) {
-        this.context = context;
         tracesStore =
             (KeyValueStore<String, List<Span>>) context.getStateStore(TRACES_STORE_NAME);
         spanIdsByTsStore =
