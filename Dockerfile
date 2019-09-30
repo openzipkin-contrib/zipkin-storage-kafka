@@ -28,7 +28,7 @@ RUN apk add curl unzip && \
   unzip kafka.jar -d kafka && \
   rm kafka.jar
 
-FROM openzipkin/zipkin:2.16.2
+FROM openzipkin/zipkin:2.17.0
 
 COPY --from=0  --chown=zipkin /zipkin/ /zipkin/
 
