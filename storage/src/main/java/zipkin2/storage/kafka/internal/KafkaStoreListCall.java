@@ -27,8 +27,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.state.StreamsMetadata;
-
+import org.apache.kafka.streams.state.HostInfo;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import zipkin2.Call;
@@ -43,18 +42,18 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
   final BiFunction<String, Integer, String> httpBaseUrl;
   final String httpPath;
 
-  KafkaStoreListCall(
-      KafkaStreams kafkaStreams,
-      String storeName,
-      BiFunction<String, Integer, String> httpBaseUrl,
-      String httpPath) {
+  protected KafkaStoreListCall(
+    KafkaStreams kafkaStreams,
+    String storeName,
+    BiFunction<String, Integer, String> httpBaseUrl,
+    String httpPath) {
     this.kafkaStreams = kafkaStreams;
     this.storeName = storeName;
     this.httpBaseUrl = httpBaseUrl;
     this.httpPath = httpPath;
   }
 
-  List<V> parseList(String content) {
+  protected List<V> parseList(String content) {
     try {
       if (content == null) return Collections.emptyList();
       ArrayNode arrayNode = (ArrayNode) MAPPER.readTree(content);
@@ -70,13 +69,13 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
     }
   }
 
-  String content(AggregatedHttpResponse response) {
+  protected String content(AggregatedHttpResponse response) {
     if (!response.status().equals(HttpStatus.OK)) return null;
     return response.contentUtf8();
   }
 
-  HttpClient httpClient(StreamsMetadata metadata) {
-    return HttpClient.of(httpBaseUrl.apply(metadata.hostInfo().host(), metadata.hostInfo().port()));
+  protected HttpClient httpClient(HostInfo hostInfo) {
+    return HttpClient.of(httpBaseUrl.apply(hostInfo.host(), hostInfo.port()));
   }
 
   @Override protected List<V> doExecute() {
@@ -99,14 +98,14 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
     });
   }
 
-  /** 
-   * Calling http service to obtain {@code list of V} items 
+  /**
+   * Calling http service to obtain {@code list of V} items
    */
   protected abstract CompletableFuture<List<V>> listFuture();
-  
+
   /**
-   * Parse list element from json into {@code type V} 
-   * 
+   * Parse list element from json into {@code type V}
+   *
    * @see #parseList(String)
    */
   protected abstract V parseItem(JsonNode node) throws JsonProcessingException;

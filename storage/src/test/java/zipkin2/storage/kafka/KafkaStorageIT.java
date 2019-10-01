@@ -60,7 +60,7 @@ class KafkaStorageIT {
 
   static final long TODAY = System.currentTimeMillis();
 
-  // TODO: does this need to be confluent container?
+  // TODO: does this need to be confluent container? #45
   @Container KafkaContainer kafka = new KafkaContainer("5.3.0");
 
   Duration traceTimeout;
@@ -206,6 +206,9 @@ class KafkaStorageIT {
     assertThat(spanNames).hasSize(1); // Service names have one span name
     List<String> remoteServices = serviceAndSpanNames.getRemoteServiceNames("svc_a").execute();
     assertThat(remoteServices).hasSize(1); // And one remote service name
+    List<List<Span>> manyTraces =
+      storage.traces().getTraces(Arrays.asList(parent.traceId(), other.traceId())).execute();
+    assertThat(manyTraces).hasSize(2);
   }
 
   @Test void should_find_dependencies() throws Exception {

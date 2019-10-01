@@ -255,7 +255,7 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
     }
   }
 
-  @Get("/api/v2/traceMany")
+  @Get("/traceMany")
   public AggregatedHttpResponse getTraces(@Param("traceIds") String traceIds) {
     try {
       ReadOnlyKeyValueStore<String, List<Span>> store =

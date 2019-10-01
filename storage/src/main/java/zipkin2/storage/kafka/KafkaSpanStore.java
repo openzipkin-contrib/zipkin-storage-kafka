@@ -16,10 +16,22 @@ package zipkin2.storage.kafka;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.linecorp.armeria.common.AggregatedHttpResponse;
+import com.linecorp.armeria.common.HttpResponse;
+import com.linecorp.armeria.common.HttpStatus;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.StringJoiner;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.state.HostInfo;
+import org.apache.kafka.streams.state.StreamsMetadata;
 import zipkin2.Call;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
@@ -29,8 +41,10 @@ import zipkin2.storage.QueryRequest;
 import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.Traces;
+import zipkin2.storage.kafka.internal.KafkaStoreListCall;
 import zipkin2.storage.kafka.internal.KafkaStoreScatterGatherListCall;
 import zipkin2.storage.kafka.internal.KafkaStoreSingleKeyListCall;
+import zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier;
 import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
 
 import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
@@ -96,7 +110,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     final BiFunction<String, Integer, String> httpBaseUrl;
 
     GetServiceNamesCall(KafkaStreams traceStoreStream,
-        BiFunction<String, Integer, String> httpBaseUrl) {
+      BiFunction<String, Integer, String> httpBaseUrl) {
       super(traceStoreStream, SERVICE_NAMES_STORE_NAME, httpBaseUrl, "/serviceNames");
       this.traceStoreStream = traceStoreStream;
       this.httpBaseUrl = httpBaseUrl;
@@ -117,9 +131,9 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     final BiFunction<String, Integer, String> httpBaseUrl;
 
     GetSpanNamesCall(KafkaStreams traceStoreStream, String serviceName,
-        BiFunction<String, Integer, String> httpBaseUrl) {
+      BiFunction<String, Integer, String> httpBaseUrl) {
       super(traceStoreStream, SPAN_NAMES_STORE_NAME, httpBaseUrl,
-          "/serviceNames/" + serviceName + "/spanNames", serviceName);
+        "/serviceNames/" + serviceName + "/spanNames", serviceName);
       this.traceStoreStream = traceStoreStream;
       this.serviceName = serviceName;
       this.httpBaseUrl = httpBaseUrl;
@@ -140,9 +154,9 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     final BiFunction<String, Integer, String> httpBaseUrl;
 
     GetRemoteServiceNamesCall(KafkaStreams traceStoreStream, String serviceName,
-        BiFunction<String, Integer, String> httpBaseUrl) {
+      BiFunction<String, Integer, String> httpBaseUrl) {
       super(traceStoreStream, REMOTE_SERVICE_NAMES_STORE_NAME, httpBaseUrl,
-          "/serviceNames/" + serviceName + "/remoteServiceNames", serviceName);
+        "/serviceNames/" + serviceName + "/remoteServiceNames", serviceName);
       this.traceStoreStream = traceStoreStream;
       this.serviceName = serviceName;
       this.httpBaseUrl = httpBaseUrl;
@@ -163,21 +177,21 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     final QueryRequest request;
 
     GetTracesCall(KafkaStreams traceStoreStream,
-        BiFunction<String, Integer, String> httpBaseUrl,
-        QueryRequest request) {
+      BiFunction<String, Integer, String> httpBaseUrl,
+      QueryRequest request) {
       super(traceStoreStream, TRACES_STORE_NAME, httpBaseUrl,
-          ("/traces?"
-              + (request.serviceName() == null ? "" : "serviceName=" + request.serviceName() + "&")
-              + (request.remoteServiceName() == null ? ""
-              : "remoteServiceName=" + request.remoteServiceName() + "&")
-              + (request.spanName() == null ? "" : "spanName=" + request.spanName() + "&")
-              + (request.annotationQueryString() == null ? ""
-              : "annotationQuery=" + request.annotationQueryString() + "&")
-              + (request.minDuration() == null ? "" : "minDuration=" + request.minDuration() + "&")
-              + (request.maxDuration() == null ? "" : "maxDuration=" + request.maxDuration() + "&")
-              + ("endTs=" + request.endTs() + "&")
-              + ("lookback=" + request.lookback() + "&")
-              + ("limit=" + request.limit())));
+        ("/traces?"
+          + (request.serviceName() == null ? "" : "serviceName=" + request.serviceName() + "&")
+          + (request.remoteServiceName() == null ? ""
+          : "remoteServiceName=" + request.remoteServiceName() + "&")
+          + (request.spanName() == null ? "" : "spanName=" + request.spanName() + "&")
+          + (request.annotationQueryString() == null ? ""
+          : "annotationQuery=" + request.annotationQueryString() + "&")
+          + (request.minDuration() == null ? "" : "minDuration=" + request.minDuration() + "&")
+          + (request.maxDuration() == null ? "" : "maxDuration=" + request.maxDuration() + "&")
+          + ("endTs=" + request.endTs() + "&")
+          + ("lookback=" + request.lookback() + "&")
+          + ("limit=" + request.limit())));
       this.traceStoreStream = traceStoreStream;
       this.httpBaseUrl = httpBaseUrl;
       this.request = request;
@@ -198,10 +212,10 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     final String traceId;
 
     GetTraceCall(KafkaStreams traceStoreStream,
-        BiFunction<String, Integer, String> httpBaseUrl,
-        String traceId) {
+      BiFunction<String, Integer, String> httpBaseUrl,
+      String traceId) {
       super(traceStoreStream, TRACES_STORE_NAME, httpBaseUrl, String.format("/traces/%s", traceId),
-          traceId);
+        traceId);
       this.traceStoreStream = traceStoreStream;
       this.httpBaseUrl = httpBaseUrl;
       this.traceId = traceId;
@@ -216,7 +230,9 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     }
   }
 
-  static final class GetTraceManyCall extends KafkaStoreScatterGatherListCall<List<Span>> {
+  static final class GetTraceManyCall extends KafkaStoreListCall<List<Span>> {
+    static final StringSerializer STRING_SERIALIZER = new StringSerializer();
+
     final KafkaStreams traceStoreStream;
     final BiFunction<String, Integer, String> httpBaseUrl;
     final String traceIds;
@@ -237,6 +253,37 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     @Override public Call<List<List<Span>>> clone() {
       return new GetTraceManyCall(traceStoreStream, httpBaseUrl, traceIds);
     }
+
+    @Override
+    protected CompletableFuture<List<List<Span>>> listFuture() {
+      // To reduce calls to store instances traceIds are grouped by hostInfo
+      Map<HostInfo, List<String>> traceIdsByHost = new LinkedHashMap<>();
+      for (String traceId : traceIds.split(",", 1000)) {
+        StreamsMetadata metadata =
+          traceStoreStream.metadataForKey(TRACES_STORE_NAME, traceId, STRING_SERIALIZER);
+        List<String> collected = traceIdsByHost.get(metadata.hostInfo());
+        if (collected == null) collected = new ArrayList<>();
+        collected.add(traceId);
+        traceIdsByHost.put(metadata.hostInfo(), collected);
+      }
+      // Only calls to hosts that have traceIds are executed
+      List<CompletableFuture<AggregatedHttpResponse>> responseFutures =
+        traceIdsByHost.entrySet()
+          .stream()
+          .map(entry -> httpClient(entry.getKey())
+            .get("/traceMany?traceIds=" + String.join(",", entry.getValue())))
+          .map(HttpResponse::aggregate)
+          .collect(Collectors.toList());
+      return CompletableFuture.allOf(responseFutures.toArray(new CompletableFuture[0]))
+        .thenApply(unused ->
+          responseFutures.stream()
+            .map(s -> s.getNow(AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR)))
+            .map(this::content)
+            .map(this::parseList)
+            .flatMap(Collection::stream)
+            .distinct()
+            .collect(Collectors.toList()));
+    }
   }
 
   static final class GetDependenciesCall extends KafkaStoreScatterGatherListCall<DependencyLink> {
@@ -245,10 +292,10 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     final long endTs, lookback;
 
     GetDependenciesCall(KafkaStreams dependencyStoreStream,
-        BiFunction<String, Integer, String> httpBaseUrl,
-        long endTs, long lookback) {
+      BiFunction<String, Integer, String> httpBaseUrl,
+      long endTs, long lookback) {
       super(dependencyStoreStream, DEPENDENCIES_STORE_NAME,
-          httpBaseUrl, "/dependencies?endTs=" + endTs + "&lookback=" + lookback);
+        httpBaseUrl, "/dependencies?endTs=" + endTs + "&lookback=" + lookback);
       this.dependencyStoreStream = dependencyStoreStream;
       this.httpBaseUrl = httpBaseUrl;
       this.endTs = endTs;
