@@ -38,7 +38,7 @@ public abstract class KafkaStoreScatterGatherListCall<V> extends KafkaStoreListC
     super(kafkaStreams, storeName, httpBaseUrl, httpPath);
   }
 
-  protected CompletableFuture<List<V>> listFuture() {
+  @Override protected CompletableFuture<List<V>> listFuture() {
     List<CompletableFuture<AggregatedHttpResponse>> responseFutures =
         kafkaStreams.allMetadataForStore(storeName)
             .stream()

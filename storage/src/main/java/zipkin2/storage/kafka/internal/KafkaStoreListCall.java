@@ -60,7 +60,7 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
       ArrayNode arrayNode = (ArrayNode) MAPPER.readTree(content);
       List<V> values = new ArrayList<>();
       for (JsonNode node : arrayNode) {
-        V value = parse(node);
+        V value = parseItem(node);
         values.add(value);
       }
       return values;
@@ -99,7 +99,15 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
     });
   }
 
-  protected abstract V parse(JsonNode node) throws JsonProcessingException;
-
+  /** 
+   * Calling http service to obtain {@code list of V} items 
+   */
   protected abstract CompletableFuture<List<V>> listFuture();
+  
+  /**
+   * Parse list element from json into {@code type V} 
+   * 
+   * @see #parseList(String)
+   */
+  protected abstract V parseItem(JsonNode node) throws JsonProcessingException;
 }
