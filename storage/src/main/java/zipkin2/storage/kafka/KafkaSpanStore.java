@@ -102,7 +102,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
       this.httpBaseUrl = httpBaseUrl;
     }
 
-    @Override protected String parse(JsonNode node) {
+    @Override protected String parseItem(JsonNode node) {
       return node.textValue();
     }
 
@@ -125,7 +125,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
       this.httpBaseUrl = httpBaseUrl;
     }
 
-    @Override protected String parse(JsonNode node) {
+    @Override protected String parseItem(JsonNode node) {
       return node.textValue();
     }
 
@@ -148,7 +148,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
       this.httpBaseUrl = httpBaseUrl;
     }
 
-    @Override protected String parse(JsonNode node) {
+    @Override protected String parseItem(JsonNode node) {
       return node.textValue();
     }
 
@@ -183,7 +183,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
       this.request = request;
     }
 
-    @Override protected List<Span> parse(JsonNode node) throws JsonProcessingException {
+    @Override protected List<Span> parseItem(JsonNode node) throws JsonProcessingException {
       return SpanBytesDecoder.JSON_V2.decodeList(MAPPER.writeValueAsBytes(node));
     }
 
@@ -207,7 +207,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
       this.traceId = traceId;
     }
 
-    @Override protected Span parse(JsonNode node) throws JsonProcessingException {
+    @Override protected Span parseItem(JsonNode node) throws JsonProcessingException {
       return SpanBytesDecoder.JSON_V2.decodeOne(MAPPER.writeValueAsBytes(node));
     }
 
@@ -230,7 +230,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
       this.traceIds = traceIds;
     }
 
-    @Override protected List<Span> parse(JsonNode node) throws JsonProcessingException {
+    @Override protected List<Span> parseItem(JsonNode node) throws JsonProcessingException {
       return SpanBytesDecoder.JSON_V2.decodeList(MAPPER.writeValueAsBytes(node));
     }
 
@@ -255,7 +255,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
       this.lookback = lookback;
     }
 
-    @Override protected DependencyLink parse(JsonNode node) throws JsonProcessingException {
+    @Override protected DependencyLink parseItem(JsonNode node) throws JsonProcessingException {
       return DependencyLinkBytesDecoder.JSON_V1.decodeOne(MAPPER.writeValueAsBytes(node));
     }
 

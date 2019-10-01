@@ -60,7 +60,7 @@ final class KafkaAutocompleteTags implements AutocompleteTags {
       this.httpBaseUrl = httpBaseUrl;
     }
 
-    @Override protected String parse(JsonNode node) {
+    @Override protected String parseItem(JsonNode node) {
       return node.textValue();
     }
 
@@ -92,7 +92,7 @@ final class KafkaAutocompleteTags implements AutocompleteTags {
       return new GetTagValuesCall(traceStoreStream, httpBaseUrl, tagKey);
     }
 
-    @Override protected String parse(JsonNode node) {
+    @Override protected String parseItem(JsonNode node) {
       return node.textValue();
     }
   }
