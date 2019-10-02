@@ -35,6 +35,7 @@ import zipkin2.storage.ServiceAndSpanNames;
 import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
+import zipkin2.storage.Traces;
 import zipkin2.storage.kafka.internal.NoopServiceAndSpanNames;
 import zipkin2.storage.kafka.internal.NoopSpanStore;
 import zipkin2.storage.kafka.streams.AggregationTopologySupplier;
@@ -131,6 +132,20 @@ public class KafkaStorage extends StorageComponent {
     }
   }
 
+  @Override public SpanStore spanStore() {
+    checkResources();
+    if (searchEnabled) { // not exactly correct. See https://github.com/openzipkin/zipkin/pull/2803
+      return new KafkaSpanStore(this);
+    } else {
+      return new NoopSpanStore();
+    }
+  }
+
+  @Override public Traces traces() {
+    checkResources();
+    return new KafkaSpanStore(this);
+  }
+
   @Override public ServiceAndSpanNames serviceAndSpanNames() {
     checkResources();
     if (searchEnabled) {
@@ -140,14 +155,6 @@ public class KafkaStorage extends StorageComponent {
     }
   }
 
-  @Override public SpanStore spanStore() {
-    checkResources();
-    if (searchEnabled) { // not exactly correct. See https://github.com/openzipkin/zipkin/pull/2803
-      return new KafkaSpanStore(this);
-    } else {
-      return new NoopSpanStore();
-    }
-  }
 
   @Override public AutocompleteTags autocompleteTags() {
     checkResources();

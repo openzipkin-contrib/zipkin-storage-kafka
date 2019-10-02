@@ -88,5 +88,10 @@ class AggregationTopologySupplierTest {
         .parent("svc_a").child("svc_b").callCount(1).errorCount(0)
         .build();
     OutputVerifier.compareKeyValue(linkRecord, "svc_a:svc_b", link);
+    
+    //Finally close resources
+    testDriver.close();
+    spansSerde.close();
+    dependencyLinkSerde.close();
   }
 }

@@ -21,6 +21,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.state.StreamsMetadata;
 
 /**
  * Search for all instances containing key/value pairs and aggregate results.
@@ -38,13 +39,14 @@ public abstract class KafkaStoreScatterGatherListCall<V> extends KafkaStoreListC
     super(kafkaStreams, storeName, httpBaseUrl, httpPath);
   }
 
-  protected CompletableFuture<List<V>> listFuture() {
+  @Override protected CompletableFuture<List<V>> listFuture() {
     List<CompletableFuture<AggregatedHttpResponse>> responseFutures =
         kafkaStreams.allMetadataForStore(storeName)
             .stream()
+            .map(StreamsMetadata::hostInfo)
             .map(this::httpClient)
             .map(c -> c.get(httpPath).aggregate()).collect(Collectors.toList());
-    return CompletableFuture.allOf(responseFutures.stream().toArray(CompletableFuture[]::new))
+    return CompletableFuture.allOf(responseFutures.toArray(new CompletableFuture[0]))
         .thenApply(unused ->
             responseFutures.stream()
                 .map(s -> s.getNow(AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR)))

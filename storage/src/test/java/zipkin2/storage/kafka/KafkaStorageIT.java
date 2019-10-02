@@ -60,7 +60,7 @@ class KafkaStorageIT {
 
   static final long TODAY = System.currentTimeMillis();
 
-  // TODO: does this need to be confluent container?
+  // TODO: does this need to be confluent container? #45
   @Container KafkaContainer kafka = new KafkaContainer("5.3.0");
 
   Duration traceTimeout;
@@ -68,6 +68,8 @@ class KafkaStorageIT {
   Properties consumerConfig;
   KafkaProducer<String, List<Span>> tracesProducer;
   KafkaProducer<String, DependencyLink> dependencyProducer;
+  SpansSerde spansSerde = new SpansSerde();
+  DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
 
   @BeforeEach void start() throws Exception {
     consumerConfig = new Properties();
@@ -97,9 +99,9 @@ class KafkaStorageIT {
     Properties producerConfig = new Properties();
     producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
     tracesProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
-      new SpansSerde().serializer());
+      spansSerde.serializer());
     dependencyProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
-      new DependencyLinkSerde().serializer());
+      dependencyLinkSerde.serializer());
   }
 
   @AfterEach void close() {
@@ -109,6 +111,8 @@ class KafkaStorageIT {
     tracesProducer = null;
     storage.close();
     storage = null;
+    spansSerde.close();
+    dependencyLinkSerde.close();
   }
 
   @Test void should_aggregate() throws Exception {
@@ -202,6 +206,9 @@ class KafkaStorageIT {
     assertThat(spanNames).hasSize(1); // Service names have one span name
     List<String> remoteServices = serviceAndSpanNames.getRemoteServiceNames("svc_a").execute();
     assertThat(remoteServices).hasSize(1); // And one remote service name
+    List<List<Span>> manyTraces =
+      storage.traces().getTraces(Arrays.asList(parent.traceId(), other.traceId())).execute();
+    assertThat(manyTraces).hasSize(2);
   }
 
   @Test void should_find_dependencies() throws Exception {

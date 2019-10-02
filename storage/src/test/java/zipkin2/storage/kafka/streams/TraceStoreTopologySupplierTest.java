@@ -123,5 +123,9 @@ class TraceStoreTopologySupplierTest {
 
     // Then: Traces store is empty
     assertThat(traces.get(a.traceId())).isNull();
+
+    // Finally close resources
+    testDriver.close();
+    spansSerde.close();
   }
 }

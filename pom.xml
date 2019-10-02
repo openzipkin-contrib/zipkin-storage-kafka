@@ -37,10 +37,10 @@
 
     <!-- groupId overrinds allow testing feature branches with jitpack -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
-    <zipkin.version>2.16.2</zipkin.version>
+    <zipkin.version>2.17.0</zipkin.version>
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
-    <armeria.version>0.90.3</armeria.version>
-    <spring-boot.version>2.1.7.RELEASE</spring-boot.version>
+    <armeria.version>0.92.0</armeria.version>
+    <spring-boot.version>2.1.8.RELEASE</spring-boot.version>
 
     <log4j.version>2.12.1</log4j.version>
     <junit-jupiter.version>5.5.2</junit-jupiter.version>

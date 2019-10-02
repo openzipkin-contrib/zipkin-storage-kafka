@@ -126,14 +126,13 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
         .stream(spansTopicName, Consumed.with(Serdes.String(), spansSerde));
     // Store traces
     spansStream.process(() -> new Processor<String, List<Span>>() {
-      ProcessorContext context;
       // Actual traces store
       KeyValueStore<String, List<Span>> tracesStore;
       // timestamp index for trace IDs
       KeyValueStore<Long, Set<String>> spanIdsByTsStore;
 
+      @SuppressWarnings("unchecked")
       @Override public void init(ProcessorContext context) {
-        this.context = context;
         tracesStore =
             (KeyValueStore<String, List<Span>>) context.getStateStore(TRACES_STORE_NAME);
         spanIdsByTsStore =
@@ -195,8 +194,8 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
           KeyValueStore<String, Set<String>> remoteServiceNamesStore;
           KeyValueStore<String, Set<String>> autocompleteTagsStore;
 
-          @Override
-          public void init(ProcessorContext context) {
+          @SuppressWarnings("unchecked")
+          @Override public void init(ProcessorContext context) {
             serviceNameStore =
                 (KeyValueStore<String, String>) context.getStateStore(SERVICE_NAMES_STORE_NAME);
             spanNamesStore =

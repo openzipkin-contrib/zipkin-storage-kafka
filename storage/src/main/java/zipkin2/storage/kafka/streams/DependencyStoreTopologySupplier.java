@@ -71,6 +71,7 @@ public final class DependencyStoreTopologySupplier implements Supplier<Topology>
           ProcessorContext context;
           WindowStore<String, DependencyLink> dependenciesStore;
 
+          @SuppressWarnings("unchecked")
           @Override public void init(ProcessorContext context) {
             this.context = context;
             dependenciesStore =
