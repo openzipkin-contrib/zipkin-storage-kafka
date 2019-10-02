@@ -15,8 +15,8 @@
 
 -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.github.openzipkin-contrib.zipkin-storage-kafka</groupId>
@@ -28,6 +28,22 @@
     <module>storage</module>
     <module>autoconfigure</module>
   </modules>
+
+  <distributionManagement>
+    <repository>
+      <id>bintray</id>
+      <url>https://api.bintray.com/maven/openzipkin/maven/brave/;publish=1</url>
+    </repository>
+    <snapshotRepository>
+      <id>jfrog-snapshots</id>
+      <url>https://oss.jfrog.org/artifactory/oss-snapshot-local</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+  <issueManagement>
+    <system>Github</system>
+    <url>https://github.com/openzipkin-contrib/zipkin-storage-kafka/issues</url>
+  </issueManagement>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -50,8 +66,16 @@
     <errorprone.args/>
     <errorprone.version>2.3.3</errorprone.version>
 
-    <license-maven-plugin.version>3.0</license-maven-plugin.version>
+    <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
+    <maven-install-plugin.version>3.0.0-M1</maven-install-plugin.version>
+    <maven-deploy-plugin.version>3.0.0-M1</maven-deploy-plugin.version>
+    <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
+    <maven-source-plugin.version>3.1.0</maven-source-plugin.version>
+    <maven-javadoc-plugin.version>3.1.1</maven-javadoc-plugin.version>
+    <maven-jar-plugin.version>3.1.2</maven-jar-plugin.version>
     <maven-failsafe-plugin.version>3.0.0-M3</maven-failsafe-plugin.version>
+    <maven-enforcer-plugin.version>3.0.0-M2</maven-enforcer-plugin.version>
+    <license-maven-plugin.version>3.0</license-maven-plugin.version>
   </properties>
 
   <name>Zipkin Storage: Kafka (Parent)</name>
@@ -88,11 +112,6 @@
       <url>https://gitter.im/openzipkin/zipkin</url>
     </developer>
   </developers>
-
-  <issueManagement>
-    <system>Github</system>
-    <url>https://github.com/openzipkin-contrib/zipkin-storage-kafka/issues</url>
-  </issueManagement>
 
   <repositories>
     <repository>
@@ -176,13 +195,13 @@
           <artifactId>maven</artifactId>
           <version>0.7.6</version>
           <configuration>
-            <maven>3.6.1</maven>
+            <maven>3.6.2</maven>
           </configuration>
         </plugin>
 
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.1</version>
+          <version>${maven-compiler-plugin.version}</version>
           <inherited>true</inherited>
           <configuration>
             <source>1.8</source>
@@ -214,15 +233,15 @@
             </execution>
           </executions>
         </plugin>
+
+        <plugin>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>${maven-jar-plugin.version}</version>
+        </plugin>
       </plugins>
     </pluginManagement>
 
     <plugins>
-      <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>3.1.2</version>
-      </plugin>
-
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-failsafe-plugin.version}</version>
@@ -265,13 +284,24 @@
 
       <plugin>
         <artifactId>maven-install-plugin</artifactId>
-        <version>3.0.0-M1</version>
+        <version>${maven-install-plugin.version}</version>
       </plugin>
 
       <!-- Uploads occur as a last step (which also adds checksums) -->
       <plugin>
         <artifactId>maven-deploy-plugin</artifactId>
-        <version>3.0.0-M1</version>
+        <version>${maven-deploy-plugin.version}</version>
+      </plugin>
+      <plugin>
+        <artifactId>maven-release-plugin</artifactId>
+        <version>${maven-release-plugin.version}</version>
+        <configuration>
+          <useReleaseProfile>false</useReleaseProfile>
+          <releaseProfiles>release</releaseProfiles>
+          <autoVersionSubmodules>true</autoVersionSubmodules>
+          <!-- to match zipkin-scala (openzipkin/zipkin) -->
+          <tagNameFormat>@{project.version}</tagNameFormat>
+        </configuration>
       </plugin>
 
       <plugin>
@@ -320,7 +350,7 @@
 
       <plugin>
         <artifactId>maven-enforcer-plugin</artifactId>
-        <version>3.0.0-M2</version>
+        <version>${maven-enforcer-plugin.version}</version>
         <executions>
           <execution>
             <id>enforce-java</id>
@@ -339,4 +369,46 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>release</id>
+      <build>
+        <plugins>
+          <!-- Creates source jar -->
+          <plugin>
+            <artifactId>maven-source-plugin</artifactId>
+            <version>${maven-source-plugin.version}</version>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <!-- Creates javadoc jar -->
+          <plugin>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <version>${maven-javadoc-plugin.version}</version>
+            <configuration>
+              <failOnError>false</failOnError>
+              <!-- hush pedantic warnings: we don't put param and return on everything! -->
+              <doclint>none</doclint>
+            </configuration>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+                <phase>package</phase>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>
