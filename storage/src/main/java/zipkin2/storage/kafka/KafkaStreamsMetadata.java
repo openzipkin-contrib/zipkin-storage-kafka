@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 final class KafkaStreamsMetadata {
   static KafkaStreamsMetadata create(
-      Collection<org.apache.kafka.streams.state.StreamsMetadata> other) {
+    Collection<org.apache.kafka.streams.state.StreamsMetadata> other) {
     KafkaStreamsMetadata metadata = new KafkaStreamsMetadata();
     metadata.metadata = other.stream().map(StreamsMetadata::create).collect(Collectors.toSet());
     return metadata;
@@ -27,7 +27,15 @@ final class KafkaStreamsMetadata {
 
   Set<StreamsMetadata> metadata;
 
-  Set<StreamsMetadata> getMetadata() {
+  KafkaStreamsMetadata() {
+  }
+
+  public void setMetadata(
+    Set<StreamsMetadata> metadata) {
+    this.metadata = metadata;
+  }
+
+  public Set<StreamsMetadata> getMetadata() {
     return metadata;
   }
 
@@ -37,14 +45,30 @@ final class KafkaStreamsMetadata {
       metadata.hostInfo = HostInfo.create(other.hostInfo());
       metadata.storeNames = other.stateStoreNames();
       metadata.topicPartitions = other.topicPartitions().stream()
-          .map(TopicPartition::create)
-          .collect(Collectors.toSet());
+        .map(TopicPartition::create)
+        .collect(Collectors.toSet());
       return metadata;
     }
 
     HostInfo hostInfo;
     Set<String> storeNames;
     Set<TopicPartition> topicPartitions;
+
+    StreamsMetadata() {
+    }
+
+    public void setHostInfo(HostInfo hostInfo) {
+      this.hostInfo = hostInfo;
+    }
+
+    public void setStoreNames(Set<String> storeNames) {
+      this.storeNames = storeNames;
+    }
+
+    public void setTopicPartitions(
+      Set<TopicPartition> topicPartitions) {
+      this.topicPartitions = topicPartitions;
+    }
 
     public HostInfo getHostInfo() {
       return hostInfo;
@@ -69,6 +93,17 @@ final class KafkaStreamsMetadata {
       String host;
       Integer port;
 
+      HostInfo() {
+      }
+
+      public void setHost(String host) {
+        this.host = host;
+      }
+
+      public void setPort(Integer port) {
+        this.port = port;
+      }
+
       public String getHost() {
         return host;
       }
@@ -86,8 +121,19 @@ final class KafkaStreamsMetadata {
         return topicPartition;
       }
 
+      TopicPartition() {
+      }
+
       String topic;
       Integer partition;
+
+      public void setTopic(String topic) {
+        this.topic = topic;
+      }
+
+      public void setPartition(Integer partition) {
+        this.partition = partition;
+      }
 
       public String getTopic() {
         return topic;

@@ -168,4 +168,16 @@ public class ZipkinKafkaStorageAutoConfigurationTest {
     assertThat(context.getBean(KafkaStorage.class).dependencyTopicName).isEqualTo(
         "zipkin-dependencies-1");
   }
+
+  @Test void canOverridesProperty_hostname() {
+    TestPropertyValues.of(
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.hostname:other_host"
+    ).applyTo(context);
+    Access.registerKafka(context);
+    context.refresh();
+
+    assertThat(context.getBean(KafkaStorage.class).hostname).isEqualTo(
+      "other_host");
+  }
 }

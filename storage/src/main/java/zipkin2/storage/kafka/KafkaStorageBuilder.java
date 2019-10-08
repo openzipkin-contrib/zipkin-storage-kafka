@@ -43,6 +43,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   Duration dependencyWindowSize = Duration.ofMinutes(1);
 
   long minTracesStored = 10_000;
+  String hostname = "localhost";
   int httpPort = 9412;
   BiFunction<String, Integer, String> httpBaseUrl =
       (hostname, port) -> "http://" + hostname + ":" + port;
@@ -100,13 +101,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   }
 
   String hostInfo() {
-    String hostInfo = "localhost";
-    try {
-      hostInfo = InetAddress.getLocalHost().getHostName() + ":" + httpPort;
-    } catch (UnknownHostException e) {
-      e.printStackTrace();
-    }
-    return hostInfo;
+    return hostname + ":" + httpPort;
   }
 
   @Override public KafkaStorageBuilder strictTraceId(boolean strictTraceId) {
@@ -135,6 +130,14 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     return this;
   }
 
+  public KafkaStorageBuilder hostname(String hostname) {
+    if (hostname == null) throw new NullPointerException("hostname == null");
+    this.hostname = hostname;
+    traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
+    dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
+    return this;
+  }
+
   public KafkaStorageBuilder httpPort(int httpPort) {
     this.httpPort = httpPort;
     traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
@@ -146,9 +149,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
    * How long to wait for a span in order to trigger a trace as completed.
    */
   public KafkaStorageBuilder traceTimeout(Duration traceTimeout) {
-    if (traceTimeout == null) {
-      throw new NullPointerException("traceTimeout == null");
-    }
+    if (traceTimeout == null) throw new NullPointerException("traceTimeout == null");
     this.traceTimeout = traceTimeout;
     return this;
   }

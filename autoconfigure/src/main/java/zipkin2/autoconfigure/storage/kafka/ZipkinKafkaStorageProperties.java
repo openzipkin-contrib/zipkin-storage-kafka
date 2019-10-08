@@ -27,6 +27,8 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private Boolean spanConsumerEnabled;
 
+  private String hostname;
+
   private String bootstrapServers;
 
   private Long traceTtlCheckInterval;
@@ -57,6 +59,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   KafkaStorageBuilder toBuilder() {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
     if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
+    if (hostname != null) builder.hostname(hostname);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
     if (traceTimeout != null) {
       builder.traceTimeout(Duration.ofMillis(traceTimeout));
@@ -99,7 +102,11 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     return builder;
   }
 
-  public void setSpanConsumerEnabled(boolean spanConsumerEnabled) {
+  public Boolean getSpanConsumerEnabled() {
+    return spanConsumerEnabled;
+  }
+
+  public void setSpanConsumerEnabled(Boolean spanConsumerEnabled) {
     this.spanConsumerEnabled = spanConsumerEnabled;
   }
 
@@ -109,6 +116,14 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setBootstrapServers(String bootstrapServers) {
     this.bootstrapServers = bootstrapServers;
+  }
+
+  public String getHostname() {
+    return hostname;
+  }
+
+  public void setHostname(String hostname) {
+    this.hostname = hostname;
   }
 
   public Long getTraceTtlCheckInterval() {
@@ -141,14 +156,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setSpansTopic(String spansTopic) {
     this.spansTopic = spansTopic;
-  }
-
-  public Boolean getSpanConsumerEnabled() {
-    return spanConsumerEnabled;
-  }
-
-  public void setSpanConsumerEnabled(Boolean spanConsumerEnabled) {
-    this.spanConsumerEnabled = spanConsumerEnabled;
   }
 
   public String getTraceTopic() {
