@@ -197,7 +197,6 @@ class KafkaStorageIT {
         .limit(1)
         .build())
         .execute();
-
     assertThat(filteredTraces).hasSize(1);
     assertThat(filteredTraces.get(0)).hasSize(1); // last trace is returned first
     List<String> services = serviceAndSpanNames.getServiceNames().execute();

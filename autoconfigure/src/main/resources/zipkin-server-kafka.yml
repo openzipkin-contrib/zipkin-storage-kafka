@@ -2,6 +2,7 @@
 zipkin:
   storage:
     kafka:
+      hostname: ${KAFKA_STORAGE_HOST_NAME:${HOSTNAME:localhost}}
       # Connection to Kafka
       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
       # Kafka topic names
