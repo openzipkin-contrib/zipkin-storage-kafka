@@ -106,12 +106,18 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
   }
 
   static final class GetServiceNamesCall extends KafkaStoreScatterGatherListCall<String> {
+    static final long SERVICE_NAMES_LIMIT = 1_000;
     final KafkaStreams traceStoreStream;
     final BiFunction<String, Integer, String> httpBaseUrl;
 
     GetServiceNamesCall(KafkaStreams traceStoreStream,
       BiFunction<String, Integer, String> httpBaseUrl) {
-      super(traceStoreStream, SERVICE_NAMES_STORE_NAME, httpBaseUrl, "/serviceNames");
+      super(
+        traceStoreStream,
+        SERVICE_NAMES_STORE_NAME,
+        httpBaseUrl,
+        "/serviceNames",
+        SERVICE_NAMES_LIMIT);
       this.traceStoreStream = traceStoreStream;
       this.httpBaseUrl = httpBaseUrl;
     }
@@ -179,7 +185,10 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     GetTracesCall(KafkaStreams traceStoreStream,
       BiFunction<String, Integer, String> httpBaseUrl,
       QueryRequest request) {
-      super(traceStoreStream, TRACES_STORE_NAME, httpBaseUrl,
+      super(
+        traceStoreStream,
+        TRACES_STORE_NAME,
+        httpBaseUrl,
         ("/traces?"
           + (request.serviceName() == null ? "" : "serviceName=" + request.serviceName() + "&")
           + (request.remoteServiceName() == null ? ""
@@ -191,7 +200,8 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
           + (request.maxDuration() == null ? "" : "maxDuration=" + request.maxDuration() + "&")
           + ("endTs=" + request.endTs() + "&")
           + ("lookback=" + request.lookback() + "&")
-          + ("limit=" + request.limit())));
+          + ("limit=" + request.limit())),
+        request.limit());
       this.traceStoreStream = traceStoreStream;
       this.httpBaseUrl = httpBaseUrl;
       this.request = request;
@@ -258,7 +268,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     protected CompletableFuture<List<List<Span>>> listFuture() {
       // To reduce calls to store instances traceIds are grouped by hostInfo
       Map<HostInfo, List<String>> traceIdsByHost = new LinkedHashMap<>();
-      for (String traceId : traceIds.split(",", 1000)) {
+      for (String traceId : traceIds.split(",", 1_000)) {
         StreamsMetadata metadata =
           traceStoreStream.metadataForKey(TRACES_STORE_NAME, traceId, STRING_SERIALIZER);
         List<String> collected = traceIdsByHost.get(metadata.hostInfo());
@@ -287,6 +297,8 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
   }
 
   static final class GetDependenciesCall extends KafkaStoreScatterGatherListCall<DependencyLink> {
+    static final long DEPENDENCIES_LIMIT = 1_000;
+
     final KafkaStreams dependencyStoreStream;
     final BiFunction<String, Integer, String> httpBaseUrl;
     final long endTs, lookback;
@@ -294,8 +306,12 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     GetDependenciesCall(KafkaStreams dependencyStoreStream,
       BiFunction<String, Integer, String> httpBaseUrl,
       long endTs, long lookback) {
-      super(dependencyStoreStream, DEPENDENCIES_STORE_NAME,
-        httpBaseUrl, "/dependencies?endTs=" + endTs + "&lookback=" + lookback);
+      super(
+        dependencyStoreStream,
+        DEPENDENCIES_STORE_NAME,
+        httpBaseUrl,
+        "/dependencies?endTs=" + endTs + "&lookback=" + lookback,
+        DEPENDENCIES_LIMIT);
       this.dependencyStoreStream = dependencyStoreStream;
       this.httpBaseUrl = httpBaseUrl;
       this.endTs = endTs;

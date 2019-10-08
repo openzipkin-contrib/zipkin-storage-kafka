@@ -33,11 +33,11 @@ public abstract class KafkaStoreSingleKeyListCall<V> extends KafkaStoreListCall<
   final String key;
 
   protected KafkaStoreSingleKeyListCall(
-      KafkaStreams kafkaStreams,
-      String storeName,
-      BiFunction<String, Integer, String> httpBaseUrl,
-      String httpPath,
-      String key) {
+    KafkaStreams kafkaStreams,
+    String storeName,
+    BiFunction<String, Integer, String> httpBaseUrl,
+    String httpPath,
+    String key) {
     super(kafkaStreams, storeName, httpBaseUrl, httpPath);
     this.key = key;
   }
@@ -46,10 +46,10 @@ public abstract class KafkaStoreSingleKeyListCall<V> extends KafkaStoreListCall<
     StreamsMetadata metadata = kafkaStreams.metadataForKey(storeName, key, STRING_SERIALIZER);
     HttpClient httpClient = httpClient(metadata.hostInfo());
     return httpClient.get(httpPath)
-        .aggregate()
-        .thenApply(response -> {
-          String content = content(response);
-          return parseList(content);
-        });
+      .aggregate()
+      .thenApply(response -> {
+        String content = content(response);
+        return parseList(content);
+      });
   }
 }
