@@ -20,13 +20,13 @@ Kafka-based storage for Zipkin.
 *kafka*                                               +->( traces )    |
  topics                                               |                |
                                                       +->( dependencies )
-                                                         
+
 -------------------------------------------------------------------------------------------------------
 
 ```
 
 > Spans collected via different transports are partitioned by `traceId` and stored in a "spans" Kafka topic.
-Partitioned spans are then aggregated into traces and then into dependency links, both 
+Partitioned spans are then aggregated into traces and then into dependency links, both
 results are emitted into Kafka topics as well.
 These 3 topics are used as source for local stores (Kafka Stream stores) that support Zipkin query and search APIs.
 
@@ -62,7 +62,7 @@ To run locally, first you need to get Zipkin binaries:
 make get-zipkin
 ```
 
-By default Zipkin will be waiting for a Kafka broker to be running on `localhost:19092`. If you don't have one, 
+By default Zipkin will be waiting for a Kafka broker to be running on `localhost:19092`. If you don't have one,
 this service is available via Docker Compose:
 
 ```bash
@@ -80,7 +80,7 @@ make run
 If you have Docker available, run:
 
 ```bash
-make run-docker 
+make run-docker
 ```
 
 And Docker image will be built and Docker compose will start.
@@ -89,12 +89,12 @@ And Docker image will be built and Docker compose will start.
 
 There are two examples, running Zipkin with kafka as storage:
 
-+ [Single-node](docker-compose.yml)
-+ [Multi-mode](docker-compose-distributed.yml)
++ [Single-node](docker/single-instance/docker-compose.yml)
++ [Multi-mode](docker/distributed/docker-compose.yml)
 
 ### Testing
 
-To validate storage make sure that Kafka topics are created so Kafka Stream instances can be 
+To validate storage make sure that Kafka topics are created so Kafka Stream instances can be
 initialized properly:
 
 ```bash
