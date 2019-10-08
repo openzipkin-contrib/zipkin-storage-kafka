@@ -1,0 +1,11 @@
+**/\.*
+!.git
+
+**/target
+**/*.iml
+
+*.md
+
+**/Dockerfile
+travis
+mvnw*

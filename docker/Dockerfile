@@ -12,27 +12,23 @@
 # the License.
 #
 
-FROM alpine
+FROM openzipkin/zipkin-builder
 
-ARG VERSION=master-SNAPSHOT
-ENV USER jeqo
+WORKDIR /code
+COPY . /code
+RUN mvn -B --no-transfer-progress package -DskipTests=true -pl autoconfigure -am
 
-WORKDIR /zipkin
+RUN \
+  cd /code && mkdir -p /zipkin-storage-kafka && cp autoconfigure/target/zipkin-autoconfigure-storage-kafka-*-module.jar /zipkin-storage-kafka && cd /zipkin-storage-kafka && jar xf *.jar && rm *.jar
 
-#Enable this when replacing curl for local jar
-#ADD autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar kafka.jar
+FROM openzipkin/zipkin:master
+MAINTAINER Zipkin "https://zipkin.io/"
 
-RUN apk add curl unzip && \
-  curl -SL https://jitpack.io/com/github/${USER}/zipkin-storage-kafka/zipkin-autoconfigure-storage-kafka/${VERSION}/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar > kafka.jar && \
-  echo > .kafka_profile && \
-  unzip kafka.jar -d kafka && \
-  rm kafka.jar
+COPY --from=0 /zipkin-storage-kafka/ /zipkin/lib/
 
-FROM openzipkin/zipkin:2.17.0
+RUN echo > .kafka_profile
 
-COPY --from=0  --chown=zipkin /zipkin/ /zipkin/
-
-ENV MODULE_OPTS="-Dloader.path=kafka -Dspring.profiles.active=kafka"
+ENV MODULE_OPTS="-Dloader.path=lib -Dspring.profiles.active=kafka"
 ENV STORAGE_TYPE=kafka
 ENV KAFKA_STORAGE_DIR /data
 

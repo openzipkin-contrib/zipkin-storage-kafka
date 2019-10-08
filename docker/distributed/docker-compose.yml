@@ -32,7 +32,7 @@ services:
       KAFKA_STORAGE_SPAN_CONSUMER_ENABLED: 'true'
       QUERY_ENABLED: 'false'
   zipkin-storage-1:
-    image: jeqo/zipkin-kafka
+    image: openzipkincontrib/zipkin-storage-kafka
     container_name: zipkin-storage-1
     hostname: zipkin-storage-1
     ports:
@@ -44,7 +44,7 @@ services:
     volumes:
       - zipkin1:/data
   zipkin-storage-2:
-    image: jeqo/zipkin-kafka
+    image: openzipkincontrib/zipkin-storage-kafka
     container_name: zipkin-storage-2
     hostname: zipkin-storage-2
     ports:

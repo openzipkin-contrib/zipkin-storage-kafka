@@ -23,13 +23,7 @@ kafka-topics:
 
 .PHONY: docker-build
 docker-build:
-	docker build --no-cache --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:latest .
-	docker build --build-arg VERSION=${VERSION} -t ${IMAGE_NAME}:${VERSION} .
-
-.PHONY: docker-push
-docker-push:
-	docker push ${IMAGE_NAME}:latest
-	docker push ${IMAGE_NAME}:${VERSION}
+	docker build -t openzipkincontrib/zipkin-storage-kafka:test -f docker/Dockerfile .
 
 .PHONY: docker-up
 docker-up:
