@@ -67,6 +67,7 @@ public class KafkaStorage extends StorageComponent {
   // Kafka Storage configs
   final String storageDir;
   final long minTracesStored;
+  final String hostname;
   final int httpPort;
   // Kafka Topics
   final String spansTopicName, traceTopicName, dependencyTopicName;
@@ -97,6 +98,7 @@ public class KafkaStorage extends StorageComponent {
     // Storage directories
     this.storageDir = builder.storageDir;
     this.minTracesStored = builder.minTracesStored;
+    this.hostname = builder.hostname;
     this.httpPort = builder.httpPort;
     this.httpBaseUrl = builder.httpBaseUrl;
     // Kafka Configs
