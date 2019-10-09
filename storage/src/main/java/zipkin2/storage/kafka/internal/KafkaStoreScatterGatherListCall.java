@@ -31,29 +31,41 @@ import org.apache.kafka.streams.state.StreamsMetadata;
  */
 public abstract class KafkaStoreScatterGatherListCall<V> extends KafkaStoreListCall<V> {
 
+  final long limit;
+
+  /**
+   * @param kafkaStreams Kafka Streams instance where storeName is located.
+   * @param storeName Store name which will be queried on all instances.
+   * @param httpBaseUrl Base URL composed by protocol, hostname and port.
+   * @param httpPath Http path to query other instances.
+   * @param limit Maximum number of results when collecting results from all instances.
+   */
   protected KafkaStoreScatterGatherListCall(
-      KafkaStreams kafkaStreams,
-      String storeName,
-      BiFunction<String, Integer, String> httpBaseUrl,
-      String httpPath) {
+    KafkaStreams kafkaStreams,
+    String storeName,
+    BiFunction<String, Integer, String> httpBaseUrl,
+    String httpPath,
+    long limit) {
     super(kafkaStreams, storeName, httpBaseUrl, httpPath);
+    this.limit = limit;
   }
 
   @Override protected CompletableFuture<List<V>> listFuture() {
     List<CompletableFuture<AggregatedHttpResponse>> responseFutures =
-        kafkaStreams.allMetadataForStore(storeName)
-            .stream()
-            .map(StreamsMetadata::hostInfo)
-            .map(this::httpClient)
-            .map(c -> c.get(httpPath).aggregate()).collect(Collectors.toList());
+      kafkaStreams.allMetadataForStore(storeName)
+        .stream()
+        .map(StreamsMetadata::hostInfo)
+        .map(this::httpClient)
+        .map(c -> c.get(httpPath).aggregate()).collect(Collectors.toList());
     return CompletableFuture.allOf(responseFutures.toArray(new CompletableFuture[0]))
-        .thenApply(unused ->
-            responseFutures.stream()
-                .map(s -> s.getNow(AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR)))
-                .map(this::content)
-                .map(this::parseList)
-                .flatMap(Collection::stream)
-                .distinct()
-                .collect(Collectors.toList()));
+      .thenApply(unused ->
+        responseFutures.stream()
+          .map(s -> s.getNow(AggregatedHttpResponse.of(HttpStatus.INTERNAL_SERVER_ERROR)))
+          .map(this::content)
+          .map(this::parseList)
+          .flatMap(Collection::stream)
+          .distinct()
+          .limit(limit)
+          .collect(Collectors.toList()));
   }
 }

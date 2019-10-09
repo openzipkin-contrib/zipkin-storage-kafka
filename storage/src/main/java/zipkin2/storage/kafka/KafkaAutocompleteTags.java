@@ -33,6 +33,8 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPL
  * for scatter gather data from different instances.
  */
 final class KafkaAutocompleteTags implements AutocompleteTags {
+  static final long AUTOCOMPLETE_TAGS_LIMIT = 1_000;
+
   final KafkaStreams traceStoreStream;
   final BiFunction<String, Integer, String> httpBaseUrl;
 
@@ -55,7 +57,12 @@ final class KafkaAutocompleteTags implements AutocompleteTags {
 
     GetTagKeysCall(KafkaStreams traceStoreStream,
         BiFunction<String, Integer, String> httpBaseUrl) {
-      super(traceStoreStream, AUTOCOMPLETE_TAGS_STORE_NAME, httpBaseUrl, "/autocompleteTags");
+      super(
+        traceStoreStream,
+        AUTOCOMPLETE_TAGS_STORE_NAME,
+        httpBaseUrl,
+        "/autocompleteTags",
+        AUTOCOMPLETE_TAGS_LIMIT);
       this.traceStoreStream = traceStoreStream;
       this.httpBaseUrl = httpBaseUrl;
     }
