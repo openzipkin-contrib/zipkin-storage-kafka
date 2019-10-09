@@ -14,7 +14,6 @@
 package zipkin2.storage.kafka;
 
 import com.linecorp.armeria.server.Server;
-import com.linecorp.armeria.server.ServerBuilder;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
@@ -318,15 +317,16 @@ public class KafkaStorage extends StorageComponent {
     return traceAggregationStream;
   }
 
+  @SuppressWarnings("FutureReturnValueIgnored")
   Server getServer() {
     if (server == null) {
       synchronized (this) {
         if (server == null) {
           try {
-            ServerBuilder builder = new ServerBuilder();
-            builder.http(httpPort);
-            builder.annotatedService(new KafkaStoreHttpService(this));
-            server = builder.build();
+            server = Server.builder()
+              .http(httpPort)
+              .annotatedService(new KafkaStoreHttpService(this))
+              .build();
             server.start();
           } catch (Exception e) {
             LOG.error("Error starting http server", e);

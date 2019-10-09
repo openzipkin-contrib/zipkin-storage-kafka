@@ -17,7 +17,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>io.zipkin.openzipkin-contrib.zipkin-storage-kafka</groupId>
+  <groupId>io.zipkin.contrib.zipkin-storage-kafka</groupId>
   <artifactId>zipkin-storage-kafka-parent</artifactId>
   <version>0.6.1-SNAPSHOT</version>
   <packaging>pom</packaging>
@@ -51,14 +51,15 @@
 
     <!-- groupId overrinds allow testing feature branches with jitpack -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
-    <zipkin.version>2.17.0</zipkin.version>
+    <zipkin.version>2.17.1</zipkin.version>
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
-    <armeria.version>0.92.0</armeria.version>
-    <spring-boot.version>2.1.8.RELEASE</spring-boot.version>
+    <armeria.version>0.94.0</armeria.version>
+    <spring-boot.version>2.1.9.RELEASE</spring-boot.version>
 
     <log4j.version>2.12.1</log4j.version>
     <junit-jupiter.version>5.5.2</junit-jupiter.version>
     <testcontainers.version>1.12.1</testcontainers.version>
+    <assertj.version>3.13.2</assertj.version>
 
     <!-- override to set exclusions per-project -->
     <errorprone.args />
@@ -172,7 +173,7 @@
     <dependency>
       <groupId>org.assertj</groupId>
       <artifactId>assertj-core</artifactId>
-      <version>3.13.2</version>
+      <version>${assertj.version}</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
@@ -319,6 +320,7 @@
             <exclude>src/main/resources/**</exclude>
             <exclude>**/*.puml</exclude>
             <exclude>Makefile</exclude>
+            <exclude>.dockerignore</exclude>
           </excludes>
           <strictCheck>true</strictCheck>
         </configuration>

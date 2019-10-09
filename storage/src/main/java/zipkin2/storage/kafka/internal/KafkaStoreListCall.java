@@ -53,6 +53,7 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
     this.httpPath = httpPath;
   }
 
+  @SuppressWarnings("MixedMutabilityReturnType")
   protected List<V> parseList(String content) {
     try {
       if (content == null) return Collections.emptyList();
@@ -82,6 +83,7 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
     return listFuture().join();
   }
 
+  @SuppressWarnings("FutureReturnValueIgnored")
   @Override protected void doEnqueue(Callback<List<V>> callback) {
     listFuture().handle((response, t) -> {
       if (t != null) {
