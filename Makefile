@@ -58,14 +58,9 @@ docker-up-single:
 .PHONY: docker-up-distributed
 docker-up-distributed:
 	docker-compose -f docker/distributed/docker-compose.yml up -d
-## Shut down compose cluster
-.PHONY: docker-down
-docker-down:
-	TAG=${VERSION} \
-	docker-compose down --remove-orphans
 ## Task to build and run on docker
 .PHONY: run-docker
-run-docker: build docker-build docker-up
+run-docker: build docker-build docker-up-single
 # Testing instances
 ## Testing distributed instances
 .PHONY: zipkin-test-distributed
