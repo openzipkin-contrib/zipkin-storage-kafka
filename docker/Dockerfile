@@ -21,7 +21,7 @@ RUN mvn -B --no-transfer-progress package -DskipTests=true -pl autoconfigure -am
 RUN \
   cd /code && mkdir -p /zipkin-storage-kafka && cp autoconfigure/target/zipkin-autoconfigure-storage-kafka-*-module.jar /zipkin-storage-kafka && cd /zipkin-storage-kafka && jar xf *.jar && rm *.jar
 
-FROM openzipkin/zipkin:master
+FROM openzipkin/zipkin:2.17.2
 MAINTAINER Zipkin "https://zipkin.io/"
 
 COPY --from=0 /zipkin-storage-kafka/ /zipkin/lib/

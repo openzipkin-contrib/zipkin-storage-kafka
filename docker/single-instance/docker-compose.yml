@@ -22,8 +22,21 @@ services:
       - 2181:2181
       - 9092:9092
       - 19092:19092
+  kafka-topics:
+    image: openzipkin/zipkin-kafka
+    container_name: kafka-topics
+    entrypoint: "/busybox/sh -c"
+    command: "
+      \"/busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper kafka-zookeeper:2181 --create --topic zipkin-spans --partitions 2 --replication-factor 1 --if-not-exists
+      &&
+      /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper kafka-zookeeper:2181 --create --topic zipkin-trace --partitions 2 --replication-factor 1 --if-not-exists
+      &&
+      /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper kafka-zookeeper:2181 --create --topic zipkin-dependency --partitions 2 --replication-factor 1 --if-not-exists\"
+      "
+    depends_on:
+      - kafka-zookeeper
   zipkin:
-    image: openzipkincontrib/zipkin-storage-kafka:test
+    image: openzipkincontrib/zipkin-storage-kafka
     container_name: zipkin
     hostname: zipkin # required to route call to scatter-gather endpoint properly. should not be needed after #40 is solved
     ports:

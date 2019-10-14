@@ -22,8 +22,19 @@ services:
       - 2181:2181
       - 9092:9092
       - 19092:19092
+  kafka-topics:
+    image: openzipkin/zipkin-kafka
+    container_name: kafka-topics
+    entrypoint: "/busybox/sh -c"
+    command: "
+      \"/busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper kafka-zookeeper:2181 --create --topic zipkin-spans --partitions 2 --replication-factor 1 --if-not-exists
+      &&
+      /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper kafka-zookeeper:2181 --create --topic zipkin-trace --partitions 2 --replication-factor 1 --if-not-exists
+      &&
+      /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper kafka-zookeeper:2181 --create --topic zipkin-dependency --partitions 2 --replication-factor 1 --if-not-exists\"
+      "
   zipkin-aggregation:
-    image: jeqo/zipkin-kafka
+    image: openzipkincontrib/zipkin-storage-kafka
     container_name: zipkin-aggregation
     ports:
       - 9411:9411
