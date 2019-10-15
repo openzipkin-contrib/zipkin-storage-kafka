@@ -218,8 +218,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     return aggregationStreamOverrides;
   }
 
-  public void setAggregationStreamOverrides(
-    Map<String, String> aggregationStreamOverrides) {
+  public void setAggregationStreamOverrides(Map<String, String> aggregationStreamOverrides) {
     this.aggregationStreamOverrides = aggregationStreamOverrides;
   }
 
@@ -227,8 +226,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     return traceStoreStreamOverrides;
   }
 
-  public void setTraceStoreStreamOverrides(
-    Map<String, String> traceStoreStreamOverrides) {
+  public void setTraceStoreStreamOverrides(Map<String, String> traceStoreStreamOverrides) {
     this.traceStoreStreamOverrides = traceStoreStreamOverrides;
   }
 
@@ -237,7 +235,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   }
 
   public void setDependencyStoreStreamOverrides(
-    Map<String, String> dependencyStoreStreamOverrides) {
+      Map<String, String> dependencyStoreStreamOverrides) {
     this.dependencyStoreStreamOverrides = dependencyStoreStreamOverrides;
   }
 
