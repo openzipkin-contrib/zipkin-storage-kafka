@@ -13,8 +13,6 @@
  */
 package zipkin2.storage.kafka;
 
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,9 +58,12 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   String dependencyStoreStreamAppId = "zipkin-dependency-store";
   String aggregationStreamAppId = "zipkin-aggregation";
 
-  String spansTopicName = "zipkin-spans";
-  String traceTopicName = "zipkin-trace";
-  String dependencyTopicName = "zipkin-dependency";
+  String partitionedSpansTopic = "zipkin-spans";
+  String aggregationSpansTopic = "zipkin-spans";
+  String aggregationTraceTopic = "zipkin-trace";
+  String aggregationDependencyTopic = "zipkin-dependency";
+  String storeSpansTopic = "zipkin-spans";
+  String storeDependencyTopic = "zipkin-dependency";
 
   KafkaStorageBuilder() {
     // Kafka Producer configuration
@@ -196,35 +197,72 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   }
 
   /**
-   * Kafka topic name where incoming spans are stored.
+   * Kafka topic name where incoming partitioned spans are stored.
    * <p>
    * A Span is received from Collectors that contains all metadata and is partitioned by Trace Id.
    */
-  public KafkaStorageBuilder spansTopicName(String spansTopicName) {
-    if (spansTopicName == null) throw new NullPointerException("spansTopicName == null");
-    this.spansTopicName = spansTopicName;
+  public KafkaStorageBuilder partitionedSpansTopic(String partitionedSpansTopic) {
+    if (partitionedSpansTopic == null) {
+      throw new NullPointerException("partitionedSpansTopic == null");
+    }
+    this.partitionedSpansTopic = partitionedSpansTopic;
     return this;
   }
 
   /**
-   * Kafka topic name where incoming spans are stored.
-   * <p>
-   * A Span is received from Collectors that contains all metadata and is partitioned by Trace Id.
+   * Kafka topic name where partitioned spans are stored to be used on aggregation.
    */
-  public KafkaStorageBuilder tracesTopicName(String tracesTopicName) {
-    if (tracesTopicName == null) throw new NullPointerException("tracesTopicName == null");
-    this.traceTopicName = tracesTopicName;
+  public KafkaStorageBuilder aggregationSpansTopic(String aggregationSpansTopic) {
+    if (aggregationSpansTopic == null) {
+      throw new NullPointerException("aggregationSpansTopic == null");
+    }
+    this.aggregationSpansTopic = aggregationSpansTopic;
+    return this;
+  }
+
+  /**
+   * Kafka topic name where aggregated traces are stored.
+   * <p>
+   * Topic with key = traceId and value = list of Spans.
+   */
+  public KafkaStorageBuilder aggregationTraceTopic(String aggregationTraceTopic) {
+    if (aggregationTraceTopic == null) {
+      throw new NullPointerException("aggregationTraceTopic == null");
+    }
+    this.aggregationTraceTopic = aggregationTraceTopic;
+    return this;
+  }
+
+  /**
+   * Kafka topic name where dependencies changelog are stored.
+   * <p>
+   * Topic with key = parent-child pair and value = dependency link
+   */
+  public KafkaStorageBuilder aggregationDependencyTopic(String aggregationDependencyTopic) {
+    if (aggregationDependencyTopic == null) {
+      throw new NullPointerException("aggregationDependencyTopic == null");
+    }
+    this.aggregationDependencyTopic = aggregationDependencyTopic;
+    return this;
+  }
+
+  /**
+   * Kafka topic name where partitioned spans are stored to be used on aggregation.
+   */
+  public KafkaStorageBuilder storeSpansTopic(String storeSpansTopic) {
+    if (storeSpansTopic == null) throw new NullPointerException("storeSpansTopic == null");
+    this.storeSpansTopic = storeSpansTopic;
     return this;
   }
 
   /**
    * Kafka topic name where dependencies changelog are stored.
    */
-  public KafkaStorageBuilder dependenciesTopicName(String dependenciesTopicName) {
-    if (dependenciesTopicName == null) {
-      throw new NullPointerException("dependenciesTopicName == null");
+  public KafkaStorageBuilder storeDependencyTopic(String storeDependencyTopic) {
+    if (storeDependencyTopic == null) {
+      throw new NullPointerException("storeDependencyTopic == null");
     }
-    this.dependencyTopicName = dependenciesTopicName;
+    this.storeDependencyTopic = storeDependencyTopic;
     return this;
   }
 

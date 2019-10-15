@@ -69,7 +69,9 @@ public class KafkaStorage extends StorageComponent {
   final String hostname;
   final int httpPort;
   // Kafka Topics
-  final String spansTopicName, traceTopicName, dependencyTopicName;
+  final String partitionedSpansTopic;
+  final String aggregationSpansTopic, aggregationTraceTopic, aggregationDependencyTopic;
+  final String storeSpansTopic, storeDependencyTopic;
   // Kafka Clients config
   final Properties adminConfig;
   final Properties producerConfig;
@@ -91,9 +93,12 @@ public class KafkaStorage extends StorageComponent {
     // Autocomplete tags
     this.autocompleteKeys = builder.autocompleteKeys;
     // Kafka Topics config
-    this.spansTopicName = builder.spansTopicName;
-    this.traceTopicName = builder.traceTopicName;
-    this.dependencyTopicName = builder.dependencyTopicName;
+    this.partitionedSpansTopic = builder.partitionedSpansTopic;
+    this.aggregationSpansTopic = builder.aggregationSpansTopic;
+    this.aggregationTraceTopic = builder.aggregationTraceTopic;
+    this.aggregationDependencyTopic = builder.aggregationDependencyTopic;
+    this.storeSpansTopic = builder.storeSpansTopic;
+    this.storeDependencyTopic = builder.storeDependencyTopic;
     // Storage directories
     this.storageDir = builder.storageDir;
     this.minTracesStored = builder.minTracesStored;
@@ -108,18 +113,18 @@ public class KafkaStorage extends StorageComponent {
     this.dependencyStoreStreamConfig = builder.dependencyStoreStreamConfig;
 
     aggregationTopology = new AggregationTopologySupplier(
-        spansTopicName,
-        traceTopicName,
-        dependencyTopicName,
+        aggregationSpansTopic,
+        aggregationTraceTopic,
+        aggregationDependencyTopic,
         builder.traceTimeout).get();
     traceStoreTopology = new TraceStoreTopologySupplier(
-        spansTopicName,
+        storeSpansTopic,
         autocompleteKeys,
         builder.traceTtl,
         builder.traceTtlCheckInterval,
         builder.minTracesStored).get();
     dependencyStoreTopology = new DependencyStoreTopologySupplier(
-        dependencyTopicName,
+        storeDependencyTopic,
         builder.dependencyTtl,
         builder.dependencyWindowSize).get();
   }
@@ -344,9 +349,6 @@ public class KafkaStorage extends StorageComponent {
         ", spanConsumerEnabled=" + spanConsumerEnabled +
         ", searchEnabled=" + searchEnabled +
         ", storageDir='" + storageDir + '\'' +
-        ", spansTopicName='" + spansTopicName + '\'' +
-        ", traceTopicName='" + traceTopicName + '\'' +
-        ", dependencyTopicName='" + dependencyTopicName + '\'' +
         '}';
   }
 }

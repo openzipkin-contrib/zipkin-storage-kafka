@@ -43,9 +43,7 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
-/**
- * Storage of Traces, Service names and Autocomplete Tags.
- */
+/** Storage of Traces, Service names and Autocomplete Tags. */
 public class TraceStoreTopologySupplier implements Supplier<Topology> {
   public static final String TRACES_STORE_NAME = "zipkin-traces";
   public static final String SPAN_IDS_BY_TS_STORE_NAME = "zipkin-traces-by-timestamp";
@@ -56,7 +54,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
   static final Logger LOG = LogManager.getLogger();
 
   // Kafka topics
-  final String spansTopicName;
+  final String spansTopic;
   // Limits
   final List<String> autoCompleteKeys;
   final Duration traceTtl;
@@ -69,9 +67,13 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
 
   final Counter brokenTracesTotal;
 
-  public TraceStoreTopologySupplier(String spansTopicName, List<String> autoCompleteKeys,
-      Duration traceTtl, Duration traceTtlCheckInterval, long minTracesStored) {
-    this.spansTopicName = spansTopicName;
+  public TraceStoreTopologySupplier(
+      String spansTopic,
+      List<String> autoCompleteKeys,
+      Duration traceTtl,
+      Duration traceTtlCheckInterval,
+      long minTracesStored) {
+    this.spansTopic = spansTopic;
     this.autoCompleteKeys = autoCompleteKeys;
     this.traceTtl = traceTtl;
     this.traceTtlCheckInterval = traceTtlCheckInterval;
@@ -123,7 +125,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
             namesSerde));
     // Traces stream
     KStream<String, List<Span>> spansStream = builder
-        .stream(spansTopicName, Consumed.with(Serdes.String(), spansSerde));
+        .stream(spansTopic, Consumed.with(Serdes.String(), spansSerde));
     // Store traces
     spansStream.process(() -> new Processor<String, List<Span>>() {
       // Actual traces store

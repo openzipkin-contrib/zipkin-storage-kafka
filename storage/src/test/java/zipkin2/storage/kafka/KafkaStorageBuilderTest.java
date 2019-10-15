@@ -29,9 +29,17 @@ class KafkaStorageBuilderTest {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
     assertThat(builder.storageDir).isNotNull();
 
-    assertThatThrownBy(() -> builder.spansTopicName(null))
+    assertThatThrownBy(() -> builder.partitionedSpansTopic(null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> builder.dependenciesTopicName(null))
+    assertThatThrownBy(() -> builder.aggregationSpansTopic(null))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(() -> builder.aggregationTraceTopic(null))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(() -> builder.aggregationDependencyTopic(null))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(() -> builder.storeSpansTopic(null))
+        .isInstanceOf(NullPointerException.class);
+    assertThatThrownBy(() -> builder.storeDependencyTopic(null))
         .isInstanceOf(NullPointerException.class);
     assertThatThrownBy(() -> builder.storageDir(null))
         .isInstanceOf(NullPointerException.class);
