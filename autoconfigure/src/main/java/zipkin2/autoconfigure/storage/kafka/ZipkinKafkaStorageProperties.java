@@ -41,8 +41,8 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String aggregationSpansTopic;
   private String aggregationTraceTopic;
   private String aggregationDependencyTopic;
-  private String storeSpansTopic;
-  private String storeDependencyTopic;
+  private String storageSpansTopic;
+  private String storageDependencyTopic;
 
   private String storageDir;
 
@@ -88,8 +88,8 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     if (aggregationDependencyTopic != null) {
       builder.aggregationDependencyTopic(aggregationDependencyTopic);
     }
-    if (storeSpansTopic != null) builder.storeSpansTopic(storeSpansTopic);
-    if (storeDependencyTopic != null) builder.storeDependencyTopic(storeDependencyTopic);
+    if (storageSpansTopic != null) builder.storageSpansTopic(storageSpansTopic);
+    if (storageDependencyTopic != null) builder.storageDependencyTopic(storageDependencyTopic);
     if (adminOverrides != null) builder.adminOverrides(adminOverrides);
     if (producerOverrides != null) builder.producerOverrides(producerOverrides);
     if (aggregationStreamOverrides != null) {
@@ -271,19 +271,19 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.partitionedSpansTopic = partitionedSpansTopic;
   }
 
-  public String getStoreSpansTopic() {
-    return storeSpansTopic;
+  public String getStorageSpansTopic() {
+    return storageSpansTopic;
   }
 
-  public void setStoreSpansTopic(String storeSpansTopic) {
-    this.storeSpansTopic = storeSpansTopic;
+  public void setStorageSpansTopic(String storageSpansTopic) {
+    this.storageSpansTopic = storageSpansTopic;
   }
 
-  public String getStoreDependencyTopic() {
-    return storeDependencyTopic;
+  public String getStorageDependencyTopic() {
+    return storageDependencyTopic;
   }
 
-  public void setStoreDependencyTopic(String storeDependencyTopic) {
-    this.storeDependencyTopic = storeDependencyTopic;
+  public void setStorageDependencyTopic(String storageDependencyTopic) {
+    this.storageDependencyTopic = storageDependencyTopic;
   }
 }

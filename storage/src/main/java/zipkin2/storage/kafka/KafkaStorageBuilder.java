@@ -62,8 +62,8 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   String aggregationSpansTopic = "zipkin-spans";
   String aggregationTraceTopic = "zipkin-trace";
   String aggregationDependencyTopic = "zipkin-dependency";
-  String storeSpansTopic = "zipkin-spans";
-  String storeDependencyTopic = "zipkin-dependency";
+  String storageSpansTopic = "zipkin-spans";
+  String storageDependencyTopic = "zipkin-dependency";
 
   KafkaStorageBuilder() {
     // Kafka Producer configuration
@@ -249,20 +249,20 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   /**
    * Kafka topic name where partitioned spans are stored to be used on aggregation.
    */
-  public KafkaStorageBuilder storeSpansTopic(String storeSpansTopic) {
-    if (storeSpansTopic == null) throw new NullPointerException("storeSpansTopic == null");
-    this.storeSpansTopic = storeSpansTopic;
+  public KafkaStorageBuilder storageSpansTopic(String storageSpansTopic) {
+    if (storageSpansTopic == null) throw new NullPointerException("storageSpansTopic == null");
+    this.storageSpansTopic = storageSpansTopic;
     return this;
   }
 
   /**
    * Kafka topic name where dependencies changelog are stored.
    */
-  public KafkaStorageBuilder storeDependencyTopic(String storeDependencyTopic) {
-    if (storeDependencyTopic == null) {
-      throw new NullPointerException("storeDependencyTopic == null");
+  public KafkaStorageBuilder storageDependencyTopic(String storageDependencyTopic) {
+    if (storageDependencyTopic == null) {
+      throw new NullPointerException("storageDependencyTopic == null");
     }
-    this.storeDependencyTopic = storeDependencyTopic;
+    this.storageDependencyTopic = storageDependencyTopic;
     return this;
   }
 

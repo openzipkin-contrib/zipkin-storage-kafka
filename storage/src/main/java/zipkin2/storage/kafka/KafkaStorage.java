@@ -71,7 +71,7 @@ public class KafkaStorage extends StorageComponent {
   // Kafka Topics
   final String partitionedSpansTopic;
   final String aggregationSpansTopic, aggregationTraceTopic, aggregationDependencyTopic;
-  final String storeSpansTopic, storeDependencyTopic;
+  final String storageSpansTopic, storageDependencyTopic;
   // Kafka Clients config
   final Properties adminConfig;
   final Properties producerConfig;
@@ -97,8 +97,8 @@ public class KafkaStorage extends StorageComponent {
     this.aggregationSpansTopic = builder.aggregationSpansTopic;
     this.aggregationTraceTopic = builder.aggregationTraceTopic;
     this.aggregationDependencyTopic = builder.aggregationDependencyTopic;
-    this.storeSpansTopic = builder.storeSpansTopic;
-    this.storeDependencyTopic = builder.storeDependencyTopic;
+    this.storageSpansTopic = builder.storageSpansTopic;
+    this.storageDependencyTopic = builder.storageDependencyTopic;
     // Storage directories
     this.storageDir = builder.storageDir;
     this.minTracesStored = builder.minTracesStored;
@@ -118,13 +118,13 @@ public class KafkaStorage extends StorageComponent {
         aggregationDependencyTopic,
         builder.traceTimeout).get();
     traceStoreTopology = new TraceStoreTopologySupplier(
-        storeSpansTopic,
+        storageSpansTopic,
         autocompleteKeys,
         builder.traceTtl,
         builder.traceTtlCheckInterval,
         builder.minTracesStored).get();
     dependencyStoreTopology = new DependencyStoreTopologySupplier(
-        storeDependencyTopic,
+        storageDependencyTopic,
         builder.dependencyTtl,
         builder.dependencyWindowSize).get();
   }

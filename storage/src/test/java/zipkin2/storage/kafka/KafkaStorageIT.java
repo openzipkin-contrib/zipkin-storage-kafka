@@ -167,13 +167,13 @@ class KafkaStorageIT {
     // When: and stores running
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
     // When: been published
-    tracesProducer.send(new ProducerRecord<>(storage.storeSpansTopic, parent.traceId(), spans));
-    tracesProducer.send(new ProducerRecord<>(storage.storeSpansTopic, other.traceId(),
+    tracesProducer.send(new ProducerRecord<>(storage.storageSpansTopic, parent.traceId(), spans));
+    tracesProducer.send(new ProducerRecord<>(storage.storageSpansTopic, other.traceId(),
       Collections.singletonList(other)));
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.storeSpansTopic, 2, 10000);
+      consumerConfig, storage.storageSpansTopic, 2, 10000);
     // Then: services names are searchable
     await().atMost(100, TimeUnit.SECONDS).until(() -> {
       List<List<Span>> traces = storage.spanStore().getTraces(QueryRequest.newBuilder()
@@ -210,7 +210,7 @@ class KafkaStorageIT {
     //Given: two related dependency links
     // When: sent first one
     dependencyProducer.send(
-      new ProducerRecord<>(storage.storeDependencyTopic, "svc_a:svc_b",
+      new ProducerRecord<>(storage.storageDependencyTopic, "svc_a:svc_b",
         DependencyLink.newBuilder()
           .parent("svc_a")
           .child("svc_b")
@@ -219,7 +219,7 @@ class KafkaStorageIT {
           .build()));
     // When: and another one
     dependencyProducer.send(
-      new ProducerRecord<>(storage.storeDependencyTopic, "svc_a:svc_b",
+      new ProducerRecord<>(storage.storageDependencyTopic, "svc_a:svc_b",
         DependencyLink.newBuilder()
           .parent("svc_a")
           .child("svc_b")
@@ -229,7 +229,7 @@ class KafkaStorageIT {
     dependencyProducer.flush();
     // Then: stored in topic
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.storeDependencyTopic, 2, 10000);
+      consumerConfig, storage.storageDependencyTopic, 2, 10000);
     // Then:
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       List<DependencyLink> links = new ArrayList<>();
