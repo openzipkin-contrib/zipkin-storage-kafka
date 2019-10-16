@@ -9,6 +9,9 @@
 | `KAFKA_TRACE_TOPIC` | Topic where aggregated traces are stored. | `zipkin-trace` |
 | `KAFKA_DEPENDENCY_TOPIC` | Topic where aggregated service dependencies names are stored. | `zipkin-dependency` |
 
+> These topics can be configured by individual components (span-consumer, aggregation, storage) by using Java options. 
+> For more information about property names, check [zipkin-server-kafka.yml](src/main/resources/zipkin-server-kafka.yml)
+
 ## Storage configurations
 
 | Configuration | Description | Default |
