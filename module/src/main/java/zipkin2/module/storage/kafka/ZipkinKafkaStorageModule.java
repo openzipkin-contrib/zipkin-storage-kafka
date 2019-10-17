@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.autoconfigure.storage.kafka;
+package zipkin2.module.storage.kafka;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -24,7 +24,7 @@ import zipkin2.storage.StorageComponent;
 @EnableConfigurationProperties(ZipkinKafkaStorageProperties.class)
 @ConditionalOnProperty(name = "zipkin.storage.type", havingValue = "kafka")
 @ConditionalOnMissingBean(StorageComponent.class)
-class ZipkinKafkaStorageAutoConfiguration {
+class ZipkinKafkaStorageModule {
 
   @Bean
   @ConditionalOnMissingBean

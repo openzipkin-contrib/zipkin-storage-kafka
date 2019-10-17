@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.autoconfigure.storage.kafka;
+package zipkin2.module.storage.kafka;
 
 import java.io.Serializable;
 import java.time.Duration;

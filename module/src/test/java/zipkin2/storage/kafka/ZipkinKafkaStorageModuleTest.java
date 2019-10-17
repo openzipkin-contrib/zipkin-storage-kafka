@@ -21,12 +21,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import zipkin2.autoconfigure.storage.kafka.Access;
+import zipkin2.module.storage.kafka.Access;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class ZipkinKafkaStorageAutoConfigurationTest {
+public class ZipkinKafkaStorageModuleTest {
   AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
 
   @AfterEach void close() {

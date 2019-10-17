@@ -24,7 +24,7 @@
 
   <modules>
     <module>storage</module>
-    <module>autoconfigure</module>
+    <module>module</module>
   </modules>
 
   <distributionManagement>
@@ -51,7 +51,7 @@
 
     <!-- groupId overrinds allow testing feature branches with jitpack -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
-    <zipkin.version>2.17.2</zipkin.version>
+    <zipkin.version>2.18.0</zipkin.version>
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
     <armeria.version>0.94.0</armeria.version>
     <spring-boot.version>2.1.9.RELEASE</spring-boot.version>

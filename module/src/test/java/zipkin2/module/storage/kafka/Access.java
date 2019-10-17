@@ -11,7 +11,7 @@
  * or implied. See the License for the specific language governing permissions and limitations under
  * the License.
  */
-package zipkin2.autoconfigure.storage.kafka;
+package zipkin2.module.storage.kafka;
 
 import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -20,6 +20,6 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 public final class Access {
   public static void registerKafka(AnnotationConfigApplicationContext context) {
     context.register(
-        PropertyPlaceholderAutoConfiguration.class, ZipkinKafkaStorageAutoConfiguration.class);
+        PropertyPlaceholderAutoConfiguration.class, ZipkinKafkaStorageModule.class);
   }
 }
