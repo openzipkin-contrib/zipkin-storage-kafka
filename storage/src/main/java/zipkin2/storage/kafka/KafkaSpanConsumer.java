@@ -30,8 +30,8 @@ import zipkin2.storage.kafka.internal.AwaitableCallback;
 /**
  * Span Consumer to compensate current {@code zipkin2.reporter.kafka.KafkaSender} distribution of
  * span batched without key.
- *
- * <p> This component split batch into individual spans keyed by trace ID to enabled downstream
+ * <p>
+ * This component split batch into individual spans keyed by trace ID to enabled downstream
  * processing of spans as part of a trace.
  */
 final class KafkaSpanConsumer implements SpanConsumer {
@@ -41,7 +41,7 @@ final class KafkaSpanConsumer implements SpanConsumer {
   final Producer<String, byte[]> producer;
 
   KafkaSpanConsumer(KafkaStorage storage) {
-    spansTopicName = storage.spansTopicName;
+    spansTopicName = storage.partitionedSpansTopic;
     producer = storage.getProducer();
   }
 

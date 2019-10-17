@@ -32,8 +32,6 @@ import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,8 +54,6 @@ import static org.awaitility.Awaitility.await;
 
 @Testcontainers
 class KafkaStorageIT {
-  static final Logger LOG = LogManager.getLogger();
-
   static final long TODAY = System.currentTimeMillis();
 
   // TODO: does this need to be confluent container? #45
@@ -89,9 +85,9 @@ class KafkaStorageIT {
       .build();
 
     Collection<NewTopic> newTopics = new ArrayList<>();
-    newTopics.add(new NewTopic(storage.spansTopicName, 1, (short) 1));
-    newTopics.add(new NewTopic(storage.traceTopicName, 1, (short) 1));
-    newTopics.add(new NewTopic(storage.dependencyTopicName, 1, (short) 1));
+    newTopics.add(new NewTopic(storage.aggregationSpansTopic, 1, (short) 1));
+    newTopics.add(new NewTopic(storage.aggregationTraceTopic, 1, (short) 1));
+    newTopics.add(new NewTopic(storage.aggregationDependencyTopic, 1, (short) 1));
     storage.getAdminClient().createTopics(newTopics).all().get();
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> storage.check().ok());
@@ -131,7 +127,7 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: they are partitioned
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.spansTopicName, 1, 10000);
+      consumerConfig, storage.partitionedSpansTopic, 1, 10000);
     // Given: some time for stream processes to kick in
     Thread.sleep(traceTimeout.toMillis() * 2);
     // Given: another span to move 'event time' forward
@@ -144,12 +140,12 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: a trace is published
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.spansTopicName, 1, 1000);
+      consumerConfig, storage.aggregationSpansTopic, 1, 1000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.traceTopicName, 1, 30000);
+      consumerConfig, storage.aggregationTraceTopic, 1, 30000);
     // Then: and a dependency link created
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.dependencyTopicName, 1, 1000);
+      consumerConfig, storage.aggregationDependencyTopic, 1, 1000);
   }
 
   @Test void should_return_traces_query() throws Exception {
@@ -171,13 +167,13 @@ class KafkaStorageIT {
     // When: and stores running
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
     // When: been published
-    tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, parent.traceId(), spans));
-    tracesProducer.send(new ProducerRecord<>(storage.spansTopicName, other.traceId(),
+    tracesProducer.send(new ProducerRecord<>(storage.storageSpansTopic, parent.traceId(), spans));
+    tracesProducer.send(new ProducerRecord<>(storage.storageSpansTopic, other.traceId(),
       Collections.singletonList(other)));
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.spansTopicName, 2, 10000);
+      consumerConfig, storage.storageSpansTopic, 2, 10000);
     // Then: services names are searchable
     await().atMost(100, TimeUnit.SECONDS).until(() -> {
       List<List<Span>> traces = storage.spanStore().getTraces(QueryRequest.newBuilder()
@@ -214,7 +210,7 @@ class KafkaStorageIT {
     //Given: two related dependency links
     // When: sent first one
     dependencyProducer.send(
-      new ProducerRecord<>(storage.dependencyTopicName, "svc_a:svc_b",
+      new ProducerRecord<>(storage.storageDependencyTopic, "svc_a:svc_b",
         DependencyLink.newBuilder()
           .parent("svc_a")
           .child("svc_b")
@@ -223,7 +219,7 @@ class KafkaStorageIT {
           .build()));
     // When: and another one
     dependencyProducer.send(
-      new ProducerRecord<>(storage.dependencyTopicName, "svc_a:svc_b",
+      new ProducerRecord<>(storage.storageDependencyTopic, "svc_a:svc_b",
         DependencyLink.newBuilder()
           .parent("svc_a")
           .child("svc_b")
@@ -233,7 +229,7 @@ class KafkaStorageIT {
     dependencyProducer.flush();
     // Then: stored in topic
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.dependencyTopicName, 2, 10000);
+      consumerConfig, storage.storageDependencyTopic, 2, 10000);
     // Then:
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       List<DependencyLink> links = new ArrayList<>();

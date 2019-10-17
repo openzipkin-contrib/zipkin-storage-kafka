@@ -37,9 +37,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   private Long dependencyTtl;
 
-  private String spansTopic;
-  private String traceTopic;
-  private String dependencyTopic;
+  private String partitionedSpansTopic;
+  private String aggregationSpansTopic;
+  private String aggregationTraceTopic;
+  private String aggregationDependencyTopic;
+  private String storageSpansTopic;
+  private String storageDependencyTopic;
 
   private String storageDir;
 
@@ -79,9 +82,14 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       builder.aggregationStreamAppId(dependencyStoreStreamAppId);
     }
     if (storageDir != null) builder.storageDir(storageDir);
-    if (spansTopic != null) builder.spansTopicName(spansTopic);
-    if (traceTopic != null) builder.tracesTopicName(traceTopic);
-    if (dependencyTopic != null) builder.dependenciesTopicName(dependencyTopic);
+    if (partitionedSpansTopic != null) builder.partitionedSpansTopic(partitionedSpansTopic);
+    if (aggregationSpansTopic != null) builder.aggregationSpansTopic(aggregationSpansTopic);
+    if (aggregationTraceTopic != null) builder.aggregationTraceTopic(aggregationTraceTopic);
+    if (aggregationDependencyTopic != null) {
+      builder.aggregationDependencyTopic(aggregationDependencyTopic);
+    }
+    if (storageSpansTopic != null) builder.storageSpansTopic(storageSpansTopic);
+    if (storageDependencyTopic != null) builder.storageDependencyTopic(storageDependencyTopic);
     if (adminOverrides != null) builder.adminOverrides(adminOverrides);
     if (producerOverrides != null) builder.producerOverrides(producerOverrides);
     if (aggregationStreamOverrides != null) {
@@ -150,28 +158,28 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.traceTimeout = traceTimeout;
   }
 
-  public String getSpansTopic() {
-    return spansTopic;
+  public String getAggregationSpansTopic() {
+    return aggregationSpansTopic;
   }
 
-  public void setSpansTopic(String spansTopic) {
-    this.spansTopic = spansTopic;
+  public void setAggregationSpansTopic(String aggregationSpansTopic) {
+    this.aggregationSpansTopic = aggregationSpansTopic;
   }
 
-  public String getTraceTopic() {
-    return traceTopic;
+  public String getAggregationTraceTopic() {
+    return aggregationTraceTopic;
   }
 
-  public void setTraceTopic(String traceTopic) {
-    this.traceTopic = traceTopic;
+  public void setAggregationTraceTopic(String aggregationTraceTopic) {
+    this.aggregationTraceTopic = aggregationTraceTopic;
   }
 
-  public String getDependencyTopic() {
-    return dependencyTopic;
+  public String getAggregationDependencyTopic() {
+    return aggregationDependencyTopic;
   }
 
-  public void setDependencyTopic(String dependencyTopic) {
-    this.dependencyTopic = dependencyTopic;
+  public void setAggregationDependencyTopic(String aggregationDependencyTopic) {
+    this.aggregationDependencyTopic = aggregationDependencyTopic;
   }
 
   public String getStorageDir() {
@@ -210,8 +218,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     return aggregationStreamOverrides;
   }
 
-  public void setAggregationStreamOverrides(
-      Map<String, String> aggregationStreamOverrides) {
+  public void setAggregationStreamOverrides(Map<String, String> aggregationStreamOverrides) {
     this.aggregationStreamOverrides = aggregationStreamOverrides;
   }
 
@@ -219,8 +226,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     return traceStoreStreamOverrides;
   }
 
-  public void setTraceStoreStreamOverrides(
-      Map<String, String> traceStoreStreamOverrides) {
+  public void setTraceStoreStreamOverrides(Map<String, String> traceStoreStreamOverrides) {
     this.traceStoreStreamOverrides = traceStoreStreamOverrides;
   }
 
@@ -255,5 +261,29 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setDependencyStoreStreamAppId(String dependencyStoreStreamAppId) {
     this.dependencyStoreStreamAppId = dependencyStoreStreamAppId;
+  }
+
+  public String getPartitionedSpansTopic() {
+    return partitionedSpansTopic;
+  }
+
+  public void setPartitionedSpansTopic(String partitionedSpansTopic) {
+    this.partitionedSpansTopic = partitionedSpansTopic;
+  }
+
+  public String getStorageSpansTopic() {
+    return storageSpansTopic;
+  }
+
+  public void setStorageSpansTopic(String storageSpansTopic) {
+    this.storageSpansTopic = storageSpansTopic;
+  }
+
+  public String getStorageDependencyTopic() {
+    return storageDependencyTopic;
+  }
+
+  public void setStorageDependencyTopic(String storageDependencyTopic) {
+    this.storageDependencyTopic = storageDependencyTopic;
   }
 }

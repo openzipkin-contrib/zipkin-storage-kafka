@@ -6,9 +6,12 @@ zipkin:
       # Connection to Kafka
       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
       # Kafka topic names
-      spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
-      trace-topic: ${KAFKA_TRACE_TOPIC:zipkin-trace}
-      dependency-topic: ${KAFKA_DEPENDENCY_TOPIC:zipkin-dependency}
+      partitioned-spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
+      aggregation-spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
+      aggregation-trace-topic: ${KAFKA_TRACE_TOPIC:zipkin-trace}
+      aggregation-dependency-topic: ${KAFKA_DEPENDENCY_TOPIC:zipkin-dependency}
+      storage-spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
+      storage-dependency-topic: ${KAFKA_DEPENDENCY_TOPIC:zipkin-dependency}
       # Kafka Streams configs
       aggregation-stream-app-id: ${KAFKA_STORAGE_AGGREGATION_STREAM_APP_ID:zipkin-aggregation}
       trace-store-stream-app-id: ${KAFKA_STORAGE_TRACE_STORE_STREAM_APP_ID:zipkin-trace-store}

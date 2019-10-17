@@ -34,16 +34,18 @@ public final class DependencyStoreTopologySupplier implements Supplier<Topology>
   public static final String DEPENDENCIES_STORE_NAME = "zipkin-dependencies";
 
   // Kafka topics
-  final String dependencyTopicName;
+  final String dependencyTopic;
   // Configs
   final Duration dependencyTtl;
   final Duration dependencyWindowSize;
   // SerDes
   final DependencyLinkSerde dependencyLinkSerde;
 
-  public DependencyStoreTopologySupplier(String dependencyTopicName,
-      Duration dependencyTtl, Duration dependencyWindowSize) {
-    this.dependencyTopicName = dependencyTopicName;
+  public DependencyStoreTopologySupplier(
+      String dependencyTopic,
+      Duration dependencyTtl,
+      Duration dependencyWindowSize) {
+    this.dependencyTopic = dependencyTopic;
     this.dependencyTtl = dependencyTtl;
     this.dependencyWindowSize = dependencyWindowSize;
     dependencyLinkSerde = new DependencyLinkSerde();
@@ -65,7 +67,7 @@ public final class DependencyStoreTopologySupplier implements Supplier<Topology>
             dependencyLinkSerde
         ).withLoggingDisabled());
     // Consume dependency links stream
-    builder.stream(dependencyTopicName, Consumed.with(Serdes.String(), dependencyLinkSerde))
+    builder.stream(dependencyTopic, Consumed.with(Serdes.String(), dependencyLinkSerde))
         // Storage
         .process(() -> new Processor<String, DependencyLink>() {
           ProcessorContext context;
