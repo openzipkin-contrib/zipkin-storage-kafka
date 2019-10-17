@@ -18,8 +18,11 @@ WORKDIR /code
 COPY . /code
 RUN mvn -B --no-transfer-progress package -DskipTests=true -pl module -am
 
-RUN \
-  cd /code && mkdir -p /zipkin-storage-kafka && cp module/target/zipkin-module-storage-kafka-*-module.jar /zipkin-storage-kafka && cd /zipkin-storage-kafka && jar xf *.jar && rm *.jar
+RUN cd /code && mkdir -p /zipkin-storage-kafka && \
+    cp module/target/zipkin-module-storage-kafka-*-module.jar /zipkin-storage-kafka && \
+    cd /zipkin-storage-kafka && \
+    jar xf *.jar && \
+    rm *.jar
 
 FROM openzipkin/zipkin:2.18.0
 MAINTAINER Zipkin "https://zipkin.io/"
