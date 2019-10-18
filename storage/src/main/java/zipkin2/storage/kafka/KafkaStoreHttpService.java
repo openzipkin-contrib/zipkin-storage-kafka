@@ -28,7 +28,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -132,7 +131,7 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
               .store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
-      names.forEach(array::add);
+      if (names != null) names.forEach(array::add);
       return array;
     } catch (InvalidStateStoreException e) {
       LOG.debug("State store is not ready", e);
@@ -149,7 +148,7 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
               QueryableStoreTypes.keyValueStore());
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
-      names.forEach(array::add);
+      if (names != null) names.forEach(array::add);
       return (array);
     } catch (InvalidStateStoreException e) {
       LOG.debug("State store is not ready", e);
@@ -260,12 +259,10 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
     try {
       ReadOnlyKeyValueStore<String, List<Span>> store =
         storage.getTraceStoreStream().store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
-
       List<List<Span>> result = new ArrayList<>();
       for (String traceId : traceIds.split(",", 1000)) {
         result.add(store.get(traceId));
       }
-
       return AggregatedHttpResponse.of(HttpStatus.OK, MediaType.JSON, writeTraces(result));
     } catch (InvalidStateStoreException e) {
       LOG.debug("State store is not ready", e);
@@ -296,10 +293,9 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
           storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
               QueryableStoreTypes.keyValueStore());
-      Set<String> valuesSet = autocompleteTagsStore.get(key);
-      if (valuesSet == null) valuesSet = new LinkedHashSet<>();
+      Set<String> values = autocompleteTagsStore.get(key);
       ArrayNode array = MAPPER.createArrayNode();
-      valuesSet.forEach(array::add);
+      if (values != null) values.forEach(array::add);
       return array;
     } catch (InvalidStateStoreException e) {
       LOG.debug("State store is not ready", e);
@@ -331,13 +327,12 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
     int sizeInBytes = 2; // []
     if (length > 1) sizeInBytes += length - 1; // comma to join elements
 
-    for (int i = 0; i < length; i++) {
-      List<zipkin2.Span> spans = traces.get(i);
+    for (List<Span> spans : traces) {
       int jLength = spans.size();
       sizeInBytes += 2; // []
       if (jLength > 1) sizeInBytes += jLength - 1; // comma to join elements
-      for (int j = 0; j < jLength; j++) {
-        sizeInBytes += SpanBytesEncoder.JSON_V2.sizeInBytes(spans.get(j));
+      for (Span span : spans) {
+        sizeInBytes += SpanBytesEncoder.JSON_V2.sizeInBytes(span);
       }
     }
 
