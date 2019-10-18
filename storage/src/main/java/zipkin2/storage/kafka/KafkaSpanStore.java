@@ -56,7 +56,7 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
 /**
  * Span store backed by Kafka Stream distributed state stores built by {@link
  * TraceStoreTopologySupplier} and {@link DependencyStoreTopologySupplier}, and made accessible by
- * {@link  KafkaStoreHttpService}.
+ * {@link  KafkaStorageHttpService}.
  */
 final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
   static final ObjectMapper MAPPER = new ObjectMapper();

@@ -50,7 +50,6 @@
     <dependency>
       <groupId>${armeria.groupId}</groupId>
       <artifactId>armeria</artifactId>
-      <scope>test</scope>
     </dependency>
   </dependencies>
 

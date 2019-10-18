@@ -331,7 +331,7 @@ public class KafkaStorage extends StorageComponent {
           try {
             server = Server.builder()
                 .http(httpPort)
-                .annotatedService(new KafkaStoreHttpService(this))
+                .annotatedService(new KafkaStorageHttpService(this))
                 .build();
             server.start();
           } catch (Exception e) {

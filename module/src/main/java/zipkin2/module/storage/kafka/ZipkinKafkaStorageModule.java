@@ -13,12 +13,16 @@
  */
 package zipkin2.module.storage.kafka;
 
+import com.linecorp.armeria.server.ServerBuilder;
+import java.util.function.Consumer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import zipkin2.storage.StorageComponent;
+import zipkin2.storage.kafka.KafkaStorage;
+import zipkin2.storage.kafka.KafkaStorageHttpService;
 
 @Configuration
 @EnableConfigurationProperties(ZipkinKafkaStorageProperties.class)
@@ -26,9 +30,12 @@ import zipkin2.storage.StorageComponent;
 @ConditionalOnMissingBean(StorageComponent.class)
 class ZipkinKafkaStorageModule {
 
-  @Bean
   @ConditionalOnMissingBean
-  StorageComponent storage(ZipkinKafkaStorageProperties properties) {
+  @Bean StorageComponent storage(ZipkinKafkaStorageProperties properties) {
     return properties.toBuilder().build();
+  }
+
+  @Bean public Consumer<ServerBuilder> storageHttpService(StorageComponent storage) {
+    return new KafkaStorageHttpService((KafkaStorage) storage);
   }
 }

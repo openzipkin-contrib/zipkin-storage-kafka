@@ -65,20 +65,20 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
  * distributed state. This component exposes access to local state via Http call from {@link
  * KafkaSpanStore}
  */
-final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
+public final class KafkaStorageHttpService implements Consumer<ServerBuilder> {
   static final Logger LOG = LogManager.getLogger();
   static final ObjectMapper MAPPER = new ObjectMapper();
 
   final KafkaStorage storage;
   final long minTracesStored;
 
-  KafkaStoreHttpService(KafkaStorage storage) {
+  public KafkaStorageHttpService(KafkaStorage storage) {
     this.storage = storage;
     this.minTracesStored = storage.minTracesStored;
   }
 
-  @Override public void accept(ServerBuilder serverBuilder) {
-    serverBuilder.annotatedService("/zipkin/storage/kafka", this);
+  @Override public void accept(ServerBuilder builder) {
+    builder.annotatedService("/storage/kafka", this);
   }
 
   @Get("/dependencies")
