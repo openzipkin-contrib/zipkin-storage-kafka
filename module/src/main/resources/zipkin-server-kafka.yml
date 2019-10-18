@@ -1,5 +1,8 @@
 # When enabled, this allows shorter env properties (ex -Dspring.profiles.active=kafka)
 zipkin:
+  internal:
+    module:
+      kafka: zipkin2.module.storage.kafka.ZipkinKafkaStorageModule
   storage:
     kafka:
       hostname: ${KAFKA_STORAGE_HOST_NAME:${HOSTNAME:localhost}}

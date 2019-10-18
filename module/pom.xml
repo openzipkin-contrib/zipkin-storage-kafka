@@ -22,8 +22,8 @@
     <version>0.6.2-SNAPSHOT</version>
   </parent>
 
-  <artifactId>zipkin-autoconfigure-storage-kafka</artifactId>
-  <name>Auto Configuration: Kafka Storage</name>
+  <artifactId>zipkin-module-storage-kafka</artifactId>
+  <name>Zipkin Server Module: Kafka Storage</name>
 
   <properties>
     <main.basedir>${project.basedir}/..</main.basedir>
