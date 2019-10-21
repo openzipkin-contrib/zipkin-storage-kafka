@@ -87,8 +87,8 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
       @Param("lookback") long lookback) {
     try {
       ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore =
-          storage.getDependencyStoreStream().store(DEPENDENCIES_STORE_NAME,
-              QueryableStoreTypes.windowStore());
+          storage.getDependencyStoreStream()
+              .store(DEPENDENCIES_STORE_NAME, QueryableStoreTypes.windowStore());
       List<DependencyLink> links = new ArrayList<>();
       Instant from = Instant.ofEpochMilli(endTs - lookback);
       Instant to = Instant.ofEpochMilli(endTs);
@@ -110,9 +110,8 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   @ProducesJson
   public JsonNode getServiceNames() {
     try {
-      ReadOnlyKeyValueStore<String, String> store =
-          storage.getTraceStoreStream()
-              .store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+      ReadOnlyKeyValueStore<String, String> store = storage.getTraceStoreStream()
+          .store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       ArrayNode array = MAPPER.createArrayNode();
       store.all().forEachRemaining(keyValue -> array.add(keyValue.value));
       return array;
@@ -126,9 +125,8 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   @ProducesJson
   public JsonNode getSpanNames(@Param("service_name") String serviceName) {
     try {
-      ReadOnlyKeyValueStore<String, Set<String>> store =
-          storage.getTraceStoreStream()
-              .store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+      ReadOnlyKeyValueStore<String, Set<String>> store = storage.getTraceStoreStream()
+          .store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
       if (names != null) names.forEach(array::add);
@@ -143,9 +141,8 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   @ProducesJson
   public JsonNode getRemoteServiceNames(@Param("service_name") String serviceName) {
     try {
-      ReadOnlyKeyValueStore<String, Set<String>> store =
-          storage.getTraceStoreStream().store(REMOTE_SERVICE_NAMES_STORE_NAME,
-              QueryableStoreTypes.keyValueStore());
+      ReadOnlyKeyValueStore<String, Set<String>> store = storage.getTraceStoreStream()
+          .store(REMOTE_SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
       if (names != null) names.forEach(array::add);
@@ -257,8 +254,8 @@ final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
   @Get("/traceMany")
   public AggregatedHttpResponse getTraces(@Param("traceIds") String traceIds) {
     try {
-      ReadOnlyKeyValueStore<String, List<Span>> store =
-        storage.getTraceStoreStream().store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
+      ReadOnlyKeyValueStore<String, List<Span>> store = storage.getTraceStoreStream()
+          .store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       List<List<Span>> result = new ArrayList<>();
       for (String traceId : traceIds.split(",", 1000)) {
         result.add(store.get(traceId));
