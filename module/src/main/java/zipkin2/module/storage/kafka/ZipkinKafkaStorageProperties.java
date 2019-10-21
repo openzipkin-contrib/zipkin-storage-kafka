@@ -26,6 +26,10 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
 
   private Boolean spanConsumerEnabled;
+  private Boolean aggregationEnabled;
+  private Boolean traceSearchEnabled;
+  private Boolean traceByIdQueryEnabled;
+  private Boolean dependencyQueryEnabled;
 
   private String hostname;
 
@@ -62,6 +66,10 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   KafkaStorageBuilder toBuilder() {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
     if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
+    if (aggregationEnabled != null) builder.aggregationEnabled(aggregationEnabled);
+    if (traceByIdQueryEnabled != null) builder.traceByIdQueryEnabled(traceByIdQueryEnabled);
+    if (traceSearchEnabled != null) builder.traceSearchEnabled(traceSearchEnabled);
+    if (dependencyQueryEnabled != null) builder.dependencyQueryEnabled(dependencyQueryEnabled);
     if (hostname != null) builder.hostname(hostname);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
     if (traceTimeout != null) {
@@ -115,6 +123,38 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   public void setSpanConsumerEnabled(Boolean spanConsumerEnabled) {
     this.spanConsumerEnabled = spanConsumerEnabled;
+  }
+
+  public Boolean getAggregationEnabled() {
+    return aggregationEnabled;
+  }
+
+  public void setAggregationEnabled(Boolean aggregationEnabled) {
+    this.aggregationEnabled = aggregationEnabled;
+  }
+
+  public Boolean getTraceSearchEnabled() {
+    return traceSearchEnabled;
+  }
+
+  public void setTraceSearchEnabled(Boolean traceSearchEnabled) {
+    this.traceSearchEnabled = traceSearchEnabled;
+  }
+
+  public Boolean getTraceByIdQueryEnabled() {
+    return traceByIdQueryEnabled;
+  }
+
+  public void setTraceByIdQueryEnabled(Boolean traceByIdQueryEnabled) {
+    this.traceByIdQueryEnabled = traceByIdQueryEnabled;
+  }
+
+  public Boolean getDependencyQueryEnabled() {
+    return dependencyQueryEnabled;
+  }
+
+  public void setDependencyQueryEnabled(Boolean dependencyQueryEnabled) {
+    this.dependencyQueryEnabled = dependencyQueryEnabled;
   }
 
   public String getBootstrapServers() {
