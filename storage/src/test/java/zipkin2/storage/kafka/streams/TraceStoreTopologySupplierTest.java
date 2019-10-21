@@ -55,7 +55,9 @@ class TraceStoreTopologySupplierTest {
         autocompleteKeys,
         traceTtl,
         traceTtlCheckInterval,
-        0).get();
+        0,
+        true,
+        true).get();
     TopologyDescription description = topology.describe();
     // Then: 2 threads prepared
     assertThat(description.subtopologies()).hasSize(1);

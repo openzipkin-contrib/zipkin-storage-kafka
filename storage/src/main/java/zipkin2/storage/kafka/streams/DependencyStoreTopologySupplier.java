@@ -29,7 +29,9 @@ import org.apache.kafka.streams.state.WindowStoreIterator;
 import zipkin2.DependencyLink;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 
-/** Windowed storage of dependency links. */
+/**
+ * Windowed storage of dependency links.
+ */
 public final class DependencyStoreTopologySupplier implements Supplier<Topology> {
   public static final String DEPENDENCIES_STORE_NAME = "zipkin-dependencies";
 
@@ -38,76 +40,80 @@ public final class DependencyStoreTopologySupplier implements Supplier<Topology>
   // Configs
   final Duration dependencyTtl;
   final Duration dependencyWindowSize;
+  // Flags
+  final boolean dependencyQueryEnabled;
   // SerDes
   final DependencyLinkSerde dependencyLinkSerde;
 
   public DependencyStoreTopologySupplier(
       String dependencyTopic,
       Duration dependencyTtl,
-      Duration dependencyWindowSize) {
+      Duration dependencyWindowSize,
+      boolean dependencyQueryEnabled) {
     this.dependencyTopic = dependencyTopic;
     this.dependencyTtl = dependencyTtl;
     this.dependencyWindowSize = dependencyWindowSize;
+    this.dependencyQueryEnabled = dependencyQueryEnabled;
     dependencyLinkSerde = new DependencyLinkSerde();
   }
 
   @Override public Topology get() {
     StreamsBuilder builder = new StreamsBuilder();
+    if (dependencyQueryEnabled) {
+      // Dependency links window store
+      builder.addStateStore(
+          // Disabling logging to avoid long starting times
+          Stores.windowStoreBuilder(
+              Stores.persistentWindowStore(
+                  DEPENDENCIES_STORE_NAME,
+                  dependencyTtl,
+                  dependencyWindowSize,
+                  false),
+              Serdes.String(),
+              dependencyLinkSerde
+          ).withLoggingDisabled());
+      // Consume dependency links stream
+      builder.stream(dependencyTopic, Consumed.with(Serdes.String(), dependencyLinkSerde))
+          // Storage
+          .process(() -> new Processor<String, DependencyLink>() {
+            ProcessorContext context;
+            WindowStore<String, DependencyLink> dependenciesStore;
 
-    // Dependency links window store
-    builder.addStateStore(
-        // Disabling logging to avoid long starting times
-        Stores.windowStoreBuilder(
-            Stores.persistentWindowStore(
-                DEPENDENCIES_STORE_NAME,
-                dependencyTtl,
-                dependencyWindowSize,
-                false),
-            Serdes.String(),
-            dependencyLinkSerde
-        ).withLoggingDisabled());
-    // Consume dependency links stream
-    builder.stream(dependencyTopic, Consumed.with(Serdes.String(), dependencyLinkSerde))
-        // Storage
-        .process(() -> new Processor<String, DependencyLink>() {
-          ProcessorContext context;
-          WindowStore<String, DependencyLink> dependenciesStore;
-
-          @SuppressWarnings("unchecked")
-          @Override public void init(ProcessorContext context) {
-            this.context = context;
-            dependenciesStore =
-                (WindowStore<String, DependencyLink>) context.getStateStore(
-                    DEPENDENCIES_STORE_NAME);
-          }
-
-          @Override public void process(String linkKey, DependencyLink link) {
-            // Event time
-            Instant now = Instant.ofEpochMilli(context.timestamp());
-            Instant from = now.minus(dependencyWindowSize);
-            WindowStoreIterator<DependencyLink> currentLinkWindow =
-                dependenciesStore.fetch(linkKey, from, now);
-            // Get latest window. Only two are possible.
-            KeyValue<Long, DependencyLink> windowAndValue = null;
-            if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
-            if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
-            // Persist dependency link per window
-            if (windowAndValue != null) {
-              DependencyLink currentLink = windowAndValue.value;
-              DependencyLink aggregated = currentLink.toBuilder()
-                  .callCount(currentLink.callCount() + link.callCount())
-                  .errorCount(currentLink.errorCount() + link.errorCount())
-                  .build();
-              dependenciesStore.put(linkKey, aggregated, windowAndValue.key);
-            } else {
-              dependenciesStore.put(linkKey, link);
+            @SuppressWarnings("unchecked")
+            @Override public void init(ProcessorContext context) {
+              this.context = context;
+              dependenciesStore =
+                  (WindowStore<String, DependencyLink>) context.getStateStore(
+                      DEPENDENCIES_STORE_NAME);
             }
-          }
 
-          @Override public void close() {
-          }
-        }, DEPENDENCIES_STORE_NAME);
+            @Override public void process(String linkKey, DependencyLink link) {
+              // Event time
+              Instant now = Instant.ofEpochMilli(context.timestamp());
+              Instant from = now.minus(dependencyWindowSize);
+              WindowStoreIterator<DependencyLink> currentLinkWindow =
+                  dependenciesStore.fetch(linkKey, from, now);
+              // Get latest window. Only two are possible.
+              KeyValue<Long, DependencyLink> windowAndValue = null;
+              if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
+              if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
+              // Persist dependency link per window
+              if (windowAndValue != null) {
+                DependencyLink currentLink = windowAndValue.value;
+                DependencyLink aggregated = currentLink.toBuilder()
+                    .callCount(currentLink.callCount() + link.callCount())
+                    .errorCount(currentLink.errorCount() + link.errorCount())
+                    .build();
+                dependenciesStore.put(linkKey, aggregated, windowAndValue.key);
+              } else {
+                dependenciesStore.put(linkKey, link);
+              }
+            }
 
+            @Override public void close() {
+            }
+          }, DEPENDENCIES_STORE_NAME);
+    }
     return builder.build();
   }
 }

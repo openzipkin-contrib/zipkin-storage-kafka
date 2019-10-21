@@ -47,7 +47,11 @@ class AggregationTopologySupplierTest {
     DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
     // When: topology built
     Topology topology = new AggregationTopologySupplier(
-        spansTopicName, tracesTopicName, dependencyLinksTopicName, traceTimeout).get();
+        spansTopicName,
+        tracesTopicName,
+        dependencyLinksTopicName,
+        traceTimeout,
+        true).get();
     TopologyDescription description = topology.describe();
     // Then: single threaded topology
     assertThat(description.subtopologies()).hasSize(1);

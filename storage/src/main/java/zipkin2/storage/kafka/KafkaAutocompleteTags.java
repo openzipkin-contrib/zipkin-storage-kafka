@@ -35,20 +35,30 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPL
 final class KafkaAutocompleteTags implements AutocompleteTags {
   static final long AUTOCOMPLETE_TAGS_LIMIT = 1_000;
 
-  final KafkaStreams traceStoreStream;
+  final KafkaStorage storage;
   final BiFunction<String, Integer, String> httpBaseUrl;
+  final boolean traceSearchEnabled;
 
   KafkaAutocompleteTags(KafkaStorage storage) {
-    traceStoreStream = storage.getTraceStoreStream();
+    this.storage = storage;
+    this.traceSearchEnabled = storage.traceSearchEnabled;
     httpBaseUrl = storage.httpBaseUrl;
   }
 
   @Override public Call<List<String>> getKeys() {
-    return new GetTagKeysCall(traceStoreStream, httpBaseUrl);
+    if (traceSearchEnabled) {
+      return new GetTagKeysCall(storage.getTraceStoreStream(), httpBaseUrl);
+    } else {
+      return Call.emptyList();
+    }
   }
 
   @Override public Call<List<String>> getValues(String key) {
-    return new GetTagValuesCall(traceStoreStream, httpBaseUrl, key);
+    if (traceSearchEnabled) {
+      return new GetTagValuesCall(storage.getTraceStoreStream(), httpBaseUrl, key);
+    } else {
+      return Call.emptyList();
+    }
   }
 
   static class GetTagKeysCall extends KafkaStoreScatterGatherListCall<String> {
@@ -58,11 +68,11 @@ final class KafkaAutocompleteTags implements AutocompleteTags {
     GetTagKeysCall(KafkaStreams traceStoreStream,
         BiFunction<String, Integer, String> httpBaseUrl) {
       super(
-        traceStoreStream,
-        AUTOCOMPLETE_TAGS_STORE_NAME,
-        httpBaseUrl,
-        "/autocompleteTags",
-        AUTOCOMPLETE_TAGS_LIMIT);
+          traceStoreStream,
+          AUTOCOMPLETE_TAGS_STORE_NAME,
+          httpBaseUrl,
+          "/autocompleteTags",
+          AUTOCOMPLETE_TAGS_LIMIT);
       this.traceStoreStream = traceStoreStream;
       this.httpBaseUrl = httpBaseUrl;
     }

@@ -43,8 +43,8 @@ class DependencyStoreTopologySupplierTest {
     Topology topology = new DependencyStoreTopologySupplier(
         dependencyTopicName,
         dependenciesRetentionPeriod,
-        dependenciesWindowSize
-    ).get();
+        dependenciesWindowSize,
+        true).get();
     TopologyDescription description = topology.describe();
     // Then: topology with 1 thread
     assertThat(description.subtopologies()).hasSize(1);

@@ -35,8 +35,6 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 import zipkin2.storage.Traces;
-import zipkin2.storage.kafka.internal.NoopServiceAndSpanNames;
-import zipkin2.storage.kafka.internal.NoopSpanStore;
 import zipkin2.storage.kafka.streams.AggregationTopologySupplier;
 import zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier;
 import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
@@ -62,7 +60,11 @@ public class KafkaStorage extends StorageComponent {
   }
 
   // Kafka Storage modes
-  final boolean spanConsumerEnabled, searchEnabled;
+  final boolean spanConsumerEnabled;
+  final boolean aggregationEnabled;
+  final boolean traceByIdQueryEnabled;
+  final boolean traceSearchEnabled;
+  final boolean dependencyQueryEnabled;
   // Autocomplete Tags
   final List<String> autocompleteKeys;
   // Kafka Storage configs
@@ -91,7 +93,10 @@ public class KafkaStorage extends StorageComponent {
   KafkaStorage(KafkaStorageBuilder builder) {
     // Kafka Storage modes
     this.spanConsumerEnabled = builder.spanConsumerEnabled;
-    this.searchEnabled = builder.searchEnabled;
+    this.aggregationEnabled = builder.aggregationEnabled;
+    this.traceByIdQueryEnabled = builder.traceByIdQueryEnabled;
+    this.traceSearchEnabled = builder.traceSearchEnabled;
+    this.dependencyQueryEnabled = builder.dependencyQueryEnabled;
     // Autocomplete tags
     this.autocompleteKeys = builder.autocompleteKeys;
     // Kafka Topics config
@@ -118,17 +123,21 @@ public class KafkaStorage extends StorageComponent {
         aggregationSpansTopic,
         aggregationTraceTopic,
         aggregationDependencyTopic,
-        builder.traceTimeout).get();
+        builder.traceTimeout,
+        aggregationEnabled).get();
     traceStoreTopology = new TraceStoreTopologySupplier(
         storageSpansTopic,
         autocompleteKeys,
         builder.traceTtl,
         builder.traceTtlCheckInterval,
-        builder.minTracesStored).get();
+        builder.minTracesStored,
+        traceByIdQueryEnabled,
+        traceSearchEnabled).get();
     dependencyStoreTopology = new DependencyStoreTopologySupplier(
         storageDependencyTopic,
         builder.dependencyTtl,
-        builder.dependencyWindowSize).get();
+        builder.dependencyWindowSize,
+        dependencyQueryEnabled).get();
   }
 
   @Override public SpanConsumer spanConsumer() {
@@ -142,72 +151,48 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public SpanStore spanStore() {
     checkResources();
-    if (searchEnabled) { // not exactly correct. See https://github.com/openzipkin/zipkin/pull/2803
-      return new KafkaSpanStore(this);
-    } else {
-      return new NoopSpanStore();
-    }
+    return new KafkaSpanStore(this);
   }
 
   @Override public Traces traces() {
     checkResources();
-    if (searchEnabled) {
-      return new KafkaSpanStore(this);
-    } else {
-      return new NoopSpanStore();
-    }
+    return new KafkaSpanStore(this);
   }
 
   @Override public ServiceAndSpanNames serviceAndSpanNames() {
     checkResources();
-    if (searchEnabled) {
-      return new KafkaSpanStore(this);
-    } else {
-      return new NoopServiceAndSpanNames();
-    }
+    return new KafkaSpanStore(this);
   }
 
   @Override public AutocompleteTags autocompleteTags() {
     checkResources();
-    if (searchEnabled) {
-      return new KafkaAutocompleteTags(this);
-    } else {
-      return super.autocompleteTags();
-    }
+    return new KafkaAutocompleteTags(this);
   }
 
   void checkResources() {
-    if (spanConsumerEnabled) {
-      getAggregationStream();
-    }
-    if (searchEnabled) {
-      getTraceStoreStream();
-      getDependencyStoreStream();
-    }
+    getAggregationStream();
+    getTraceStoreStream();
+    getDependencyStoreStream();
   }
 
   @Override public CheckResult check() {
     try {
       KafkaFuture<String> maybeClusterId = getAdminClient().describeCluster().clusterId();
       maybeClusterId.get(1, TimeUnit.SECONDS);
-      if (spanConsumerEnabled) {
-        KafkaStreams.State state = getAggregationStream().state();
-        if (!state.isRunning()) {
-          return CheckResult.failed(
-              new IllegalStateException("Aggregation stream not running. " + state));
-        }
+      KafkaStreams.State state = getAggregationStream().state();
+      if (!state.isRunning()) {
+        return CheckResult.failed(
+            new IllegalStateException("Aggregation stream not running. " + state));
       }
-      if (searchEnabled) {
-        KafkaStreams.State traceStateStore = getTraceStoreStream().state();
-        if (!traceStateStore.isRunning()) {
-          return CheckResult.failed(
-              new IllegalStateException("Store stream not running. " + traceStateStore));
-        }
-        KafkaStreams.State dependencyStateStore = getDependencyStoreStream().state();
-        if (!dependencyStateStore.isRunning()) {
-          return CheckResult.failed(
-              new IllegalStateException("Store stream not running. " + dependencyStateStore));
-        }
+      KafkaStreams.State traceStateStore = getTraceStoreStream().state();
+      if (!traceStateStore.isRunning()) {
+        return CheckResult.failed(
+            new IllegalStateException("Store stream not running. " + traceStateStore));
+      }
+      KafkaStreams.State dependencyStateStore = getDependencyStoreStream().state();
+      if (!dependencyStateStore.isRunning()) {
+        return CheckResult.failed(
+            new IllegalStateException("Store stream not running. " + dependencyStateStore));
       }
       return CheckResult.OK;
     } catch (Exception e) {
@@ -327,8 +312,8 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public String toString() {
     return "KafkaStorage{" +
-        "spanConsumerEnabled=" + spanConsumerEnabled +
-        ", searchEnabled=" + searchEnabled +
+        "httpPort=" + httpPort +
+        ", spanConsumerEnabled=" + spanConsumerEnabled +
         ", storageDir='" + storageDir + '\'' +
         '}';
   }
