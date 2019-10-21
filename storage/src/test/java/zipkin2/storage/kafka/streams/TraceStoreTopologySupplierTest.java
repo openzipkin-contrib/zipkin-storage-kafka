@@ -42,36 +42,39 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAME
 import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_STORE_NAME;
 
 class TraceStoreTopologySupplierTest {
-  @Test void should_persist_stores() {
+  String spansTopic = "zipkin-spans";
+  Properties props = new Properties();
+
+  TraceStoreTopologySupplierTest() {
+    props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
+    props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
+    props.put(StreamsConfig.STATE_DIR_CONFIG,
+        "target/kafka-streams-test/" + System.currentTimeMillis());
+  }
+
+  @Test void should_persistSpans_and_onlyQueryTraces_whenEnabled() {
     // Given: configs
-    String spansTopicName = "zipkin-spans";
     Duration traceTtl = Duration.ofMillis(5);
     Duration traceTtlCheckInterval = Duration.ofMinutes(1);
     List<String> autocompleteKeys = Collections.singletonList("environment");
     SpansSerde spansSerde = new SpansSerde();
     // When: topology provided
     Topology topology = new TraceStoreTopologySupplier(
-        spansTopicName,
+        spansTopic,
         autocompleteKeys,
         traceTtl,
         traceTtlCheckInterval,
         0,
         true,
-        true).get();
+        false).get();
     TopologyDescription description = topology.describe();
-    // Then: 2 threads prepared
+    // Then: 1 thread prepared
     assertThat(description.subtopologies()).hasSize(1);
     // Given: streams config
-    Properties props = new Properties();
-    props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
-    props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
-    props.put(StreamsConfig.STATE_DIR_CONFIG,
-        "target/kafka-streams-test/" + System.currentTimeMillis());
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     // When: a trace is passed
     ConsumerRecordFactory<String, List<Span>> factory =
-        new ConsumerRecordFactory<>(spansTopicName, new StringSerializer(),
-            spansSerde.serializer());
+        new ConsumerRecordFactory<>(spansTopic, new StringSerializer(), spansSerde.serializer());
     Span a = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
         .timestamp(10000L).duration(11L)
@@ -87,10 +90,71 @@ class TraceStoreTopologySupplierTest {
         .putTag("environment", "dev")
         .build();
     List<Span> spans = Arrays.asList(a, b, c);
-    testDriver.pipeInput(factory.create(spansTopicName, a.traceId(), spans, 10L));
+    testDriver.pipeInput(factory.create(spansTopic, a.traceId(), spans, 10L));
     // Then: trace stores are filled
-    KeyValueStore<String, List<Span>> traces =
-        testDriver.getKeyValueStore(TRACES_STORE_NAME);
+    KeyValueStore<String, List<Span>> traces = testDriver.getKeyValueStore(TRACES_STORE_NAME);
+    assertThat(traces.get(a.traceId())).containsExactlyElementsOf(spans);
+    KeyValueStore<Long, Set<String>> spanIdsByTs =
+        testDriver.getKeyValueStore(SPAN_IDS_BY_TS_STORE_NAME);
+    KeyValueIterator<Long, Set<String>> ids = spanIdsByTs.all();
+    assertThat(ids).hasNext();
+    assertThat(ids.next().value).containsExactly(a.traceId());
+    // Then: service name stores are filled
+    KeyValueStore<String, String> serviceNames =
+        testDriver.getKeyValueStore(SERVICE_NAMES_STORE_NAME);
+    assertThat(serviceNames).isNull();
+    KeyValueStore<String, Set<String>> spanNames =
+        testDriver.getKeyValueStore(SPAN_NAMES_STORE_NAME);
+    assertThat(spanNames).isNull();
+    KeyValueStore<String, Set<String>> autocompleteTags =
+        testDriver.getKeyValueStore(AUTOCOMPLETE_TAGS_STORE_NAME);
+    assertThat(autocompleteTags).isNull();
+    // Finally close resources
+    testDriver.close();
+    spansSerde.close();
+  }
+
+  @Test void should_persistSpans_and_searchQueryTraces_whenAllEnabled() {
+    // Given: configs
+    Duration traceTtl = Duration.ofMillis(5);
+    Duration traceTtlCheckInterval = Duration.ofMinutes(1);
+    List<String> autocompleteKeys = Collections.singletonList("environment");
+    SpansSerde spansSerde = new SpansSerde();
+    // When: topology provided
+    Topology topology = new TraceStoreTopologySupplier(
+        spansTopic,
+        autocompleteKeys,
+        traceTtl,
+        traceTtlCheckInterval,
+        0,
+        true,
+        true).get();
+    TopologyDescription description = topology.describe();
+    // Then: 1 thread prepared
+    assertThat(description.subtopologies()).hasSize(1);
+    // Given: streams config
+    TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
+    // When: a trace is passed
+    ConsumerRecordFactory<String, List<Span>> factory =
+        new ConsumerRecordFactory<>(spansTopic, new StringSerializer(), spansSerde.serializer());
+    Span a = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+        .timestamp(10000L).duration(11L)
+        .putTag("environment", "dev")
+        .build();
+    Span b = Span.newBuilder().traceId("a").id("b").name("op_b").kind(Span.Kind.SERVER)
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_b").build())
+        .timestamp(10000L).duration(10L)
+        .build();
+    Span c = Span.newBuilder().traceId("c").id("c").name("op_a").kind(Span.Kind.CLIENT)
+        .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
+        .timestamp(10000L).duration(11L)
+        .putTag("environment", "dev")
+        .build();
+    List<Span> spans = Arrays.asList(a, b, c);
+    testDriver.pipeInput(factory.create(spansTopic, a.traceId(), spans, 10L));
+    // Then: trace stores are filled
+    KeyValueStore<String, List<Span>> traces = testDriver.getKeyValueStore(TRACES_STORE_NAME);
     assertThat(traces.get(a.traceId())).containsExactlyElementsOf(spans);
     KeyValueStore<Long, Set<String>> spanIdsByTs =
         testDriver.getKeyValueStore(SPAN_IDS_BY_TS_STORE_NAME);
@@ -114,18 +178,16 @@ class TraceStoreTopologySupplierTest {
     assertThat(autocompleteTags.get("environment")).containsExactly("dev");
     // When: clock moves forward
     Span d = Span.newBuilder()
-        .traceId("d").id("d")
+        .traceId("d")
+        .id("d")
         .timestamp(
-            MILLISECONDS.toMicros(traceTtlCheckInterval.toMillis()) +
-                MILLISECONDS.toMicros(20))
+            MILLISECONDS.toMicros(traceTtlCheckInterval.toMillis()) + MILLISECONDS.toMicros(20))
         .build();
     testDriver.pipeInput(
-        factory.create(spansTopicName, d.traceId(), Collections.singletonList(d),
-            traceTtlCheckInterval.toMillis() + 1));
-
+        factory.create(spansTopic, d.traceId(), Collections.singletonList(d),
+            traceTtlCheckInterval.plusMillis(1).toMillis()));
     // Then: Traces store is empty
     assertThat(traces.get(a.traceId())).isNull();
-
     // Finally close resources
     testDriver.close();
     spansSerde.close();

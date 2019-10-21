@@ -157,7 +157,7 @@ class KafkaStorageIT {
       consumerConfig, storage.aggregationDependencyTopic, 1, 1000);
   }
 
-  @Test void should_return_traces_query() throws Exception {
+  @Test void should_returnTraces_whenQuery() throws Exception {
     // Given: a trace prepared to be published
     Span parent = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
       .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
@@ -215,7 +215,7 @@ class KafkaStorageIT {
     assertThat(manyTraces).hasSize(2);
   }
 
-  @Test void should_find_dependencies() throws Exception {
+  @Test void should_findDependencies() throws Exception {
     //Given: two related dependency links
     // When: sent first one
     dependencyProducer.send(
@@ -256,7 +256,7 @@ class KafkaStorageIT {
     });
   }
 
-  @Test void shouldFailWhenKafkaNotAvailable() {
+  @Test void shouldFail_whenKafkaNotAvailable() {
     CheckResult checked = storage.check();
     assertThat(checked.ok()).isTrue();
 

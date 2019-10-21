@@ -33,15 +33,42 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
 
 class DependencyStoreTopologySupplierTest {
-  @Test void should_store_dependencies() {
+  String dependencyTopic = "zipkin-dependency";
+  DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
+  Properties props = new Properties();
+
+  DependencyStoreTopologySupplierTest() {
+    props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
+    props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
+    props.put(StreamsConfig.STATE_DIR_CONFIG,
+        "target/kafka-streams-test/" + System.currentTimeMillis());
+  }
+
+  @Test void should_doNothing_whenDisabled() {
     // Given: configs
-    String dependencyTopicName = "zipkin-dependency";
-    DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
     Duration dependenciesRetentionPeriod = Duration.ofMinutes(1);
     Duration dependenciesWindowSize = Duration.ofMillis(100);
     // When: topology created
     Topology topology = new DependencyStoreTopologySupplier(
-        dependencyTopicName,
+        dependencyTopic,
+        dependenciesRetentionPeriod,
+        dependenciesWindowSize,
+        false).get();
+    TopologyDescription description = topology.describe();
+    // Then: topology with 1 thread
+    assertThat(description.subtopologies()).hasSize(0);
+    // Given: streams configuration
+    TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
+    testDriver.close();
+  }
+
+  @Test void should_storeDependencies() {
+    // Given: configs
+    Duration dependenciesRetentionPeriod = Duration.ofMinutes(1);
+    Duration dependenciesWindowSize = Duration.ofMillis(100);
+    // When: topology created
+    Topology topology = new DependencyStoreTopologySupplier(
+        dependencyTopic,
         dependenciesRetentionPeriod,
         dependenciesWindowSize,
         true).get();
@@ -49,43 +76,34 @@ class DependencyStoreTopologySupplierTest {
     // Then: topology with 1 thread
     assertThat(description.subtopologies()).hasSize(1);
     // Given: streams configuration
-    Properties props = new Properties();
-    props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
-    props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
-    props.put(StreamsConfig.STATE_DIR_CONFIG,
-        "target/kafka-streams-test/" + System.currentTimeMillis());
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     // When: a trace is passed
     ConsumerRecordFactory<String, DependencyLink> factory =
-        new ConsumerRecordFactory<>(dependencyTopicName, new StringSerializer(),
+        new ConsumerRecordFactory<>(dependencyTopic, new StringSerializer(),
             dependencyLinkSerde.serializer());
     DependencyLink dependencyLink = DependencyLink.newBuilder()
         .parent("svc_a").child("svc_b").callCount(1).errorCount(0)
         .build();
     String dependencyLinkId = "svc_a:svc_b";
-    testDriver.pipeInput(
-        factory.create(dependencyTopicName, dependencyLinkId, dependencyLink, 10L));
-    WindowStore<String, DependencyLink> links =
-        testDriver.getWindowStore(DEPENDENCIES_STORE_NAME);
+    testDriver.pipeInput(factory.create(dependencyTopic, dependencyLinkId, dependencyLink, 10L));
+    WindowStore<String, DependencyLink> links = testDriver.getWindowStore(DEPENDENCIES_STORE_NAME);
     // Then: dependency link created
-    WindowStoreIterator<DependencyLink> fetch1 = links.fetch(dependencyLinkId, 0L, 100L);
-    assertThat(fetch1).hasNext();
-    assertThat(fetch1.next().value).isEqualTo(dependencyLink);
+    WindowStoreIterator<DependencyLink> firstLink = links.fetch(dependencyLinkId, 0L, 100L);
+    assertThat(firstLink).hasNext();
+    assertThat(firstLink.next().value).isEqualTo(dependencyLink);
     // When: new links appear
-    testDriver.pipeInput(
-        factory.create(dependencyTopicName, dependencyLinkId, dependencyLink, 90L));
+    testDriver.pipeInput(factory.create(dependencyTopic, dependencyLinkId, dependencyLink, 90L));
     // Then: dependency link increases
-    WindowStoreIterator<DependencyLink> fetch2 = links.fetch(dependencyLinkId, 0L, 100L);
-    assertThat(fetch2).hasNext();
-    assertThat(fetch2.next().value.callCount()).isEqualTo(2);
+    WindowStoreIterator<DependencyLink> secondLink = links.fetch(dependencyLinkId, 0L, 100L);
+    assertThat(secondLink).hasNext();
+    assertThat(secondLink.next().value.callCount()).isEqualTo(2);
     // When: time moves forward
     testDriver.advanceWallClockTime(dependenciesRetentionPeriod.toMillis() + 91L);
-    testDriver.pipeInput(
-        factory.create(dependencyTopicName, dependencyLinkId, dependencyLink));
+    testDriver.pipeInput(factory.create(dependencyTopic, dependencyLinkId, dependencyLink));
     // Then: dependency link is removed and restarted
-    KeyValueIterator<Windowed<String>, DependencyLink> fetch3 = links.all();
-    assertThat(fetch3).hasNext();
-    assertThat(fetch3.next().value.callCount()).isEqualTo(1);
+    KeyValueIterator<Windowed<String>, DependencyLink> thirdLink = links.all();
+    assertThat(thirdLink).hasNext();
+    assertThat(thirdLink.next().value.callCount()).isEqualTo(1);
     // Close resources
     testDriver.close();
     dependencyLinkSerde.close();
