@@ -149,7 +149,11 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public Traces traces() {
     checkResources();
-    return new KafkaSpanStore(this);
+    if (searchEnabled) {
+      return new KafkaSpanStore(this);
+    } else {
+      return new NoopSpanStore();
+    }
   }
 
   @Override public ServiceAndSpanNames serviceAndSpanNames() {
@@ -160,7 +164,6 @@ public class KafkaStorage extends StorageComponent {
       return new NoopServiceAndSpanNames();
     }
   }
-
 
   @Override public AutocompleteTags autocompleteTags() {
     checkResources();
@@ -194,20 +197,18 @@ public class KafkaStorage extends StorageComponent {
         }
       }
       if (searchEnabled) {
-        KafkaStreams.State stateTraceStore = getTraceStoreStream().state();
-        if (!stateTraceStore.isRunning()) {
+        KafkaStreams.State traceStateStore = getTraceStoreStream().state();
+        if (!traceStateStore.isRunning()) {
           return CheckResult.failed(
-              new IllegalStateException("Store stream not running. " + stateTraceStore));
+              new IllegalStateException("Store stream not running. " + traceStateStore));
         }
-        KafkaStreams.State stateDependencyStore = getDependencyStoreStream().state();
-        if (!stateDependencyStore.isRunning()) {
+        KafkaStreams.State dependencyStateStore = getDependencyStoreStream().state();
+        if (!dependencyStateStore.isRunning()) {
           return CheckResult.failed(
-              new IllegalStateException("Store stream not running. " + stateDependencyStore));
+              new IllegalStateException("Store stream not running. " + dependencyStateStore));
         }
         if (!getServer().activePort().isPresent()) {
-          return CheckResult.failed(
-              new IllegalStateException(
-                  "Storage HTTP server not running. " + stateDependencyStore));
+          return CheckResult.failed(new IllegalStateException("Storage HTTP server not running."));
         }
       }
       return CheckResult.OK;
@@ -329,9 +330,9 @@ public class KafkaStorage extends StorageComponent {
         if (server == null) {
           try {
             server = Server.builder()
-              .http(httpPort)
-              .annotatedService(new KafkaStoreHttpService(this))
-              .build();
+                .http(httpPort)
+                .annotatedService(new KafkaStoreHttpService(this))
+                .build();
             server.start();
           } catch (Exception e) {
             LOG.error("Error starting http server", e);
