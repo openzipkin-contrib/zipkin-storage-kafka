@@ -42,9 +42,9 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
 
   long minTracesStored = 10_000;
   String hostname = "localhost";
-  int httpPort = 9412;
+  int httpPort = 9411;
   BiFunction<String, Integer, String> httpBaseUrl =
-      (hostname, port) -> "http://" + hostname + ":" + port;
+      (hostname, port) -> "http://" + hostname + ":" + port + "/storage/kafka";
 
   String storageDir = "/tmp/zipkin-storage-kafka";
 

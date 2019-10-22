@@ -183,7 +183,7 @@ public class KafkaStorage extends StorageComponent {
     if (searchEnabled) {
       getTraceStoreStream();
       getDependencyStoreStream();
-      getServer();
+      //getServer();
     }
   }
 
@@ -209,9 +209,9 @@ public class KafkaStorage extends StorageComponent {
           return CheckResult.failed(
               new IllegalStateException("Store stream not running. " + dependencyStateStore));
         }
-        if (!getServer().activePort().isPresent()) {
-          return CheckResult.failed(new IllegalStateException("Storage HTTP server not running."));
-        }
+        //if (!getServer().activePort().isPresent()) {
+        //  return CheckResult.failed(new IllegalStateException("Storage HTTP server not running."));
+        //}
       }
       return CheckResult.OK;
     } catch (Exception e) {
@@ -325,30 +325,29 @@ public class KafkaStorage extends StorageComponent {
     return traceAggregationStream;
   }
 
-  public Consumer<ServerBuilder> configureHttpService() {
+  public KafkaStorageHttpService httpService() {
     return new KafkaStorageHttpService(this);
   }
 
-  @SuppressWarnings("FutureReturnValueIgnored")
-  Server getServer() {
-    if (server == null) {
-      synchronized (this) {
-        if (server == null) {
-          try {
-            server = Server.builder()
-                .http(httpPort)
-                .annotatedService(new KafkaStorageHttpService(this))
-                .build();
-            server.start();
-          } catch (Exception e) {
-            LOG.error("Error starting http server", e);
-            server = null;
-          }
-        }
-      }
-    }
-    return server;
-  }
+  //@SuppressWarnings("FutureReturnValueIgnored")
+  //Server getServer() {
+  //  if (server == null) {
+  //    synchronized (this) {
+  //      if (server == null) {
+  //        try {
+  //          ServerBuilder builder = Server.builder().http(httpPort);
+  //          configureHttpService().accept(builder);
+  //          server = builder.build();
+  //          server.start();
+  //        } catch (Exception e) {
+  //          LOG.error("Error starting http server", e);
+  //          server = null;
+  //        }
+  //      }
+  //    }
+  //  }
+  //  return server;
+  //}
 
   @Override public String toString() {
     return "KafkaStorage{" +

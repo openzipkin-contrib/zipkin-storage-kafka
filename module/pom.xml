@@ -35,6 +35,11 @@
       <artifactId>zipkin-storage-kafka</artifactId>
     </dependency>
     <dependency>
+      <groupId>${armeria.groupId}</groupId>
+      <artifactId>armeria-spring-boot-autoconfigure</artifactId>
+      <version>${armeria.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-autoconfigure</artifactId>
       <version>${spring-boot.version}</version>

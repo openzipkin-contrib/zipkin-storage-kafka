@@ -14,7 +14,13 @@
 package zipkin2.module.storage.kafka;
 
 import com.linecorp.armeria.server.ServerBuilder;
+import com.linecorp.armeria.spring.ArmeriaServerConfigurator;
+import java.util.List;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -23,18 +29,25 @@ import org.springframework.context.annotation.Configuration;
 import zipkin2.storage.StorageComponent;
 import zipkin2.storage.kafka.KafkaStorage;
 
-@Configuration
+@Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(ZipkinKafkaStorageProperties.class)
 @ConditionalOnProperty(name = "zipkin.storage.type", havingValue = "kafka")
 @ConditionalOnMissingBean(StorageComponent.class)
 class ZipkinKafkaStorageModule {
+  static final String QUALIFIER = "zipkinKafkaStorage";
 
-  @ConditionalOnMissingBean
-  @Bean StorageComponent storage(ZipkinKafkaStorageProperties properties) {
-    return properties.toBuilder().build();
+  @ConditionalOnMissingBean @Qualifier(QUALIFIER) @Bean StorageComponent storage(
+      @Value("${zipkin.storage.search-enabled:true}") boolean searchEnabled,
+      @Value("${zipkin.storage.autocomplete-keys:}") List<String> autocompleteKeys,
+      ZipkinKafkaStorageProperties properties) {
+    return properties.toBuilder()
+        .searchEnabled(searchEnabled)
+        .autocompleteKeys(autocompleteKeys)
+        .build();
   }
 
-  @Bean public Consumer<ServerBuilder> storageHttpService(StorageComponent storage) {
-    return ((KafkaStorage) storage).configureHttpService();
+  @Qualifier(QUALIFIER) @Bean public ArmeriaServerConfigurator storageHttpService(
+      @Qualifier(QUALIFIER) StorageComponent storage) {
+    return sb -> sb.annotatedService("/storage/kafka", ((KafkaStorage) storage).httpService());
   }
 }

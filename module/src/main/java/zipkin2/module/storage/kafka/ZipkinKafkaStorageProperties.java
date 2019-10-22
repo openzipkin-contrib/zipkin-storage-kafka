@@ -106,7 +106,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     if (dependencyStoreStreamAppId != null) {
       builder.dependencyStoreStreamAppId(dependencyStoreStreamAppId);
     }
-
     return builder;
   }
 
