@@ -36,6 +36,6 @@ class ZipkinKafkaStorageModule {
   }
 
   @Bean public Consumer<ServerBuilder> storageHttpService(StorageComponent storage) {
-    return new KafkaStorageHttpService((KafkaStorage) storage);
+    return ((KafkaStorage) storage).configureHttpService();
   }
 }

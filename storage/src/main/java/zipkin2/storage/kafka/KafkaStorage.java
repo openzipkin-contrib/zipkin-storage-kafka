@@ -14,11 +14,13 @@
 package zipkin2.storage.kafka;
 
 import com.linecorp.armeria.server.Server;
+import com.linecorp.armeria.server.ServerBuilder;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -321,6 +323,10 @@ public class KafkaStorage extends StorageComponent {
       }
     }
     return traceAggregationStream;
+  }
+
+  public Consumer<ServerBuilder> configureHttpService() {
+    return new KafkaStorageHttpService(this);
   }
 
   @SuppressWarnings("FutureReturnValueIgnored")
