@@ -13,6 +13,7 @@
  */
 package zipkin2.storage.kafka;
 
+import com.linecorp.armeria.server.Server;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.time.Duration;
@@ -61,6 +62,7 @@ class KafkaStorageIT {
 
   Duration traceTimeout;
   KafkaStorage storage;
+  Server server;
   Properties consumerConfig;
   KafkaProducer<String, List<Span>> tracesProducer;
   KafkaProducer<String, DependencyLink> dependencyProducer;
@@ -77,12 +79,18 @@ class KafkaStorageIT {
     assertThat(kafka.isRunning()).isTrue();
 
     traceTimeout = Duration.ofSeconds(5);
+    int httpPort = randomPort();
     storage = (KafkaStorage) KafkaStorage.newBuilder()
       .bootstrapServers(kafka.getBootstrapServers())
       .storageDir("target/zipkin_" + System.currentTimeMillis())
       .traceTimeout(traceTimeout)
-      .httpPort(randomPort())
+      .httpPort(httpPort)
       .build();
+    server = Server.builder()
+        .http(httpPort)
+        .annotatedService(KafkaStorage.HTTP_PATH_PREFIX, storage.httpService())
+        .build();
+    server.start();
 
     Collection<NewTopic> newTopics = new ArrayList<>();
     newTopics.add(new NewTopic(storage.aggregationSpansTopic, 1, (short) 1));
@@ -107,6 +115,7 @@ class KafkaStorageIT {
     tracesProducer = null;
     storage.close();
     storage = null;
+    server.close();
     spansSerde.close();
     dependencyLinkSerde.close();
   }

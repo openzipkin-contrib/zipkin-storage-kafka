@@ -13,9 +13,9 @@
  */
 package zipkin2.module.storage.kafka;
 
-import com.linecorp.armeria.spring.ArmeriaServerConfigurator;
+import com.linecorp.armeria.server.ServerBuilder;
 import java.util.List;
-import org.springframework.beans.factory.annotation.Qualifier;
+import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -32,9 +32,8 @@ import static zipkin2.storage.kafka.KafkaStorage.HTTP_PATH_PREFIX;
 @ConditionalOnProperty(name = "zipkin.storage.type", havingValue = "kafka")
 @ConditionalOnMissingBean(StorageComponent.class)
 class ZipkinKafkaStorageModule {
-  static final String QUALIFIER = "zipkinKafkaStorage";
 
-  @ConditionalOnMissingBean @Qualifier(QUALIFIER) @Bean StorageComponent storage(
+  @ConditionalOnMissingBean @Bean StorageComponent storage(
       @Value("${zipkin.storage.search-enabled:true}") boolean searchEnabled,
       @Value("${zipkin.storage.autocomplete-keys:}") List<String> autocompleteKeys,
       ZipkinKafkaStorageProperties properties) {
@@ -44,8 +43,7 @@ class ZipkinKafkaStorageModule {
         .build();
   }
 
-  @Qualifier(QUALIFIER) @Bean public ArmeriaServerConfigurator storageHttpService(
-      @Qualifier(QUALIFIER) StorageComponent storage) {
+  @Bean public Consumer<ServerBuilder> storageHttpService(StorageComponent storage) {
     return sb -> sb.annotatedService(HTTP_PATH_PREFIX, ((KafkaStorage) storage).httpService());
   }
 }
