@@ -60,7 +60,6 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
  */
 final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
   static final ObjectMapper MAPPER = new ObjectMapper();
-  // Kafka Streams Store provider
   final KafkaStorage storage;
   final BiFunction<String, Integer, String> httpBaseUrl;
   final boolean traceSearchEnabled, traceByIdQueryEnabled, dependencyQueryEnabled;

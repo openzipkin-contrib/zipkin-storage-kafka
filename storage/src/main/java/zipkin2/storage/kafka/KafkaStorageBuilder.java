@@ -131,21 +131,36 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     return this;
   }
 
+  /**
+   * Enable aggregation stream application to run. When disabled spans will not be consumed to
+   * produce traces and dependencies.
+   */
   public KafkaStorageBuilder aggregationEnabled(boolean aggregationEnabled) {
     this.aggregationEnabled = aggregationEnabled;
     return this;
   }
 
+  /**
+   * Enable Trace query by specific ID.
+   */
   public KafkaStorageBuilder traceByIdQueryEnabled(boolean traceByIdQueryEnabled) {
     this.traceByIdQueryEnabled = traceByIdQueryEnabled;
     return this;
   }
 
+  /**
+   * Enable trace searching and indexes (service names, span names, etc.). When disabled instance
+   * will not store trace indexes. If disabled with @{code traceByIdQueryEnabled} then no trace
+   * store will be created.
+   */
   public KafkaStorageBuilder traceSearchEnabled(boolean traceSearchEnabled) {
     this.traceSearchEnabled = traceSearchEnabled;
     return this;
   }
 
+  /**
+   * Enable dependency store from aggregated topic and query endpoint.
+   */
   public KafkaStorageBuilder dependencyQueryEnabled(boolean dependencyQueryEnabled) {
     this.dependencyQueryEnabled = dependencyQueryEnabled;
     return this;

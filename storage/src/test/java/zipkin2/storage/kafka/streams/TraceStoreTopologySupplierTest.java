@@ -52,6 +52,29 @@ class TraceStoreTopologySupplierTest {
         "target/kafka-streams-test/" + System.currentTimeMillis());
   }
 
+  @Test void should_doNothing_whenAllDisabled() {
+    // Given: configs
+    Duration traceTtl = Duration.ofMillis(5);
+    Duration traceTtlCheckInterval = Duration.ofMinutes(1);
+    List<String> autocompleteKeys = Collections.singletonList("environment");
+    SpansSerde spansSerde = new SpansSerde();
+    // When: topology provided
+    Topology topology = new TraceStoreTopologySupplier(
+        spansTopic,
+        autocompleteKeys,
+        traceTtl,
+        traceTtlCheckInterval,
+        0,
+        false,
+        false).get();
+    TopologyDescription description = topology.describe();
+    // Then:
+    assertThat(description.subtopologies()).hasSize(0);
+    // Given: streams config
+    TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
+    testDriver.close();
+  }
+
   @Test void should_persistSpans_and_onlyQueryTraces_whenEnabled() {
     // Given: configs
     Duration traceTtl = Duration.ofMillis(5);
