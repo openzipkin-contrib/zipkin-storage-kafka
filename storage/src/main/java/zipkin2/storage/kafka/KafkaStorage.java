@@ -14,13 +14,11 @@
 package zipkin2.storage.kafka;
 
 import com.linecorp.armeria.server.Server;
-import com.linecorp.armeria.server.ServerBuilder;
 import java.time.Duration;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
-import java.util.function.Consumer;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
@@ -55,6 +53,8 @@ import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
  * </ul>
  */
 public class KafkaStorage extends StorageComponent {
+  public static final String HTTP_PATH_PREFIX = "/storage/kafka";
+
   static final Logger LOG = LogManager.getLogger();
 
   public static KafkaStorageBuilder newBuilder() {
@@ -183,7 +183,6 @@ public class KafkaStorage extends StorageComponent {
     if (searchEnabled) {
       getTraceStoreStream();
       getDependencyStoreStream();
-      //getServer();
     }
   }
 
@@ -209,9 +208,6 @@ public class KafkaStorage extends StorageComponent {
           return CheckResult.failed(
               new IllegalStateException("Store stream not running. " + dependencyStateStore));
         }
-        //if (!getServer().activePort().isPresent()) {
-        //  return CheckResult.failed(new IllegalStateException("Storage HTTP server not running."));
-        //}
       }
       return CheckResult.OK;
     } catch (Exception e) {
@@ -329,30 +325,9 @@ public class KafkaStorage extends StorageComponent {
     return new KafkaStorageHttpService(this);
   }
 
-  //@SuppressWarnings("FutureReturnValueIgnored")
-  //Server getServer() {
-  //  if (server == null) {
-  //    synchronized (this) {
-  //      if (server == null) {
-  //        try {
-  //          ServerBuilder builder = Server.builder().http(httpPort);
-  //          configureHttpService().accept(builder);
-  //          server = builder.build();
-  //          server.start();
-  //        } catch (Exception e) {
-  //          LOG.error("Error starting http server", e);
-  //          server = null;
-  //        }
-  //      }
-  //    }
-  //  }
-  //  return server;
-  //}
-
   @Override public String toString() {
     return "KafkaStorage{" +
-        "httpPort=" + httpPort +
-        ", spanConsumerEnabled=" + spanConsumerEnabled +
+        "spanConsumerEnabled=" + spanConsumerEnabled +
         ", searchEnabled=" + searchEnabled +
         ", storageDir='" + storageDir + '\'' +
         '}';

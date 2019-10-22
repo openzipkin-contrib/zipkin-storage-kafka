@@ -27,6 +27,8 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.StreamsConfig;
 import zipkin2.storage.StorageComponent;
 
+import static zipkin2.storage.kafka.KafkaStorage.HTTP_PATH_PREFIX;
+
 // extracted as the type is huge
 public final class KafkaStorageBuilder extends StorageComponent.Builder {
   boolean spanConsumerEnabled = true;
@@ -44,7 +46,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   String hostname = "localhost";
   int httpPort = 9411;
   BiFunction<String, Integer, String> httpBaseUrl =
-      (hostname, port) -> "http://" + hostname + ":" + port + "/storage/kafka";
+      (hostname, port) -> "http://" + hostname + ":" + port + HTTP_PATH_PREFIX;
 
   String storageDir = "/tmp/zipkin-storage-kafka";
 

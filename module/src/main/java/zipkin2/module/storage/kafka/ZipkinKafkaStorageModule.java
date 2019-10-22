@@ -13,12 +13,8 @@
  */
 package zipkin2.module.storage.kafka;
 
-import com.linecorp.armeria.server.ServerBuilder;
 import com.linecorp.armeria.spring.ArmeriaServerConfigurator;
 import java.util.List;
-import java.util.function.Consumer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -28,6 +24,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import zipkin2.storage.StorageComponent;
 import zipkin2.storage.kafka.KafkaStorage;
+
+import static zipkin2.storage.kafka.KafkaStorage.HTTP_PATH_PREFIX;
 
 @Configuration(proxyBeanMethods = false)
 @EnableConfigurationProperties(ZipkinKafkaStorageProperties.class)
@@ -48,6 +46,6 @@ class ZipkinKafkaStorageModule {
 
   @Qualifier(QUALIFIER) @Bean public ArmeriaServerConfigurator storageHttpService(
       @Qualifier(QUALIFIER) StorageComponent storage) {
-    return sb -> sb.annotatedService("/storage/kafka", ((KafkaStorage) storage).httpService());
+    return sb -> sb.annotatedService(HTTP_PATH_PREFIX, ((KafkaStorage) storage).httpService());
   }
 }
