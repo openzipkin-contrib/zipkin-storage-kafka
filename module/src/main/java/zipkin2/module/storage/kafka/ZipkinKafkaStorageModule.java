@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import zipkin2.storage.StorageComponent;
 import zipkin2.storage.kafka.KafkaStorage;
-import zipkin2.storage.kafka.KafkaStorageHttpService;
 
 @Configuration
 @EnableConfigurationProperties(ZipkinKafkaStorageProperties.class)
