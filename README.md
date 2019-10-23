@@ -30,7 +30,9 @@ Partitioned spans are then aggregated into traces and then into dependency links
 results are emitted into Kafka topics as well.
 These 3 topics are used as source for local stores (Kafka Stream stores) that support Zipkin query and search APIs.
 
-[Design notes](storage/DESIGN.md)
+[Rationale](RATIONALE.md)
+
+[Design](storage/README.md)
 
 [Configuration](module/README.md)
 
