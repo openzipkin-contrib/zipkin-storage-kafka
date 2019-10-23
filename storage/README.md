@@ -1,4 +1,4 @@
-# Design
+# zipkin-storage-kafka design
 
 ## Goals
 
@@ -11,25 +11,25 @@
 
 Storage is composed by 4 main components: 
 
-- Span Consumer: repartition of collected span batches into individual spans keyed by `traceId`
+- Span Consumer: repartition of collected span batches into spans keyed by `traceId`
 - Span Aggregator: processing of _partitioned spans_ into aggregated traces and later into dependency links.
 - Trace and Dependency Stores: building local state stores to support search and query APIs for traces and dependencies.
 
 ### Span Consumer
 
 This component processes span batches, received via HTTP, Kafka, ActiveMQ, etc.; 
-take each element and keyed them by `traceId` on the "zipkin-spans" topic for repartition.
+take elements with same trace-id and keyed them to be stored on `zipkin-spans` topic for repartition.
 
 | Property | Environment Variable | Description |
 |----------|----------------------|-------------|
 | `zipkin.storage.kafka.span-partitioning-enabled` | `SPAN_PARTITIONING_ENABLED` | `false` disables span partitioning. Consider that `Aggregation` component requires partitioned spans. Defaults to `true`. |
-| `zipkin.storage.kafka.partitioned-spans-topic` | `none` | Kafka topic where partitioned spans will be stored. Defaults to `zipkin-spans` |
+| `zipkin.storage.kafka.partitioned-spans-topic` | `none` | Kafka topic where partitioned spans will be stored. Key type: trace-id string, Value type: list of spans with same trace-id. Defaults to `zipkin-spans` |
 
 > This component is currently compensating how `KafkaSender` (part of [Zipkin-Reporter](https://github.com/openzipkin/zipkin-reporter-java))
 is reporting spans to Kafka, by grouping spans into batches and sending them to a un-keyed
 Kafka topic.
 
-Source code: [KafkaSpanConsumer.java](storage/src/main/java/zipkin2/storage/kafka/KafkaSpanConsumer.java)
+Source code: [KafkaSpanConsumer.java](src/main/java/zipkin2/storage/kafka/KafkaSpanConsumer.java)
 
 ### Span Aggregator
 
@@ -66,7 +66,7 @@ on each trace, and emitted the dependencies topic for further metric aggregation
 | `zipkin.storage.kafka.aggregation-trace-topic` | `none` | Kafka topic where aggregated traces will be stored. Key type: trace-id string. Value type: binary list of spans. Defaults to `zipkin-trace` |
 | `zipkin.storage.kafka.aggregation-dependency-topic` | `none` | Kafka topic where aggregated dependencies will be stored. Key type: string with `parent&#124;child` format. Value type: dependency link. Defaults to `zipkin-dependency` |
 
-Kafka Streams topology: ![trace aggregation](docs/trace-aggregation-topology.png)
+Kafka Streams topology: ![trace aggregation](../docs/trace-aggregation-topology.png)
 
 ### Trace Store
 
@@ -109,9 +109,9 @@ Supported by a key-value containing list of values valid for `autocompleteKeys`.
 | `zipkin.storage.kafka.trace-search-enabled` | `TRACE_SEARCH_ENABLED` | `false` disables trace search functionality `GET /traces` and indexes: service names, span names, tags. Defaults to `true`. |
 | `zipkin.storage.kafka.storage-spans-topic` | `none` | Kafka topic where trace spans are consumed from to build state store. Expected value: list of spans; it does not use record keys. Defaults to `zipkin-spans` |
 
-Source code: [TraceStoreTopology](storage/src/main/java/zipkin2/storage/kafka/streams/TraceStoreTopology.java)
+Source code: [TraceStoreTopology](src/main/java/zipkin2/storage/kafka/streams/TraceStoreTopology.java)
 
-Kafka Streams topology: ![trace store](docs/trace-store-topology.png)
+Kafka Streams topology: ![trace store](../docs/trace-store-topology.png)
 
 
 ### Dependency Store
@@ -125,6 +125,6 @@ Windowed store: `zipkin-dependencies`.
 | `zipkin.storage.kafka.dependency-query-enabled` | `DEPENDENCY_QUERY_ENABLED` | `false` disables dependency query store `GET /dependencies`. Consider that `Aggregation` component requires partitioned spans. Defaults to `true`. |
 | `zipkin.storage.kafka.storage-dependency-topic` | `none` | Kafka topic where dependencies are consumed from to build state store. Defaults to `zipkin-dependency` |
 
-Kafka Streams topology: ![dependency store](docs/dependency-store-topology.png)
+Kafka Streams topology: ![dependency store](../docs/dependency-store-topology.png)
 
-Source code: [DependencyStoreTopologySupplier](storage/src/main/java/zipkin2/storage/kafka/streams/DependencyStoreTopology.java)
+Source code: [DependencyStoreTopologySupplier](src/main/java/zipkin2/storage/kafka/streams/DependencyStoreTopology.java)

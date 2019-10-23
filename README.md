@@ -30,9 +30,9 @@ Partitioned spans are then aggregated into traces and then into dependency links
 results are emitted into Kafka topics as well.
 These 3 topics are used as source for local stores (Kafka Stream stores) that support Zipkin query and search APIs.
 
-[Design notes](DESIGN.md)
+[Design notes](storage/DESIGN.md)
 
-[Configuration](autoconfigure/README.md)
+[Configuration](module/README.md)
 
 ## Building
 
@@ -62,37 +62,13 @@ To run locally, first you need to get Zipkin binaries:
 make get-zipkin
 ```
 
-By default Zipkin will be waiting for a Kafka broker to be running on `localhost:19092`. If you don't have one,
-this service is available via Docker Compose:
-
-```bash
-make docker-kafka-up
-```
+By default Zipkin will be waiting for a Kafka broker to be running on `localhost:19092`. 
 
 Then run Zipkin locally:
 
 ```bash
-make run
+make run-local
 ```
-
-### Run with Docker
-
-If you have Docker available, run:
-
-```bash
-make run-docker
-```
-
-And Docker image will be built and Docker compose will start.
-
-#### Examples
-
-There are two examples, running Zipkin with kafka as storage:
-
-+ [Single-node](docker/single-instance/docker-compose.yml)
-+ [Multi-mode](docker/distributed/docker-compose.yml)
-
-### Testing
 
 To validate storage make sure that Kafka topics are created so Kafka Stream instances can be
 initialized properly:
@@ -107,15 +83,33 @@ This will start a browser and check a traces has been registered.
 It will send another trace after a minute (`trace timeout`) + 1 second to trigger
 aggregation and visualize dependency graph.
 
-If running multi-node docker example, run:
+### Run with Docker
+
+If you have Docker available, run:
 
 ```bash
-make zipkin-test-multi
+make run-docker
+```
+
+And Docker image will be built and Docker compose will start.
+
+To test it, run:
+
+```bash
+make zipkin-test-single
+# or
+make zipkin-test-distributed
 ```
 
 ![traces](docs/traces.png)
 
 ![dependencies](docs/dependencies.png)
+
+### Examples
+
++ [Single-node](docker/single/docker-compose.yml): span partitioning, aggregation, and storage happen on the same containers.
++ [Distributed-mode](docker/distributed/docker-compose.yml): partitioning and aggregation is in a different container than storage.
++ [Only-dependencies](docker/dependencies/docker-compose.yml): only components to support dependency graphs.
 
 ## Acknowledgments
 
