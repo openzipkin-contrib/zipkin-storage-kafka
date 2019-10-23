@@ -25,7 +25,7 @@ Kafka-based storage for Zipkin.
 
 ```
 
-> Spans collected via different transports are partitioned by `traceId` and stored in a "spans" Kafka topic.
+> Spans collected via different transports are partitioned by `traceId` and stored in a partitioned spans Kafka topic.
 Partitioned spans are then aggregated into traces and then into dependency links, both
 results are emitted into Kafka topics as well.
 These 3 topics are used as source for local stores (Kafka Stream stores) that support Zipkin query and search APIs.
