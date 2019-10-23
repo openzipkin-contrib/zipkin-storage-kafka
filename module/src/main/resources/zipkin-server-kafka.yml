@@ -21,7 +21,11 @@ zipkin:
       dependency-store-stream-app-id: ${KAFKA_STORAGE_DEPENDENCY_STORE_STREAM_APP_ID:zipkin-dependency-store}
       storage-dir: ${KAFKA_STORAGE_DIR:/tmp/zipkin-storage-kafka}
       # Kafka Storage flags
-      span-consumer-enabled: true
+      span-partitioning-enabled: true
+      span-aggregation-enabled: true
+      trace-by-id-query-enabled: true
+      trace-search-enabled: true
+      dependency-query-enabled: true
       # Kafka Storage timing configs
       trace-timeout: ${KAFKA_STORAGE_TRACE_TIMEOUT:60000}
       trace-ttl: ${KAFKA_STORAGE_TRACE_TTL:259200000}

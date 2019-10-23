@@ -30,14 +30,14 @@ import zipkin2.DependencyLink;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.DependencyStoreTopology.DEPENDENCIES_STORE_NAME;
 
-class DependencyStoreTopologySupplierTest {
+class DependencyStoreTopologyTest {
   String dependencyTopic = "zipkin-dependency";
   DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
   Properties props = new Properties();
 
-  DependencyStoreTopologySupplierTest() {
+  DependencyStoreTopologyTest() {
     props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
     props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
     props.put(StreamsConfig.STATE_DIR_CONFIG,
@@ -49,7 +49,7 @@ class DependencyStoreTopologySupplierTest {
     Duration dependenciesRetentionPeriod = Duration.ofMinutes(1);
     Duration dependenciesWindowSize = Duration.ofMillis(100);
     // When: topology created
-    Topology topology = new DependencyStoreTopologySupplier(
+    Topology topology = new DependencyStoreTopology(
         dependencyTopic,
         dependenciesRetentionPeriod,
         dependenciesWindowSize,
@@ -67,7 +67,7 @@ class DependencyStoreTopologySupplierTest {
     Duration dependenciesRetentionPeriod = Duration.ofMinutes(1);
     Duration dependenciesWindowSize = Duration.ofMillis(100);
     // When: topology created
-    Topology topology = new DependencyStoreTopologySupplier(
+    Topology topology = new DependencyStoreTopology(
         dependencyTopic,
         dependenciesRetentionPeriod,
         dependenciesWindowSize,

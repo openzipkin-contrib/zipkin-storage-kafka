@@ -44,18 +44,18 @@ import zipkin2.storage.Traces;
 import zipkin2.storage.kafka.internal.KafkaStoreListCall;
 import zipkin2.storage.kafka.internal.KafkaStoreScatterGatherListCall;
 import zipkin2.storage.kafka.internal.KafkaStoreSingleKeyListCall;
-import zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier;
-import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
+import zipkin2.storage.kafka.streams.DependencyStoreTopology;
+import zipkin2.storage.kafka.streams.TraceStoreTopology;
 
-import static zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier.DEPENDENCIES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.REMOTE_SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.DependencyStoreTopology.DEPENDENCIES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopology.REMOTE_SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopology.SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopology.SPAN_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopology.TRACES_STORE_NAME;
 
 /**
  * Span store backed by Kafka Stream distributed state stores built by {@link
- * TraceStoreTopologySupplier} and {@link DependencyStoreTopologySupplier}, and made accessible by
+ * TraceStoreTopology} and {@link DependencyStoreTopology}, and made accessible by
  * {@link  KafkaStorageHttpService}.
  */
 final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {

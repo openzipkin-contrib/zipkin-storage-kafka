@@ -25,8 +25,8 @@ import zipkin2.storage.kafka.KafkaStorageBuilder;
 public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
 
-  private Boolean spanConsumerEnabled;
-  private Boolean aggregationEnabled;
+  private Boolean spanPartitioningEnabled;
+  private Boolean spanAggregationEnabled;
   private Boolean traceSearchEnabled;
   private Boolean traceByIdQueryEnabled;
   private Boolean dependencyQueryEnabled;
@@ -65,8 +65,8 @@ public class ZipkinKafkaStorageProperties implements Serializable {
 
   KafkaStorageBuilder toBuilder() {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
-    if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
-    if (aggregationEnabled != null) builder.aggregationEnabled(aggregationEnabled);
+    if (spanPartitioningEnabled != null) builder.spanConsumerEnabled(spanPartitioningEnabled);
+    if (spanAggregationEnabled != null) builder.aggregationEnabled(spanAggregationEnabled);
     if (traceByIdQueryEnabled != null) builder.traceByIdQueryEnabled(traceByIdQueryEnabled);
     if (traceSearchEnabled != null) builder.traceSearchEnabled(traceSearchEnabled);
     if (dependencyQueryEnabled != null) builder.dependencyQueryEnabled(dependencyQueryEnabled);
@@ -117,20 +117,20 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     return builder;
   }
 
-  public Boolean getSpanConsumerEnabled() {
-    return spanConsumerEnabled;
+  public Boolean getSpanPartitioningEnabled() {
+    return spanPartitioningEnabled;
   }
 
-  public void setSpanConsumerEnabled(Boolean spanConsumerEnabled) {
-    this.spanConsumerEnabled = spanConsumerEnabled;
+  public void setSpanPartitioningEnabled(Boolean spanPartitioningEnabled) {
+    this.spanPartitioningEnabled = spanPartitioningEnabled;
   }
 
-  public Boolean getAggregationEnabled() {
-    return aggregationEnabled;
+  public Boolean getSpanAggregationEnabled() {
+    return spanAggregationEnabled;
   }
 
-  public void setAggregationEnabled(Boolean aggregationEnabled) {
-    this.aggregationEnabled = aggregationEnabled;
+  public void setSpanAggregationEnabled(Boolean spanAggregationEnabled) {
+    this.spanAggregationEnabled = spanAggregationEnabled;
   }
 
   public Boolean getTraceSearchEnabled() {

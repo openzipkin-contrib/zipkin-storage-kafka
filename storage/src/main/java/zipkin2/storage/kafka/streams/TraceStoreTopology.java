@@ -46,7 +46,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 /**
  * Storage of Traces, Service names and Autocomplete Tags.
  */
-public class TraceStoreTopologySupplier implements Supplier<Topology> {
+public class TraceStoreTopology implements Supplier<Topology> {
   public static final String TRACES_STORE_NAME = "zipkin-traces";
   public static final String SPAN_IDS_BY_TS_STORE_NAME = "zipkin-traces-by-timestamp";
   public static final String SERVICE_NAMES_STORE_NAME = "zipkin-service-names";
@@ -72,7 +72,7 @@ public class TraceStoreTopologySupplier implements Supplier<Topology> {
 
   final Counter brokenTracesTotal;
 
-  public TraceStoreTopologySupplier(
+  public TraceStoreTopology(
       String spansTopic,
       List<String> autoCompleteKeys,
       Duration traceTtl,

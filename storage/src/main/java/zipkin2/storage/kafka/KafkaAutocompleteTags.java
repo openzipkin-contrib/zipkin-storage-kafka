@@ -21,13 +21,13 @@ import zipkin2.Call;
 import zipkin2.storage.AutocompleteTags;
 import zipkin2.storage.kafka.internal.KafkaStoreScatterGatherListCall;
 import zipkin2.storage.kafka.internal.KafkaStoreSingleKeyListCall;
-import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
+import zipkin2.storage.kafka.streams.TraceStoreTopology;
 
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopology.AUTOCOMPLETE_TAGS_STORE_NAME;
 
 /**
  * Autocomplete tags query component based on Kafka Streams local store built by {@link
- * TraceStoreTopologySupplier}
+ * TraceStoreTopology}
  * <p>
  * These stores are currently supporting only single instance as there is not mechanism implemented
  * for scatter gather data from different instances.

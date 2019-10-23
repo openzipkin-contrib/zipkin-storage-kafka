@@ -35,17 +35,17 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.AUTOCOMPLETE_TAGS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_IDS_BY_TS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.SPAN_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopology.AUTOCOMPLETE_TAGS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopology.SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopology.SPAN_IDS_BY_TS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopology.SPAN_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStoreTopology.TRACES_STORE_NAME;
 
-class TraceStoreTopologySupplierTest {
+class TraceStoreTopologyTest {
   String spansTopic = "zipkin-spans";
   Properties props = new Properties();
 
-  TraceStoreTopologySupplierTest() {
+  TraceStoreTopologyTest() {
     props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
     props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
     props.put(StreamsConfig.STATE_DIR_CONFIG,
@@ -59,7 +59,7 @@ class TraceStoreTopologySupplierTest {
     List<String> autocompleteKeys = Collections.singletonList("environment");
     SpansSerde spansSerde = new SpansSerde();
     // When: topology provided
-    Topology topology = new TraceStoreTopologySupplier(
+    Topology topology = new TraceStoreTopology(
         spansTopic,
         autocompleteKeys,
         traceTtl,
@@ -82,7 +82,7 @@ class TraceStoreTopologySupplierTest {
     List<String> autocompleteKeys = Collections.singletonList("environment");
     SpansSerde spansSerde = new SpansSerde();
     // When: topology provided
-    Topology topology = new TraceStoreTopologySupplier(
+    Topology topology = new TraceStoreTopology(
         spansTopic,
         autocompleteKeys,
         traceTtl,
@@ -144,7 +144,7 @@ class TraceStoreTopologySupplierTest {
     List<String> autocompleteKeys = Collections.singletonList("environment");
     SpansSerde spansSerde = new SpansSerde();
     // When: topology provided
-    Topology topology = new TraceStoreTopologySupplier(
+    Topology topology = new TraceStoreTopology(
         spansTopic,
         autocompleteKeys,
         traceTtl,

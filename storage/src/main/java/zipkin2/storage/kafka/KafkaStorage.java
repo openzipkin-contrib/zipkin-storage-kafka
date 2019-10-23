@@ -35,9 +35,9 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 import zipkin2.storage.Traces;
-import zipkin2.storage.kafka.streams.AggregationTopologySupplier;
-import zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier;
-import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
+import zipkin2.storage.kafka.streams.SpanAggregatorTopology;
+import zipkin2.storage.kafka.streams.DependencyStoreTopology;
+import zipkin2.storage.kafka.streams.TraceStoreTopology;
 
 /**
  * Zipkin's Kafka Storage.
@@ -60,8 +60,8 @@ public class KafkaStorage extends StorageComponent {
   }
 
   // Kafka Storage modes
-  final boolean spanConsumerEnabled;
-  final boolean aggregationEnabled;
+  final boolean spanPartitioningEnabled;
+  final boolean spanAggregationEnabled;
   final boolean traceByIdQueryEnabled;
   final boolean traceSearchEnabled;
   final boolean dependencyQueryEnabled;
@@ -92,8 +92,8 @@ public class KafkaStorage extends StorageComponent {
 
   KafkaStorage(KafkaStorageBuilder builder) {
     // Kafka Storage modes
-    this.spanConsumerEnabled = builder.spanConsumerEnabled;
-    this.aggregationEnabled = builder.aggregationEnabled;
+    this.spanPartitioningEnabled = builder.spanPartitioningEnabled;
+    this.spanAggregationEnabled = builder.spanAggregationEnabled;
     this.traceByIdQueryEnabled = builder.traceByIdQueryEnabled;
     this.traceSearchEnabled = builder.traceSearchEnabled;
     this.dependencyQueryEnabled = builder.dependencyQueryEnabled;
@@ -119,13 +119,13 @@ public class KafkaStorage extends StorageComponent {
     this.traceStoreStreamConfig = builder.traceStoreStreamConfig;
     this.dependencyStoreStreamConfig = builder.dependencyStoreStreamConfig;
 
-    aggregationTopology = new AggregationTopologySupplier(
+    aggregationTopology = new SpanAggregatorTopology(
         aggregationSpansTopic,
         aggregationTraceTopic,
         aggregationDependencyTopic,
         builder.traceTimeout,
-        aggregationEnabled).get();
-    traceStoreTopology = new TraceStoreTopologySupplier(
+        spanAggregationEnabled).get();
+    traceStoreTopology = new TraceStoreTopology(
         storageSpansTopic,
         autocompleteKeys,
         builder.traceTtl,
@@ -133,7 +133,7 @@ public class KafkaStorage extends StorageComponent {
         builder.minTracesStored,
         traceByIdQueryEnabled,
         traceSearchEnabled).get();
-    dependencyStoreTopology = new DependencyStoreTopologySupplier(
+    dependencyStoreTopology = new DependencyStoreTopology(
         storageDependencyTopic,
         builder.dependencyTtl,
         builder.dependencyWindowSize,
@@ -142,7 +142,7 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public SpanConsumer spanConsumer() {
     checkResources();
-    if (spanConsumerEnabled) {
+    if (spanPartitioningEnabled) {
       return new KafkaSpanConsumer(this);
     } else { // NoopSpanConsumer
       return spans -> Call.create(null);
@@ -315,8 +315,8 @@ public class KafkaStorage extends StorageComponent {
   @Override public String toString() {
     return "KafkaStorage{" +
         "httpPort=" + httpPort +
-        ", spanConsumerEnabled=" + spanConsumerEnabled +
-        ", aggregationEnabled=" + aggregationEnabled +
+        ", spanPartitioningEnabled=" + spanPartitioningEnabled +
+        ", spanAggregationEnabled=" + spanAggregationEnabled +
         ", traceByIdQueryEnabled=" + traceByIdQueryEnabled +
         ", traceSearchEnabled=" + traceSearchEnabled +
         ", dependencyQueryEnabled=" + dependencyQueryEnabled +
