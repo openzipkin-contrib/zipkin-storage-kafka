@@ -79,7 +79,7 @@ class ZipkinKafkaStorageModuleTest {
   @Test void canOverridesProperty_producerConfigs() {
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.producer-overrides.acks:1"
+        "zipkin.storage.kafka.span-partitioning.overrides.acks:1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -91,7 +91,7 @@ class ZipkinKafkaStorageModuleTest {
   @Test void canOverridesProperty_aggregationStreamConfigs() {
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.aggregation-stream-overrides.application.id:agg1"
+        "zipkin.storage.kafka.span-aggregation.overrides.application.id:agg1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -103,7 +103,7 @@ class ZipkinKafkaStorageModuleTest {
   @Test void canOverridesProperty_traceStoreStreamConfigs() {
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.trace-store-stream-overrides.application.id:store1"
+        "zipkin.storage.kafka.trace-storage.overrides.application.id:store1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -115,7 +115,7 @@ class ZipkinKafkaStorageModuleTest {
   @Test void canOverridesProperty_dependencyStoreStreamConfigs() {
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.dependency-store-stream-overrides.application.id:store1"
+        "zipkin.storage.kafka.dependency-storage.overrides.application.id:store1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -138,7 +138,7 @@ class ZipkinKafkaStorageModuleTest {
   @Test void canOverridesProperty_partitionedSpansTopic() {
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.partitioned-spans-topic:zipkin-spans-1"
+        "zipkin.storage.kafka.span-partitioning.spans-topic:zipkin-spans-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -150,7 +150,7 @@ class ZipkinKafkaStorageModuleTest {
   @Test void canOverridesProperty_aggregationSpansTopic() {
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.aggregation-spans-topic:zipkin-spans-1"
+        "zipkin.storage.kafka.span-aggregation.spans-topic:zipkin-spans-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -162,7 +162,7 @@ class ZipkinKafkaStorageModuleTest {
   @Test void canOverridesProperty_aggregationTraceTopic() {
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.aggregation-trace-topic:zipkin-traces-1"
+        "zipkin.storage.kafka.span-aggregation.trace-topic:zipkin-traces-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -174,7 +174,7 @@ class ZipkinKafkaStorageModuleTest {
   @Test void canOverridesProperty_aggregationDependencyTopic() {
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.aggregation-dependency-topic:zipkin-dependencies-1"
+        "zipkin.storage.kafka.span-aggregation.dependency-topic:zipkin-dependencies-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -186,7 +186,7 @@ class ZipkinKafkaStorageModuleTest {
   @Test void canOverridesProperty_storageSpansTopic() {
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.storage-spans-topic:zipkin-spans-1"
+        "zipkin.storage.kafka.trace-storage.spans-topic:zipkin-spans-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -198,7 +198,7 @@ class ZipkinKafkaStorageModuleTest {
   @Test void canOverridesProperty_storageDependencyTopic() {
     TestPropertyValues.of(
         "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.storage-dependency-topic:zipkin-dependencies-1"
+        "zipkin.storage.kafka.dependency-storage.dependency-topic:zipkin-dependencies-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();

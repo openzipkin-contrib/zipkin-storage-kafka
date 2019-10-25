@@ -33,10 +33,10 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String bootstrapServers;
   private String storageDir;
   private Map<String, String> adminOverrides = new LinkedHashMap<>();
-  private SpanPartitioning spanPartitioning;
-  private SpanAggregation spanAggregation;
-  private TraceStorage traceStorage;
-  private DependencyStorage dependencyStorage;
+  private SpanPartitioning spanPartitioning = new SpanPartitioning();
+  private SpanAggregation spanAggregation = new SpanAggregation();
+  private TraceStorage traceStorage = new TraceStorage();
+  private DependencyStorage dependencyStorage = new DependencyStorage();
 
   KafkaStorageBuilder toBuilder() {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
@@ -303,7 +303,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       if (spansTopic != null) builder.spansTopic(spansTopic);
       if (appId != null) builder.traceStoreStreamAppId(appId);
       if (overrides != null) builder.overrides(overrides);
-      return null;
+      return builder;
     }
   }
 
