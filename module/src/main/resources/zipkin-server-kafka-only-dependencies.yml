@@ -1,4 +1,4 @@
-# When enabled, this allows shorter env properties (ex -Dspring.profiles.active=kafka-dependencies)
+# When enabled, this allows shorter env properties (ex -Dspring.profiles.active=kafka-only-dependencies)
 zipkin:
   internal:
     module:
