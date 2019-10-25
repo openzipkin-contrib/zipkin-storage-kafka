@@ -1,0 +1,27 @@
+# When enabled, this allows shorter env properties (ex -Dspring.profiles.active=kafka-dependencies)
+zipkin:
+  internal:
+    module:
+      kafka: zipkin2.module.storage.kafka.ZipkinKafkaStorageModule
+  storage:
+    kafka:
+      hostname: ${KAFKA_STORAGE_HOST_NAME:${HOSTNAME:localhost}}
+      # Connection to Kafka
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      storage-dir: ${KAFKA_STORAGE_DIR:/tmp/zipkin-storage-kafka}
+      # Kafka Storage flags
+      span-partitioning:
+        spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
+        enabled: true
+      span-aggregation:
+        enabled: true
+        spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
+        trace-topic: ${KAFKA_TRACE_TOPIC:zipkin-trace}
+        dependency-topic: ${KAFKA_DEPENDENCY_TOPIC:zipkin-dependency}
+        trace-timeout: ${KAFKA_STORAGE_TRACE_TIMEOUT:60000}
+      trace-storage:
+        enabled: false
+      dependency-storage:
+        enabled: true
+        dependency-topic: ${KAFKA_DEPENDENCY_TOPIC:zipkin-dependency}
+        ttl: ${KAFKA_STORAGE_DEPENDENCY_TTL:604800000}
