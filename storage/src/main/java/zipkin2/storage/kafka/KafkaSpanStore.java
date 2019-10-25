@@ -80,6 +80,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
     }
   }
 
+  @SuppressWarnings("deprecation")
   @Override public Call<List<Span>> getTrace(String traceId) {
     if (traceByIdQueryEnabled) {
       return new GetTraceCall(storage.getTraceStoreStream(), httpBaseUrl,

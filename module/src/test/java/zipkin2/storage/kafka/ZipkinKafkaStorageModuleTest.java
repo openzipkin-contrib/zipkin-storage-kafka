@@ -143,7 +143,7 @@ class ZipkinKafkaStorageModuleTest {
     Access.registerKafka(context);
     context.refresh();
 
-    assertThat(context.getBean(KafkaStorage.class).partitionedSpansTopic).isEqualTo(
+    assertThat(context.getBean(KafkaStorage.class).partitioningSpansTopic).isEqualTo(
         "zipkin-spans-1");
   }
 

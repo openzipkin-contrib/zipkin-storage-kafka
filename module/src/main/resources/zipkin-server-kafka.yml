@@ -22,9 +22,9 @@ zipkin:
       trace-storage:
         enabled: true
         spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
-        trace-ttl: ${KAFKA_STORAGE_TRACE_TTL:259200000}
-        trace-ttl-check-interval: ${KAFKA_STORAGE_TRACE_TTL_CHECK_INTERVAL:3600000}
+        ttl: ${KAFKA_STORAGE_TRACE_TTL:259200000}
+        ttl-check-interval: ${KAFKA_STORAGE_TRACE_TTL_CHECK_INTERVAL:3600000}
       dependency-storage:
         enabled: true
         dependency-topic: ${KAFKA_DEPENDENCY_TOPIC:zipkin-dependency}
-        dependency-ttl: ${KAFKA_STORAGE_DEPENDENCY_TTL:604800000}
+        ttl: ${KAFKA_STORAGE_DEPENDENCY_TTL:604800000}

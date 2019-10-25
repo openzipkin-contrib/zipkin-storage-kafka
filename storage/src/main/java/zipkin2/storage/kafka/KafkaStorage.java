@@ -60,8 +60,8 @@ public class KafkaStorage extends StorageComponent {
   }
 
   // Kafka Storage modes
-  final boolean spanPartitioningEnabled;
-  final boolean spanAggregationEnabled;
+  final boolean partitioningEnabled;
+  final boolean aggregationEnabled;
   final boolean traceByIdQueryEnabled;
   final boolean traceSearchEnabled;
   final boolean dependencyQueryEnabled;
@@ -73,7 +73,7 @@ public class KafkaStorage extends StorageComponent {
   final String hostname;
   final int httpPort;
   // Kafka Topics
-  final String partitionedSpansTopic;
+  final String partitioningSpansTopic;
   final String aggregationSpansTopic, aggregationTraceTopic, aggregationDependencyTopic;
   final String storageSpansTopic, storageDependencyTopic;
   // Kafka Clients config
@@ -92,57 +92,57 @@ public class KafkaStorage extends StorageComponent {
 
   KafkaStorage(KafkaStorageBuilder builder) {
     // Kafka Storage modes
-    this.spanPartitioningEnabled = builder.spanPartitioningEnabled;
-    this.spanAggregationEnabled = builder.spanAggregationEnabled;
-    this.traceByIdQueryEnabled = builder.traceByIdQueryEnabled;
-    this.traceSearchEnabled = builder.traceSearchEnabled;
-    this.dependencyQueryEnabled = builder.dependencyQueryEnabled;
+    this.partitioningEnabled = builder.spanPartitioning.enabled;
+    this.aggregationEnabled = builder.spanAggregation.enabled;
+    this.traceByIdQueryEnabled = builder.traceStorage.traceByIdQueryEnabled;
+    this.traceSearchEnabled = builder.traceStorage.traceSearchEnabled;
+    this.dependencyQueryEnabled = builder.dependencyStorage.enabled;
     // Autocomplete tags
     this.autocompleteKeys = builder.autocompleteKeys;
     // Kafka Topics config
-    this.partitionedSpansTopic = builder.partitionedSpansTopic;
-    this.aggregationSpansTopic = builder.aggregationSpansTopic;
-    this.aggregationTraceTopic = builder.aggregationTraceTopic;
-    this.aggregationDependencyTopic = builder.aggregationDependencyTopic;
-    this.storageSpansTopic = builder.storageSpansTopic;
-    this.storageDependencyTopic = builder.storageDependencyTopic;
+    this.partitioningSpansTopic = builder.spanPartitioning.spansTopic;
+    this.aggregationSpansTopic = builder.spanAggregation.spansTopic;
+    this.aggregationTraceTopic = builder.spanAggregation.traceTopic;
+    this.aggregationDependencyTopic = builder.spanAggregation.dependencyTopic;
+    this.storageSpansTopic = builder.traceStorage.spansTopic;
+    this.storageDependencyTopic = builder.dependencyStorage.dependencyTopic;
     // Storage directories
-    this.storageDir = builder.storageDir;
-    this.minTracesStored = builder.minTracesStored;
+    this.storageDir = builder.storageStateDir;
+    this.minTracesStored = builder.traceStorage.minTracesStored;
+    this.httpBaseUrl = builder.httpBaseUrl;
     this.hostname = builder.hostname;
     this.httpPort = builder.httpPort;
-    this.httpBaseUrl = builder.httpBaseUrl;
     // Kafka Configs
     this.adminConfig = builder.adminConfig;
-    this.producerConfig = builder.producerConfig;
-    this.aggregationStreamConfig = builder.aggregationStreamConfig;
-    this.traceStoreStreamConfig = builder.traceStoreStreamConfig;
-    this.dependencyStoreStreamConfig = builder.dependencyStoreStreamConfig;
+    this.producerConfig = builder.spanPartitioning.producerConfig;
+    this.aggregationStreamConfig = builder.spanAggregation.streamConfig;
+    this.traceStoreStreamConfig = builder.traceStorage.streamConfig;
+    this.dependencyStoreStreamConfig = builder.dependencyStorage.streamConfig;
 
     aggregationTopology = new SpanAggregatorTopology(
-        aggregationSpansTopic,
-        aggregationTraceTopic,
-        aggregationDependencyTopic,
-        builder.traceTimeout,
-        spanAggregationEnabled).get();
+        builder.spanAggregation.spansTopic,
+        builder.spanAggregation.traceTopic,
+        builder.spanAggregation.dependencyTopic,
+        builder.spanAggregation.traceTimeout,
+        builder.spanAggregation.enabled).get();
     traceStoreTopology = new TraceStoreTopology(
-        storageSpansTopic,
+        builder.traceStorage.spansTopic,
         autocompleteKeys,
-        builder.traceTtl,
-        builder.traceTtlCheckInterval,
-        builder.minTracesStored,
-        traceByIdQueryEnabled,
-        traceSearchEnabled).get();
+        builder.traceStorage.traceTtl,
+        builder.traceStorage.traceTtlCheckInterval,
+        builder.traceStorage.minTracesStored,
+        builder.traceStorage.traceByIdQueryEnabled,
+        builder.traceStorage.traceSearchEnabled).get();
     dependencyStoreTopology = new DependencyStoreTopology(
-        storageDependencyTopic,
-        builder.dependencyTtl,
-        builder.dependencyWindowSize,
-        dependencyQueryEnabled).get();
+        builder.dependencyStorage.dependencyTopic,
+        builder.dependencyStorage.dependencyTtl,
+        builder.dependencyStorage.dependencyWindowSize,
+        builder.dependencyStorage.enabled).get();
   }
 
   @Override public SpanConsumer spanConsumer() {
     checkResources();
-    if (spanPartitioningEnabled) {
+    if (partitioningEnabled) {
       return new KafkaSpanConsumer(this);
     } else { // NoopSpanConsumer
       return spans -> Call.create(null);
@@ -314,12 +314,11 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public String toString() {
     return "KafkaStorage{" +
-        "httpPort=" + httpPort +
-        ", spanPartitioningEnabled=" + spanPartitioningEnabled +
-        ", spanAggregationEnabled=" + spanAggregationEnabled +
-        ", traceByIdQueryEnabled=" + traceByIdQueryEnabled +
-        ", traceSearchEnabled=" + traceSearchEnabled +
-        ", dependencyQueryEnabled=" + dependencyQueryEnabled +
+        //", spanPartitioningEnabled=" + spanPartitioningEnabled +
+        //", spanAggregationEnabled=" + spanAggregationEnabled +
+        //", traceByIdQueryEnabled=" + traceByIdQueryEnabled +
+        //", traceSearchEnabled=" + traceSearchEnabled +
+        //", dependencyQueryEnabled=" + dependencyQueryEnabled +
         ", storageDir='" + storageDir + '\'' +
         '}';
   }
