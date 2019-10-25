@@ -29,4 +29,4 @@ By environment variables:
 JAVA_OPTS="-Dzipkin.storage.kafka.trace-by-id-query-enabled=false -Dzipkin.storage.kafka.trace-search-enabled=false"
 ```
 
-If Kafka collector is in place, `zipkin-storage-kafka` can be run in parallel with another group id. Otherwise, you can [forward spans from another Zipkin server](https://github.com/openzipkin-contrib/zipkin-storage-forwarder) to `zipkin-storage-kafka`.
+If an existing Kafka collector is in place downstreaming traces into an existing storage, another Kafka consumer group id can be used for `zipkin-storage-kafka` to consume traces in parallel. Otherwise, you can [forward spans from another Zipkin server](https://github.com/openzipkin-contrib/zipkin-storage-forwarder)  to `zipkin-storage-kafka` if Kafka transport is not available.
