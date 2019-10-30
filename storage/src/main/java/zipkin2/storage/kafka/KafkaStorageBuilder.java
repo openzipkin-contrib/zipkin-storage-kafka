@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.function.BiFunction;
-import org.apache.kafka.clients.admin.AdminClientConfig;
+import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serdes.ByteArraySerde;
@@ -40,7 +40,6 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   DependencyStorageBuilder dependencyStorage = new DependencyStorageBuilder();
 
   String storageStateDir = "/tmp/zipkin-storage-kafka";
-  Properties adminConfig = new Properties();
 
   String hostname = "localhost";
   int httpPort = 9411;
@@ -71,7 +70,6 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
    */
   public KafkaStorageBuilder bootstrapServers(String bootstrapServers) {
     if (bootstrapServers == null) throw new NullPointerException("bootstrapServers == null");
-    adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
     spanPartitioning.bootstrapServers(bootstrapServers);
     spanAggregation.bootstrapServers(bootstrapServers);
     traceStorage.bootstrapServers(bootstrapServers);
@@ -116,9 +114,12 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
    *
    * @see org.apache.kafka.clients.admin.AdminClientConfig
    */
-  public final KafkaStorageBuilder adminOverrides(Map<String, ?> overrides) {
+  public final KafkaStorageBuilder overrides(Map<String, ?> overrides) {
     if (overrides == null) throw new NullPointerException("overrides == null");
-    adminConfig.putAll(overrides);
+    spanPartitioning.overrides(overrides);
+    spanAggregation.overrides(overrides);
+    traceStorage.overrides(overrides);
+    dependencyStorage.overrides(overrides);
     return this;
   }
 
@@ -264,13 +265,6 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     public SpanAggregationBuilder bootstrapServers(String bootstrapServers) {
       if (bootstrapServers == null) throw new NullPointerException("bootstrapServers == null");
       streamConfig.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-      return this;
-    }
-
-    public SpanAggregationBuilder appId(String appId) {
-      if (appId == null) throw new NullPointerException("appId == null");
-      this.appId = appId;
-      streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, appId);
       return this;
     }
 
@@ -425,15 +419,6 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
       return this;
     }
 
-    public TraceStorageBuilder traceStoreStreamAppId(String traceStoreStreamAppId) {
-      if (traceStoreStreamAppId == null) {
-        throw new NullPointerException("traceStoreStreamAppId == null");
-      }
-      this.traceStoreStreamAppId = traceStoreStreamAppId;
-      streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, traceStoreStreamAppId);
-      return this;
-    }
-
     /**
      * By default, a Kafka Streams applications will be built from properties derived from builder
      * defaults, as well as "poll.ms" -> 5000. Any properties set here will override the Kafka
@@ -527,16 +512,6 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     public DependencyStorageBuilder storageStateDir(String parentDir) {
       if (parentDir == null) throw new NullPointerException("parentDir == null");
       streamConfig.put(StreamsConfig.STATE_DIR_CONFIG, parentDir + "/dependencies");
-      return this;
-    }
-
-    public DependencyStorageBuilder appId(String dependencyStoreStreamAppId) {
-      if (dependencyStoreStreamAppId == null) {
-        throw new NullPointerException("dependencyStoreStreamAppId == null");
-      }
-      this.dependencyStoreStreamAppId = dependencyStoreStreamAppId;
-      streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
-          dependencyStoreStreamAppId);
       return this;
     }
 

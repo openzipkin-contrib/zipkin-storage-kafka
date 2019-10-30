@@ -113,7 +113,7 @@ public class KafkaStorage extends StorageComponent {
     this.hostname = builder.hostname;
     this.httpPort = builder.httpPort;
     // Kafka Configs
-    this.adminConfig = builder.adminConfig;
+    this.adminConfig = builder.commonConfigs;
     this.producerConfig = builder.spanPartitioning.producerConfig;
     this.aggregationStreamConfig = builder.spanAggregation.streamConfig;
     this.traceStoreStreamConfig = builder.traceStorage.streamConfig;

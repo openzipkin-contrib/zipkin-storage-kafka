@@ -29,10 +29,11 @@ import zipkin2.storage.kafka.KafkaStorageBuilder.TraceStorageBuilder;
 public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
   private String hostname;
-  // Common Kafka configs
-  private String bootstrapServers;
   private String storageDir;
-  private Map<String, String> adminOverrides = new LinkedHashMap<>();
+  // Kafka properties
+  private String bootstrapServers;
+  private Map<String, String> overrides = new LinkedHashMap<>();
+  // Component-specific properties
   private SpanPartitioning spanPartitioning = new SpanPartitioning();
   private SpanAggregation spanAggregation = new SpanAggregation();
   private TraceStorage traceStorage = new TraceStorage();
@@ -45,10 +46,9 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     builder.traceStorageBuilder(traceStorage.toBuilder());
     builder.dependencyStorageBuilder(dependencyStorage.toBuilder());
     if (hostname != null) builder.storageHostInfo(hostname, 9412); //TODO to be obtained from zipkin server port
-    if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
     if (storageDir != null) builder.storageStateDir(storageDir);
-
-    if (adminOverrides != null) builder.adminOverrides(adminOverrides);
+    if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
+    if (overrides != null) builder.overrides(overrides);
     return builder;
   }
 
@@ -76,12 +76,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.storageDir = storageDir;
   }
 
-  public Map<String, String> getAdminOverrides() {
-    return adminOverrides;
+  public Map<String, String> getOverrides() {
+    return overrides;
   }
 
-  public void setAdminOverrides(Map<String, String> adminOverrides) {
-    this.adminOverrides = adminOverrides;
+  public void setOverrides(Map<String, String> overrides) {
+    this.overrides = overrides;
   }
 
   public SpanPartitioning getSpanPartitioning() {
@@ -123,7 +123,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   static class SpanPartitioning {
     private Boolean enabled;
     private String spansTopic;
-    // Kafka Producer configs
     private Map<String, String> overrides = new LinkedHashMap<>();
 
     public Boolean getEnabled() {
@@ -150,7 +149,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       this.overrides = overrides;
     }
 
-    public SpanPartitioningBuilder toBuilder() {
+    SpanPartitioningBuilder toBuilder() {
       SpanPartitioningBuilder builder = new SpanPartitioningBuilder();
       if (enabled != null) builder.enabled(enabled);
       if (spansTopic != null) builder.spansTopic(spansTopic);
@@ -165,8 +164,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     private String traceTopic;
     private String dependencyTopic;
     private Long traceTimeout;
-    // Kafka Streams configs
-    private String appId;
     private Map<String, String> overrides = new LinkedHashMap<>();
 
     public Boolean getEnabled() {
@@ -209,14 +206,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       this.traceTimeout = traceTimeout;
     }
 
-    public String getAppId() {
-      return appId;
-    }
-
-    public void setAppId(String appId) {
-      this.appId = appId;
-    }
-
     public Map<String, String> getOverrides() {
       return overrides;
     }
@@ -232,7 +221,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       if (spansTopic != null) builder.spansTopic(spansTopic);
       if (traceTopic != null) builder.traceTopic(traceTopic);
       if (dependencyTopic != null) builder.dependencyTopic(dependencyTopic);
-      if (appId != null) builder.appId(appId);
       if (overrides != null) builder.overrides(overrides);
       return builder;
     }
@@ -243,8 +231,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     private String spansTopic;
     private Long ttlCheckInterval;
     private Long ttl;
-    // Kafka Streams configs
-    private String appId;
     private Map<String, String> overrides = new LinkedHashMap<>();
 
     public Boolean getEnabled() {
@@ -279,14 +265,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       this.ttl = ttl;
     }
 
-    public String getAppId() {
-      return appId;
-    }
-
-    public void setAppId(String appId) {
-      this.appId = appId;
-    }
-
     public Map<String, String> getOverrides() {
       return overrides;
     }
@@ -295,13 +273,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       this.overrides = overrides;
     }
 
-    public TraceStorageBuilder toBuilder() {
+    TraceStorageBuilder toBuilder() {
       TraceStorageBuilder builder = new TraceStorageBuilder();
       if (enabled != null) builder.enabled(enabled);
       if (ttlCheckInterval != null) builder.ttlCheckInterval(Duration.ofMillis(ttlCheckInterval));
       if (ttl != null) builder.ttl(Duration.ofMillis(ttl));
       if (spansTopic != null) builder.spansTopic(spansTopic);
-      if (appId != null) builder.traceStoreStreamAppId(appId);
       if (overrides != null) builder.overrides(overrides);
       return builder;
     }
@@ -311,8 +288,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     private Boolean enabled;
     private String dependencyTopic;
     private Long ttl;
-    // Kafka Streams configs
-    private String appId;
     private Map<String, String> overrides = new LinkedHashMap<>();
 
     public Boolean getEnabled() {
@@ -339,14 +314,6 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       this.ttl = ttl;
     }
 
-    public String getAppId() {
-      return appId;
-    }
-
-    public void setAppId(String appId) {
-      this.appId = appId;
-    }
-
     public Map<String, String> getOverrides() {
       return overrides;
     }
@@ -355,12 +322,11 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       this.overrides = overrides;
     }
 
-    public DependencyStorageBuilder toBuilder() {
+    DependencyStorageBuilder toBuilder() {
       DependencyStorageBuilder builder = new DependencyStorageBuilder();
       if (enabled != null) builder.enabled(enabled);
       if (dependencyTopic != null) builder.dependencyTopic(dependencyTopic);
       if (ttl != null) builder.ttl(Duration.ofMillis(ttl));
-      if (appId != null) builder.appId(appId);
       if (overrides != null) builder.overrides(overrides);
       return builder;
     }
