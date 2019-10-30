@@ -83,7 +83,8 @@ class KafkaStorageIT {
     storageBuilder = KafkaStorage.newBuilder()
         .bootstrapServers(kafka.getBootstrapServers())
         .storageStateDir("target/zipkin_" + System.currentTimeMillis())
-        .storageHostInfo("localhost", randomPort());
+        .hostname("localhost")
+        .serverPort(randomPort());
     storageBuilder.spanAggregation.traceTimeout(traceTimeout);
     storage = (KafkaStorage) storageBuilder.build();
 
