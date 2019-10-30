@@ -20,6 +20,7 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.common.KafkaFuture;
@@ -35,8 +36,8 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 import zipkin2.storage.Traces;
-import zipkin2.storage.kafka.streams.SpanAggregatorTopology;
 import zipkin2.storage.kafka.streams.DependencyStoreTopology;
+import zipkin2.storage.kafka.streams.SpanAggregatorTopology;
 import zipkin2.storage.kafka.streams.TraceStoreTopology;
 
 /**
@@ -313,11 +314,18 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public String toString() {
     return "KafkaStorage{" +
-        //", spanPartitioningEnabled=" + spanPartitioningEnabled +
-        //", spanAggregationEnabled=" + spanAggregationEnabled +
-        //", traceByIdQueryEnabled=" + traceByIdQueryEnabled +
-        //", traceSearchEnabled=" + traceSearchEnabled +
-        //", dependencyQueryEnabled=" + dependencyQueryEnabled +
+        " bootstrapServers=" + adminConfig.getProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG) +
+        ", spanPartitioning{ enabled=" + partitioningEnabled +
+        ", spansTopic=" + partitioningSpansTopic + "}" +
+        ", spanAggregation{ enabled=" + aggregationEnabled +
+        ", spansTopic=" + aggregationSpansTopic +
+        ", traceTopic=" + aggregationTraceTopic +
+        ", dependencyTopic=" + aggregationDependencyTopic + "}" +
+        ", traceStore { traceByIdQueryEnabled=" + traceByIdQueryEnabled +
+        ", traceSearchEnabled=" + traceSearchEnabled +
+        ", spansTopic=" + storageSpansTopic + "}" +
+        ", dependencyStore { dependencyQueryEnabled=" + dependencyQueryEnabled +
+        ", dependencyTopic=" + storageDependencyTopic + "}" +
         '}';
   }
 }
