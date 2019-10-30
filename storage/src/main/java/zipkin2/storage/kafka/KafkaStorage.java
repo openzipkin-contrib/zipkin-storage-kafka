@@ -68,7 +68,6 @@ public class KafkaStorage extends StorageComponent {
   // Autocomplete Tags
   final List<String> autocompleteKeys;
   // Kafka Storage configs
-  final String storageDir;
   final long minTracesStored;
   final String hostname;
   final int httpPort;
@@ -107,13 +106,13 @@ public class KafkaStorage extends StorageComponent {
     this.storageSpansTopic = builder.traceStorage.spansTopic;
     this.storageDependencyTopic = builder.dependencyStorage.dependencyTopic;
     // Storage directories
-    this.storageDir = builder.storageStateDir;
+    //this.storageDir = builder.storageStateDir;
     this.minTracesStored = builder.traceStorage.minTracesStored;
     this.httpBaseUrl = builder.httpBaseUrl;
     this.hostname = builder.hostname;
     this.httpPort = builder.serverPort;
     // Kafka Configs
-    this.adminConfig = builder.commonConfigs;
+    this.adminConfig = builder.adminConfig;
     this.producerConfig = builder.spanPartitioning.producerConfig;
     this.aggregationStreamConfig = builder.spanAggregation.streamConfig;
     this.traceStoreStreamConfig = builder.traceStorage.streamConfig;
@@ -319,7 +318,6 @@ public class KafkaStorage extends StorageComponent {
         //", traceByIdQueryEnabled=" + traceByIdQueryEnabled +
         //", traceSearchEnabled=" + traceSearchEnabled +
         //", dependencyQueryEnabled=" + dependencyQueryEnabled +
-        ", storageDir='" + storageDir + '\'' +
         '}';
   }
 }

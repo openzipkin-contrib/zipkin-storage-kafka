@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.function.BiFunction;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serdes.ByteArraySerde;
@@ -38,7 +39,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   TraceStorageBuilder traceStorage = new TraceStorageBuilder();
   DependencyStorageBuilder dependencyStorage = new DependencyStorageBuilder();
 
-  String storageStateDir = "/tmp/zipkin-storage-kafka";
+  Properties adminConfig = new Properties();
 
   String hostname = "localhost";
   int serverPort = 9411;
@@ -69,6 +70,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
    */
   public KafkaStorageBuilder bootstrapServers(String bootstrapServers) {
     if (bootstrapServers == null) throw new NullPointerException("bootstrapServers == null");
+    adminConfig.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
     spanPartitioning.bootstrapServers(bootstrapServers);
     spanAggregation.bootstrapServers(bootstrapServers);
     traceStorage.bootstrapServers(bootstrapServers);
@@ -81,7 +83,6 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
    */
   public KafkaStorageBuilder storageStateDir(String storageStateDir) {
     if (storageStateDir == null) throw new NullPointerException("storageStateDir == null");
-    this.storageStateDir = storageStateDir;
     spanAggregation.storageStateDir(storageStateDir);
     traceStorage.storageStateDir(storageStateDir);
     dependencyStorage.storageStateDir(storageStateDir);
@@ -105,6 +106,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
    */
   public final KafkaStorageBuilder overrides(Map<String, ?> overrides) {
     if (overrides == null) throw new NullPointerException("overrides == null");
+    adminConfig.putAll(overrides);
     spanPartitioning.overrides(overrides);
     spanAggregation.overrides(overrides);
     traceStorage.overrides(overrides);
