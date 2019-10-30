@@ -11,10 +11,10 @@ zipkin:
       storage-dir: ${KAFKA_STORAGE_DIR:/tmp/zipkin-storage-kafka}
       # Kafka Storage flags
       span-partitioning:
+        enabled: ${KAFKA_STORAGE_SPAN_PARTITIONING_ENABLED:true}
         spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
-        enabled: true
       span-aggregation:
-        enabled: true
+        enabled: ${KAFKA_STORAGE_SPAN_AGGREGATION_ENABLED:true}
         spans-topic: ${KAFKA_SPANS_TOPIC:zipkin-spans}
         trace-topic: ${KAFKA_TRACE_TOPIC:zipkin-trace}
         dependency-topic: ${KAFKA_DEPENDENCY_TOPIC:zipkin-dependency}
@@ -22,6 +22,6 @@ zipkin:
       trace-storage:
         enabled: false
       dependency-storage:
-        enabled: true
+        enabled: ${KAFKA_STORAGE_DEPENDENCY_ENABLED:true}
         dependency-topic: ${KAFKA_DEPENDENCY_TOPIC:zipkin-dependency}
         ttl: ${KAFKA_STORAGE_DEPENDENCY_TTL:604800000}

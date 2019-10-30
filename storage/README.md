@@ -11,11 +11,11 @@
 
 Storage is composed by 4 main components: 
 
-- Span Consumer: repartition of collected span batches into spans keyed by `traceId`
-- Span Aggregator: processing of _partitioned spans_ into aggregated traces and later into dependency links.
+- Span Partitioning: repartition of collected span batches into spans keyed by `traceId`
+- Span Aggregation: processing of _partitioned spans_ into aggregated traces and later into dependency links.
 - Trace and Dependency Stores: building local state stores to support search and query APIs for traces and dependencies.
 
-### Span Consumer
+### Span Partitioning 
 
 This component processes span batches, received via HTTP, Kafka, ActiveMQ, etc.; 
 take elements with same trace-id and keyed them to be stored on `zipkin-spans` topic for repartition.
@@ -31,11 +31,11 @@ Kafka topic.
 
 Source code: [KafkaSpanConsumer.java](src/main/java/zipkin2/storage/kafka/KafkaSpanConsumer.java)
 
-### Span Aggregator
+### Span Aggregation
 
 Partitioned spans are processed to produced two aggregated streams: `trace` and `dependency`.
 
-#### Trace Stream 
+#### Trace Stream
 
 Spans are grouped by ID and stored on a local
 [Session window](https://kafka.apache.org/23/javadoc/org/apache/kafka/streams/kstream/SessionWindows.html),
@@ -68,7 +68,7 @@ on each trace, and emitted the dependencies topic for further metric aggregation
 
 Kafka Streams topology: ![trace aggregation](../docs/trace-aggregation-topology.png)
 
-### Trace Store
+### Trace Storage
 
 This component build local stores from state received on `spans` Kafka topic 
 for traces, service names and autocomplete tags. 
@@ -114,7 +114,7 @@ Source code: [TraceStoreTopology](src/main/java/zipkin2/storage/kafka/streams/Tr
 Kafka Streams topology: ![trace store](../docs/trace-store-topology.png)
 
 
-### Dependency Store
+### Dependency Storage
 
 This component build local state store from dependency stream. It builds a 1 minute time-window when counts calls and errors. When a request is received, time range is used to pick valid windows and join counters.
 

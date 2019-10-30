@@ -34,10 +34,10 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private String bootstrapServers;
   private Map<String, String> overrides = new LinkedHashMap<>();
   // Component-specific properties
-  private SpanPartitioning spanPartitioning = new SpanPartitioning();
-  private SpanAggregation spanAggregation = new SpanAggregation();
-  private TraceStorage traceStorage = new TraceStorage();
-  private DependencyStorage dependencyStorage = new DependencyStorage();
+  private SpanPartitioningProperties spanPartitioning = new SpanPartitioningProperties();
+  private SpanAggregationProperties spanAggregation = new SpanAggregationProperties();
+  private TraceStorageProperties traceStorage = new TraceStorageProperties();
+  private DependencyStorageProperties dependencyStorage = new DependencyStorageProperties();
 
   KafkaStorageBuilder toBuilder() {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
@@ -84,43 +84,43 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.overrides = overrides;
   }
 
-  public SpanPartitioning getSpanPartitioning() {
+  public SpanPartitioningProperties getSpanPartitioning() {
     return spanPartitioning;
   }
 
   public void setSpanPartitioning(
-      SpanPartitioning spanPartitioning) {
+      SpanPartitioningProperties spanPartitioning) {
     this.spanPartitioning = spanPartitioning;
   }
 
-  public SpanAggregation getSpanAggregation() {
+  public SpanAggregationProperties getSpanAggregation() {
     return spanAggregation;
   }
 
   public void setSpanAggregation(
-      SpanAggregation spanAggregation) {
+      SpanAggregationProperties spanAggregation) {
     this.spanAggregation = spanAggregation;
   }
 
-  public TraceStorage getTraceStorage() {
+  public TraceStorageProperties getTraceStorage() {
     return traceStorage;
   }
 
   public void setTraceStorage(
-      TraceStorage traceStorage) {
+      TraceStorageProperties traceStorage) {
     this.traceStorage = traceStorage;
   }
 
-  public DependencyStorage getDependencyStorage() {
+  public DependencyStorageProperties getDependencyStorage() {
     return dependencyStorage;
   }
 
   public void setDependencyStorage(
-      DependencyStorage dependencyStorage) {
+      DependencyStorageProperties dependencyStorage) {
     this.dependencyStorage = dependencyStorage;
   }
 
-  static class SpanPartitioning {
+  static class SpanPartitioningProperties {
     private Boolean enabled;
     private String spansTopic;
     private Map<String, String> overrides = new LinkedHashMap<>();
@@ -158,7 +158,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     }
   }
 
-  static class SpanAggregation {
+  static class SpanAggregationProperties {
     private Boolean enabled;
     private String spansTopic;
     private String traceTopic;
@@ -226,7 +226,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     }
   }
 
-  static class TraceStorage {
+  static class TraceStorageProperties {
     private Boolean enabled;
     private String spansTopic;
     private Long ttlCheckInterval;
@@ -284,7 +284,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     }
   }
 
-  static class DependencyStorage {
+  static class DependencyStorageProperties {
     private Boolean enabled;
     private String dependencyTopic;
     private Long ttl;

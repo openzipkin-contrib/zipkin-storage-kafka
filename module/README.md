@@ -18,6 +18,8 @@
 |---------------|-------------|---------|
 | `KAFKA_STORAGE_HOST_NAME` | Host name used by storage instances to scatter-gather results | `localhost` |
 | `KAFKA_STORAGE_DIR` | Root path where Zipkin stores tracing data | `/tmp/zipkin-storage-kafka` |
+| `KAFKA_STORAGE_SPAN_PARTITIONING_ENABLED` | Flag to enable [Span partitioning](../storage/README.md#span-consumer). | `true` |
+| `KAFKA_STORAGE_SPAN_AGGREATION_ENABLED` | Flag to enable [Span aggregation](../storage/README.md#span-aggregation). | `true` |
 | `KAFKA_STORAGE_TRACE_TIMEOUT` | How long to wait until a trace window is closed (ms). If this config is to small, dependency links won't be caught and metrics may drift. | `600000` (1 minute) |
 | `KAFKA_STORAGE_TRACE_TTL` | How long to keep traces stored. | `259200000` (3 days) |
 | `KAFKA_STORAGE_DEPENDENCY_TTL` | How long to keep dependencies stored. | `604800000` (1 week) |
