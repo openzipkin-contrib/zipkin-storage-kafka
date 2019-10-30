@@ -80,13 +80,19 @@ class KafkaStorageIT {
     assertThat(kafka.isRunning()).isTrue();
 
     traceTimeout = Duration.ofSeconds(5);
+    int serverPort = randomPort();
     storageBuilder = KafkaStorage.newBuilder()
         .bootstrapServers(kafka.getBootstrapServers())
         .storageStateDir("target/zipkin_" + System.currentTimeMillis())
         .hostname("localhost")
-        .serverPort(randomPort());
+        .serverPort(serverPort);
     storageBuilder.spanAggregation.traceTimeout(traceTimeout);
     storage = (KafkaStorage) storageBuilder.build();
+    server = Server.builder()
+        .annotatedService("/storage/kafka", new KafkaStorageHttpService(storage))
+        .http(serverPort)
+        .build();
+    server.start();
 
     Collection<NewTopic> newTopics = new ArrayList<>();
     newTopics.add(new NewTopic(storageBuilder.spanAggregation.spansTopic, 1, (short) 1));
