@@ -57,7 +57,6 @@ class TraceStoreTopologyTest {
     Duration traceTtl = Duration.ofMillis(5);
     Duration traceTtlCheckInterval = Duration.ofMinutes(1);
     List<String> autocompleteKeys = Collections.singletonList("environment");
-    SpansSerde spansSerde = new SpansSerde();
     // When: topology provided
     Topology topology = new TraceStoreTopology(
         spansTopic,
