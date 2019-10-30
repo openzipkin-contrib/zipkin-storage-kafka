@@ -53,6 +53,8 @@ import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
  * </ul>
  */
 public class KafkaStorage extends StorageComponent {
+  public static final String HTTP_PATH_PREFIX = "/storage/kafka";
+
   static final Logger LOG = LogManager.getLogger();
 
   public static KafkaStorageBuilder newBuilder() {
@@ -181,7 +183,6 @@ public class KafkaStorage extends StorageComponent {
     if (searchEnabled) {
       getTraceStoreStream();
       getDependencyStoreStream();
-      getServer();
     }
   }
 
@@ -206,9 +207,6 @@ public class KafkaStorage extends StorageComponent {
         if (!dependencyStateStore.isRunning()) {
           return CheckResult.failed(
               new IllegalStateException("Store stream not running. " + dependencyStateStore));
-        }
-        if (!getServer().activePort().isPresent()) {
-          return CheckResult.failed(new IllegalStateException("Storage HTTP server not running."));
         }
       }
       return CheckResult.OK;
@@ -323,31 +321,13 @@ public class KafkaStorage extends StorageComponent {
     return traceAggregationStream;
   }
 
-  @SuppressWarnings("FutureReturnValueIgnored")
-  Server getServer() {
-    if (server == null) {
-      synchronized (this) {
-        if (server == null) {
-          try {
-            server = Server.builder()
-                .http(httpPort)
-                .annotatedService(new KafkaStoreHttpService(this))
-                .build();
-            server.start();
-          } catch (Exception e) {
-            LOG.error("Error starting http server", e);
-            server = null;
-          }
-        }
-      }
-    }
-    return server;
+  public KafkaStorageHttpService httpService() {
+    return new KafkaStorageHttpService(this);
   }
 
   @Override public String toString() {
     return "KafkaStorage{" +
-        "httpPort=" + httpPort +
-        ", spanConsumerEnabled=" + spanConsumerEnabled +
+        "spanConsumerEnabled=" + spanConsumerEnabled +
         ", searchEnabled=" + searchEnabled +
         ", storageDir='" + storageDir + '\'' +
         '}';

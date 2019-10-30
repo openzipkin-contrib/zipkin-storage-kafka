@@ -26,7 +26,7 @@ import zipkin2.module.storage.kafka.Access;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class ZipkinKafkaStorageModuleTest {
+class ZipkinKafkaStorageModuleTest {
   AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
 
   @AfterEach void close() {

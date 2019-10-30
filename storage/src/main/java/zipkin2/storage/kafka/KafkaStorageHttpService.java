@@ -19,7 +19,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpStatus;
 import com.linecorp.armeria.common.MediaType;
-import com.linecorp.armeria.server.ServerBuilder;
 import com.linecorp.armeria.server.annotation.Default;
 import com.linecorp.armeria.server.annotation.Get;
 import com.linecorp.armeria.server.annotation.Param;
@@ -31,7 +30,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.state.KeyValueIterator;
@@ -65,20 +63,16 @@ import static zipkin2.storage.kafka.streams.TraceStoreTopologySupplier.TRACES_ST
  * distributed state. This component exposes access to local state via Http call from {@link
  * KafkaSpanStore}
  */
-final class KafkaStoreHttpService implements Consumer<ServerBuilder> {
+final class KafkaStorageHttpService {
   static final Logger LOG = LogManager.getLogger();
   static final ObjectMapper MAPPER = new ObjectMapper();
 
   final KafkaStorage storage;
   final long minTracesStored;
 
-  KafkaStoreHttpService(KafkaStorage storage) {
+  KafkaStorageHttpService(KafkaStorage storage) {
     this.storage = storage;
     this.minTracesStored = storage.minTracesStored;
-  }
-
-  @Override public void accept(ServerBuilder serverBuilder) {
-    serverBuilder.annotatedService("/zipkin/storage/kafka", this);
   }
 
   @Get("/dependencies")
