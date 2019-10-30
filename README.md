@@ -109,9 +109,9 @@ make zipkin-test-distributed
 
 ### Examples
 
-+ [Single-node](docker/single/docker-compose.yml): span partitioning, aggregation, and storage happen on the same containers.
++ [Single-node](docker/single/docker-compose.yml): span partitioning, aggregation, and storage happening on the same containers.
 + [Distributed-mode](docker/distributed/docker-compose.yml): partitioning and aggregation is in a different container than storage.
-+ [Only-dependencies](docker/dependencies/docker-compose.yml): only components to support dependency graphs.
++ [Only-dependencies](docker/dependencies/docker-compose.yml): only components to support aggregation and search of dependency graphs.
 
 ## Acknowledgments
 
