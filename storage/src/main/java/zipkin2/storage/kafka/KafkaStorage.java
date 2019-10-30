@@ -111,7 +111,7 @@ public class KafkaStorage extends StorageComponent {
     this.minTracesStored = builder.traceStorage.minTracesStored;
     this.httpBaseUrl = builder.httpBaseUrl;
     this.hostname = builder.hostname;
-    this.httpPort = builder.httpPort;
+    this.httpPort = builder.serverPort;
     // Kafka Configs
     this.adminConfig = builder.commonConfigs;
     this.producerConfig = builder.spanPartitioning.producerConfig;

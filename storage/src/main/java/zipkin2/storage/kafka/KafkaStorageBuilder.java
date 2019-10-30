@@ -19,7 +19,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.function.BiFunction;
-import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.Serdes.ByteArraySerde;
@@ -42,7 +41,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   String storageStateDir = "/tmp/zipkin-storage-kafka";
 
   String hostname = "localhost";
-  int httpPort = 9411;
+  int serverPort = 9411;
   BiFunction<String, Integer, String> httpBaseUrl =
       (hostname, port) -> "http://" + hostname + ":" + port + HTTP_PATH_PREFIX;
 
@@ -74,16 +73,6 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     spanAggregation.bootstrapServers(bootstrapServers);
     traceStorage.bootstrapServers(bootstrapServers);
     dependencyStorage.bootstrapServers(bootstrapServers);
-    return this;
-  }
-
-  public KafkaStorageBuilder storageHostInfo(String hostname, int httpPort) {
-    if (hostname == null) throw new NullPointerException("hostname == null");
-    if (httpPort <= 0) throw new IllegalArgumentException("httpPort <= 0");
-    this.hostname = hostname;
-    this.httpPort = httpPort;
-    traceStorage.hostInfo(hostname, httpPort);
-    dependencyStorage.hostInfo(hostname, httpPort);
     return this;
   }
 
@@ -129,11 +118,19 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     return this;
   }
 
-  public KafkaStorageBuilder serverPort(int httpPort) {
-    this.httpPort = httpPort;
-    //FIXME
-    //traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
-    //dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
+  public KafkaStorageBuilder hostname(String hostname) {
+    if (hostname == null) throw new NullPointerException("hostname == null");
+    this.hostname = hostname;
+    traceStorage.hostInfo(hostname, serverPort);
+    dependencyStorage.hostInfo(hostname, serverPort);
+    return this;
+  }
+
+  public KafkaStorageBuilder serverPort(int serverPort) {
+    if (serverPort <= 0) throw new IllegalArgumentException("serverPort <= 0");
+    this.serverPort = serverPort;
+    traceStorage.hostInfo(hostname, serverPort);
+    dependencyStorage.hostInfo(hostname, serverPort);
     return this;
   }
 

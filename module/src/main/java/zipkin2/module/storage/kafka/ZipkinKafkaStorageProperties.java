@@ -45,7 +45,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     builder.spanAggregationBuilder(spanAggregation.toBuilder());
     builder.traceStorageBuilder(traceStorage.toBuilder());
     builder.dependencyStorageBuilder(dependencyStorage.toBuilder());
-    if (hostname != null) builder.storageHostInfo(hostname, 9412); //TODO to be obtained from zipkin server port
+    if (hostname != null) builder.hostname(hostname);
     if (storageDir != null) builder.storageStateDir(storageDir);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
     if (overrides != null) builder.overrides(overrides);
@@ -214,7 +214,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       this.overrides = overrides;
     }
 
-    public SpanAggregationBuilder toBuilder() {
+    SpanAggregationBuilder toBuilder() {
       SpanAggregationBuilder builder = new SpanAggregationBuilder();
       if (enabled != null) builder.enabled(enabled);
       if (traceTimeout != null) builder.traceTimeout(Duration.ofMillis(traceTimeout));
