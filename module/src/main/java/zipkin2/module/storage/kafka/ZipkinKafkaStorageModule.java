@@ -35,7 +35,7 @@ class ZipkinKafkaStorageModule {
   @ConditionalOnMissingBean @Bean StorageComponent storage(
       @Value("${zipkin.storage.search-enabled:true}") boolean searchEnabled,
       @Value("${zipkin.storage.autocomplete-keys:}") List<String> autocompleteKeys,
-      @Value("${server.port:}") int port,
+      @Value("${server.port:9411}") int port,
       ZipkinKafkaStorageProperties properties) {
     return properties.toBuilder()
         .searchEnabled(searchEnabled)
