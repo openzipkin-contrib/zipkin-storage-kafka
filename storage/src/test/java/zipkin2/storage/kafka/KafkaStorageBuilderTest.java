@@ -15,7 +15,6 @@ package zipkin2.storage.kafka;
 
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class KafkaStorageBuilderTest {
@@ -27,7 +26,6 @@ class KafkaStorageBuilderTest {
 
   @Test void buildDefaultBuilder() {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
-    assertThat(builder.storageStateDir).isNotNull();
 
     assertThatThrownBy(() -> builder.spanPartitioning.spansTopic(null))
         .isInstanceOf(NullPointerException.class);
