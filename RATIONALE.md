@@ -2,11 +2,11 @@
 
 ## Use-cases
 
-### Replacement for Spark-based Zipkin dependencies
+### Replacement for batch-oriented Zipkin dependencies
 
-One limitation of [zipkin-dependencies](https://github.com/openzipkin/zipkin-dependencies) module based on Spark is that it requires to be scheduled with a defined frequency. This batch-oriented execution causes out-of-date values until processing runs again.
+One limitation of [zipkin-dependencies](https://github.com/openzipkin/zipkin-dependencies) module, is that it requires to be scheduled with a defined frequency. This batch-oriented execution causes out-of-date values until processing runs again.
 
-A Kafka-based storage brings the opportunity to aggregate dependencies as spans are received, allowing a (near-)real-time calculation of dependency metrics.
+Kafka-based storage enables aggregating dependencies as spans are received, allowing a (near-)real-time calculation of dependency metrics.
 
 To enable this, other components could be disabled:
 
