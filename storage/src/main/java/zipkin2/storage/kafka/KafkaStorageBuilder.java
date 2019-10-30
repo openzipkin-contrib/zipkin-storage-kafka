@@ -141,7 +141,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     return this;
   }
 
-  public KafkaStorageBuilder httpPort(int httpPort) {
+  public KafkaStorageBuilder serverPort(int httpPort) {
     this.httpPort = httpPort;
     traceStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
     dependencyStoreStreamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());

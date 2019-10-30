@@ -51,6 +51,11 @@
       <groupId>${armeria.groupId}</groupId>
       <artifactId>armeria</artifactId>
     </dependency>
+    <dependency>
+      <groupId>${armeria.groupId}</groupId>
+      <artifactId>armeria-spring-boot-autoconfigure</artifactId>
+      <version>${armeria.version}</version>
+    </dependency>
   </dependencies>
 
   <build>

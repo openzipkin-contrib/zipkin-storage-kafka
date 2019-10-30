@@ -13,9 +13,8 @@
  */
 package zipkin2.module.storage.kafka;
 
-import com.linecorp.armeria.server.ServerBuilder;
+import com.linecorp.armeria.spring.ArmeriaServerConfigurator;
 import java.util.List;
-import java.util.function.Consumer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -36,14 +35,18 @@ class ZipkinKafkaStorageModule {
   @ConditionalOnMissingBean @Bean StorageComponent storage(
       @Value("${zipkin.storage.search-enabled:true}") boolean searchEnabled,
       @Value("${zipkin.storage.autocomplete-keys:}") List<String> autocompleteKeys,
+      @Value("${server.port:}") int port,
       ZipkinKafkaStorageProperties properties) {
     return properties.toBuilder()
         .searchEnabled(searchEnabled)
         .autocompleteKeys(autocompleteKeys)
+        .serverPort(port)
         .build();
   }
 
-  @Bean public Consumer<ServerBuilder> storageHttpService(StorageComponent storage) {
+  // TODO: to be changed when >zipkin 2.18.4 #61
+  // @Bean public Consumer<ServerBuilder> storageHttpService(StorageComponent storage) {
+  @Bean public ArmeriaServerConfigurator storageHttpService(StorageComponent storage) {
     return sb -> sb.annotatedService(HTTP_PATH_PREFIX, ((KafkaStorage) storage).httpService());
   }
 }

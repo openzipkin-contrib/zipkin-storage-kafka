@@ -84,7 +84,7 @@ class KafkaStorageIT {
       .bootstrapServers(kafka.getBootstrapServers())
       .storageDir("target/zipkin_" + System.currentTimeMillis())
       .traceTimeout(traceTimeout)
-      .httpPort(httpPort)
+      .serverPort(httpPort)
       .build();
     server = Server.builder()
         .http(httpPort)
