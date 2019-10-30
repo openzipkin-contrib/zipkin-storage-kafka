@@ -13,7 +13,7 @@ Storage is composed by 4 main components:
 
 - Span Partitioning: repartition of collected span batches into spans keyed by `traceId`
 - Span Aggregation: processing of _partitioned spans_ into aggregated traces and later into dependency links.
-- Trace and Dependency Stores: building local state stores to support search and query APIs for traces and dependencies.
+- Trace and Dependency Storage: building local state stores to support search and query APIs for traces and dependencies.
 
 ### Span Partitioning 
 
@@ -61,7 +61,7 @@ on each trace, and emitted the dependencies topic for further metric aggregation
 
 | Property | Environment Variable | Description |
 |----------|----------------------|-------------|
-| `zipkin.storage.kafka.span-aggregation-enabled` | `SPAN_AGGREGATION_ENABLED` | `false` disables span aggregation. Consider that `Store` components will require traces and dependency streams as input. Defaults to `true`. |
+| `zipkin.storage.kafka.span-aggregation-enabled` | `SPAN_AGGREGATION_ENABLED` | `false` disables span aggregation. Consider that `Storage` components will require traces and dependency streams as input. Defaults to `true`. |
 | `zipkin.storage.kafka.aggregation-spans-topic` | `none` | Kafka topic where partitioned spans will be consumed from. Key type: trace-id string. Value type: binary list of spans. Defaults to `zipkin-spans` |
 | `zipkin.storage.kafka.aggregation-trace-topic` | `none` | Kafka topic where aggregated traces will be stored. Key type: trace-id string. Value type: binary list of spans. Defaults to `zipkin-trace` |
 | `zipkin.storage.kafka.aggregation-dependency-topic` | `none` | Kafka topic where aggregated dependencies will be stored. Key type: string with `parent&#124;child` format. Value type: dependency link. Defaults to `zipkin-dependency` |
@@ -80,7 +80,7 @@ Kafka Streams component.
 
 These queries are supported by service names indexed stores built from `spans` Kafka topic.
 
-Store names:
+Kafka Streams store names:
 
 - `zipkin-service-names`: key/value store with service name as key and value.
 - `zipkin-span-names`: key/value store with service name as key and span names list as value.
@@ -109,9 +109,9 @@ Supported by a key-value containing list of values valid for `autocompleteKeys`.
 | `zipkin.storage.kafka.trace-search-enabled` | `TRACE_SEARCH_ENABLED` | `false` disables trace search functionality `GET /traces` and indexes: service names, span names, tags. Defaults to `true`. |
 | `zipkin.storage.kafka.storage-spans-topic` | `none` | Kafka topic where trace spans are consumed from to build state store. Expected value: list of spans; it does not use record keys. Defaults to `zipkin-spans` |
 
-Source code: [TraceStoreTopology](src/main/java/zipkin2/storage/kafka/streams/TraceStoreTopology.java)
+Source code: [TraceStorageTopology](src/main/java/zipkin2/storage/kafka/streams/TraceStoreTopology.java)
 
-Kafka Streams topology: ![trace store](../docs/trace-store-topology.png)
+Kafka Streams topology: ![trace storage](../docs/trace-store-topology.png)
 
 
 ### Dependency Storage
@@ -125,6 +125,6 @@ Windowed store: `zipkin-dependencies`.
 | `zipkin.storage.kafka.dependency-query-enabled` | `DEPENDENCY_QUERY_ENABLED` | `false` disables dependency query store `GET /dependencies`. Consider that `Aggregation` component requires partitioned spans. Defaults to `true`. |
 | `zipkin.storage.kafka.storage-dependency-topic` | `none` | Kafka topic where dependencies are consumed from to build state store. Defaults to `zipkin-dependency` |
 
-Kafka Streams topology: ![dependency store](../docs/dependency-store-topology.png)
+Kafka Streams topology: ![dependency storage](../docs/dependency-store-topology.png)
 
-Source code: [DependencyStoreTopologySupplier](src/main/java/zipkin2/storage/kafka/streams/DependencyStoreTopology.java)
+Source code: [DependencyStorageTopology](src/main/java/zipkin2/storage/kafka/streams/DependencyStorageTopology.java)

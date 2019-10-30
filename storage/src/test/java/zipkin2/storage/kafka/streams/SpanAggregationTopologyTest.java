@@ -36,21 +36,21 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class SpanAggregatorTopologyTest {
+class SpanAggregationTopologyTest {
   String spansTopic = "spans";
   String traceTopic = "traces";
   String dependencyTopic = "dependencies";
 
   Properties props = new Properties();
 
-  SpanAggregatorTopologyTest() {
+  SpanAggregationTopologyTest() {
     props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
     props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
   }
 
   @Test void should_doNothing_whenAggregationDisabled() {
     Duration traceTimeout = Duration.ofSeconds(1);
-    Topology topology = new SpanAggregatorTopology(
+    Topology topology = new SpanAggregationTopology(
         spansTopic,
         traceTopic,
         dependencyTopic,
@@ -69,7 +69,7 @@ class SpanAggregatorTopologyTest {
     SpansSerde spansSerde = new SpansSerde();
     DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
     // When: topology built
-    Topology topology = new SpanAggregatorTopology(
+    Topology topology = new SpanAggregationTopology(
         spansTopic,
         traceTopic,
         dependencyTopic,

@@ -34,17 +34,17 @@ import static zipkin2.storage.kafka.KafkaStorage.HTTP_PATH_PREFIX;
 public final class KafkaStorageBuilder extends StorageComponent.Builder {
   List<String> autocompleteKeys = new ArrayList<>();
 
+  String hostname = "localhost";
+  int serverPort = 9411;
+  BiFunction<String, Integer, String> httpBaseUrl =
+      (hostname, port) -> "http://" + hostname + ":" + port + HTTP_PATH_PREFIX;
+
   SpanPartitioningBuilder spanPartitioning = new SpanPartitioningBuilder();
   SpanAggregationBuilder spanAggregation = new SpanAggregationBuilder();
   TraceStorageBuilder traceStorage = new TraceStorageBuilder();
   DependencyStorageBuilder dependencyStorage = new DependencyStorageBuilder();
 
   Properties adminConfig = new Properties();
-
-  String hostname = "localhost";
-  int serverPort = 9411;
-  BiFunction<String, Integer, String> httpBaseUrl =
-      (hostname, port) -> "http://" + hostname + ":" + port + HTTP_PATH_PREFIX;
 
   KafkaStorageBuilder() {
   }
@@ -164,7 +164,6 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     String spansTopic = "zipkin-spans";
 
     public SpanPartitioningBuilder() {
-      // Kafka Producer configuration
       producerConfig.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
       producerConfig.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
       producerConfig.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
@@ -228,15 +227,13 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     String traceTopic = "zipkin-trace";
     String dependencyTopic = "zipkin-dependency";
 
-    String appId = "zipkin-aggregation";
     Properties streamConfig = new Properties();
 
     public SpanAggregationBuilder() {
-      // Trace Aggregation Stream Topology configuration
       streamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, StringSerde.class);
       streamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, ByteArraySerde.class);
-      streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, appId);
-      //streamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
+      streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, "zipkin-aggregation");
+      streamConfig.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/zipkin-storage-kafka/aggregation");
       streamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
     }
 
@@ -309,9 +306,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
      * Topic with key = traceId and value = list of Spans.
      */
     public SpanAggregationBuilder traceTopic(String traceTopic) {
-      if (traceTopic == null) {
-        throw new NullPointerException("traceTopic == null");
-      }
+      if (traceTopic == null) throw new NullPointerException("traceTopic == null");
       this.traceTopic = traceTopic;
       return this;
     }
@@ -337,21 +332,17 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     Duration traceTtl = Duration.ofDays(3);
     Duration traceTtlCheckInterval = Duration.ofHours(1);
 
-    String traceStoreStreamAppId = "zipkin-trace-store";
     Properties streamConfig = new Properties();
 
     long minTracesStored = 10_000;
 
     public TraceStorageBuilder() {
-      // Trace Store Stream Topology configuration
-      streamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
-          StringSerde.class);
-      streamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
-          ByteArraySerde.class);
-      streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, traceStoreStreamAppId);
-      //streamConfig.put(StreamsConfig.STATE_DIR_CONFIG, traceStoreDirectory());
+      streamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, StringSerde.class);
+      streamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, ByteArraySerde.class);
+      streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, "zipkin-trace-storage");
+      streamConfig.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/zipkin-storage-kafka/trace-storage");
       streamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-      //streamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
+      streamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, "localhost:9411");
     }
 
     /**
@@ -377,29 +368,27 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     /**
      * Kafka topic name where partitioned spans are stored to be used on aggregation.
      */
-    public TraceStorageBuilder spansTopic(String storageSpansTopic) {
-      if (storageSpansTopic == null) throw new NullPointerException("storageSpansTopic == null");
-      this.spansTopic = storageSpansTopic;
+    public TraceStorageBuilder spansTopic(String spansTopic) {
+      if (spansTopic == null) throw new NullPointerException("spansTopic == null");
+      this.spansTopic = spansTopic;
       return this;
     }
 
     /**
      * Frequency to check retention policy.
      */
-    public TraceStorageBuilder ttlCheckInterval(Duration traceTtlCheckInterval) {
-      if (traceTtlCheckInterval == null) {
-        throw new NullPointerException("traceTtlCheckInterval == null");
-      }
-      this.traceTtlCheckInterval = traceTtlCheckInterval;
+    public TraceStorageBuilder ttlCheckInterval(Duration ttlCheckInterval) {
+      if (ttlCheckInterval == null) throw new NullPointerException("ttlCheckInterval == null");
+      this.traceTtlCheckInterval = ttlCheckInterval;
       return this;
     }
 
     /**
      * Traces time-to-live on local state stores.
      */
-    public TraceStorageBuilder ttl(Duration traceTtl) {
-      if (this.traceTtl == null) throw new NullPointerException("traceTtl == null");
-      this.traceTtl = traceTtl;
+    public TraceStorageBuilder ttl(Duration ttl) {
+      if (this.traceTtl == null) throw new NullPointerException("ttl == null");
+      this.traceTtl = ttl;
       return this;
     }
 
@@ -452,20 +441,16 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     Duration dependencyTtl = Duration.ofDays(7);
     Duration dependencyWindowSize = Duration.ofMinutes(1);
 
-    String dependencyStoreStreamAppId = "zipkin-dependency-store";
     Properties streamConfig = new Properties();
 
     public DependencyStorageBuilder() {
       // Dependency Store Stream Topology configuration
-      streamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG,
-          StringSerde.class);
-      streamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG,
-          ByteArraySerde.class);
-      streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG,
-          dependencyStoreStreamAppId);
-      //streamConfig.put(StreamsConfig.STATE_DIR_CONFIG, dependencyStoreDirectory());
+      streamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, StringSerde.class);
+      streamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, ByteArraySerde.class);
+      streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, "zipkin-dependency-storage");
+      streamConfig.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/zipkin-storage-kafka/dependency-storage");
       streamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
-      //streamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, hostInfo());
+      streamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, "localhost:9411");
     }
 
     /**
@@ -488,9 +473,9 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     /**
      * Dependencies time-to-live on local state stores.
      */
-    public DependencyStorageBuilder ttl(Duration dependencyTtl) {
-      if (dependencyTtl == null) throw new NullPointerException("dependencyTtl == null");
-      this.dependencyTtl = dependencyTtl;
+    public DependencyStorageBuilder ttl(Duration ttl) {
+      if (ttl == null) throw new NullPointerException("ttl == null");
+      this.dependencyTtl = ttl;
       return this;
     }
 

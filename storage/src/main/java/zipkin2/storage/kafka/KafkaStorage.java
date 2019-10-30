@@ -36,9 +36,9 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 import zipkin2.storage.Traces;
-import zipkin2.storage.kafka.streams.DependencyStoreTopology;
-import zipkin2.storage.kafka.streams.SpanAggregatorTopology;
-import zipkin2.storage.kafka.streams.TraceStoreTopology;
+import zipkin2.storage.kafka.streams.DependencyStorageTopology;
+import zipkin2.storage.kafka.streams.SpanAggregationTopology;
+import zipkin2.storage.kafka.streams.TraceStorageTopology;
 
 /**
  * Zipkin's Kafka Storage.
@@ -119,13 +119,13 @@ public class KafkaStorage extends StorageComponent {
     this.traceStoreStreamConfig = builder.traceStorage.streamConfig;
     this.dependencyStoreStreamConfig = builder.dependencyStorage.streamConfig;
 
-    aggregationTopology = new SpanAggregatorTopology(
+    aggregationTopology = new SpanAggregationTopology(
         builder.spanAggregation.spansTopic,
         builder.spanAggregation.traceTopic,
         builder.spanAggregation.dependencyTopic,
         builder.spanAggregation.traceTimeout,
         builder.spanAggregation.enabled).get();
-    traceStoreTopology = new TraceStoreTopology(
+    traceStoreTopology = new TraceStorageTopology(
         builder.traceStorage.spansTopic,
         autocompleteKeys,
         builder.traceStorage.traceTtl,
@@ -133,7 +133,7 @@ public class KafkaStorage extends StorageComponent {
         builder.traceStorage.minTracesStored,
         builder.traceStorage.traceByIdQueryEnabled,
         builder.traceStorage.traceSearchEnabled).get();
-    dependencyStoreTopology = new DependencyStoreTopology(
+    dependencyStoreTopology = new DependencyStorageTopology(
         builder.dependencyStorage.dependencyTopic,
         builder.dependencyStorage.dependencyTtl,
         builder.dependencyStorage.dependencyWindowSize,
@@ -260,9 +260,9 @@ public class KafkaStorage extends StorageComponent {
           try {
             traceStoreStream = new KafkaStreams(traceStoreTopology, traceStoreStreamConfig);
             traceStoreStream.start();
-            LOG.info("Trace store topology: {}", traceStoreTopology.describe());
+            LOG.info("Trace storage topology: {}", traceStoreTopology.describe());
           } catch (Exception e) {
-            LOG.debug("Error starting trace store process", e);
+            LOG.debug("Error starting trace storage process", e);
             traceStoreStream = null;
           }
         }
@@ -279,9 +279,9 @@ public class KafkaStorage extends StorageComponent {
             dependencyStoreStream =
                 new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
             dependencyStoreStream.start();
-            LOG.info("Dependency store topology: {}", dependencyStoreTopology.describe());
+            LOG.info("Dependency storage topology: {}", dependencyStoreTopology.describe());
           } catch (Exception e) {
-            LOG.debug("Error starting dependency store", e);
+            LOG.debug("Error starting dependency storage", e);
             dependencyStoreStream = null;
           }
         }

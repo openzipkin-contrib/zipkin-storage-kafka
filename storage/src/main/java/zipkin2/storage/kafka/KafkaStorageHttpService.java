@@ -48,13 +48,13 @@ import zipkin2.storage.QueryRequest;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static zipkin2.storage.kafka.streams.DependencyStoreTopology.DEPENDENCIES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopology.AUTOCOMPLETE_TAGS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopology.REMOTE_SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopology.SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopology.SPAN_IDS_BY_TS_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopology.SPAN_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStoreTopology.TRACES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.DependencyStorageTopology.DEPENDENCIES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStorageTopology.AUTOCOMPLETE_TAGS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStorageTopology.REMOTE_SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStorageTopology.SERVICE_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStorageTopology.SPAN_IDS_BY_TS_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStorageTopology.SPAN_NAMES_STORE_NAME;
+import static zipkin2.storage.kafka.streams.TraceStorageTopology.TRACES_STORE_NAME;
 
 /**
  * Server to enable access to local stores.

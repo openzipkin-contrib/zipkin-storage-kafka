@@ -32,7 +32,7 @@ import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 /**
  * Windowed storage of dependency links.
  */
-public final class DependencyStoreTopology implements Supplier<Topology> {
+public final class DependencyStorageTopology implements Supplier<Topology> {
   public static final String DEPENDENCIES_STORE_NAME = "zipkin-dependencies";
 
   // Kafka topics
@@ -45,7 +45,7 @@ public final class DependencyStoreTopology implements Supplier<Topology> {
   // SerDes
   final DependencyLinkSerde dependencyLinkSerde;
 
-  public DependencyStoreTopology(
+  public DependencyStorageTopology(
       String dependencyTopic,
       Duration dependencyTtl,
       Duration dependencyWindowSize,
