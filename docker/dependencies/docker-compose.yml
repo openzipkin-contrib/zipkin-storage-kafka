@@ -41,12 +41,8 @@ services:
     hostname: zipkin # required to route call to scatter-gather endpoint properly. should not be needed after #40 is solved
     ports:
       - 9411:9411
-      - 9412:9412
     environment:
-      JAVA_OPTS: "
-      -Dzipkin.storage.kafka.trace-by-id-query-enabled=false
-      -Dzipkin.storage.kafka.trace-search-enabled=false
-      "
+      MODULE_OPTS: "-Dloader.path=lib -Dspring.profiles.active=kafka-only-dependencies"
       KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
       KAFKA_STORAGE_DIR: /data
     volumes:
