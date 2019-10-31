@@ -80,7 +80,8 @@ public class TraceStorageTopology implements Supplier<Topology> {
       Duration traceTtlCheckInterval,
       long minTracesStored,
       boolean traceByIdQueryEnabled,
-      boolean traceSearchEnabled) {
+      boolean traceSearchEnabled
+  ) {
     this.spansTopic = spansTopic;
     this.autoCompleteKeys = autoCompleteKeys;
     this.traceTtl = traceTtl;

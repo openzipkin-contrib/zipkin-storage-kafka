@@ -44,8 +44,8 @@ class ZipkinKafkaStorageModule {
         .build();
   }
 
-  // TODO: to be changed when >zipkin 2.18.4 #61
-  // @Bean public Consumer<ServerBuilder> storageHttpService(StorageComponent storage) {
+  //TODO replace when Armeria supports Consumer<ServerBuilder> #61
+  //@Bean public Consumer<ServerBuilder> storageHttpService(StorageComponent storage) {
   @Bean public ArmeriaServerConfigurator storageHttpService(StorageComponent storage) {
     return sb -> sb.annotatedService(HTTP_PATH_PREFIX, ((KafkaStorage) storage).httpService());
   }

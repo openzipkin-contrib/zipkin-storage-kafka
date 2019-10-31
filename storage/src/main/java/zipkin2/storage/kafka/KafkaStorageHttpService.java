@@ -79,7 +79,8 @@ final class KafkaStorageHttpService {
   @Get("/dependencies")
   public AggregatedHttpResponse getDependencies(
       @Param("endTs") long endTs,
-      @Param("lookback") long lookback) {
+      @Param("lookback") long lookback
+  ) {
     try {
       if (!storage.dependencyQueryEnabled) return AggregatedHttpResponse.of(HttpStatus.NOT_FOUND);
       ReadOnlyWindowStore<Long, DependencyLink> store =
@@ -165,7 +166,8 @@ final class KafkaStorageHttpService {
       @Param("maxDuration") Optional<Long> maxDuration,
       @Param("endTs") Optional<Long> endTs,
       @Default("86400000") @Param("lookback") Long lookback,
-      @Default("10") @Param("limit") int limit) {
+      @Default("10") @Param("limit") int limit
+  ) {
     try {
       if (!storage.traceSearchEnabled) return AggregatedHttpResponse.of(HttpStatus.NOT_FOUND);
       QueryRequest request =
@@ -223,7 +225,8 @@ final class KafkaStorageHttpService {
       ReadOnlyKeyValueStore<String, List<Span>> tracesStore,
       List<List<Span>> traces,
       List<String> traceIds,
-      KeyValueIterator<Long, Set<String>> spanIds) {
+      KeyValueIterator<Long, Set<String>> spanIds
+  ) {
     spanIds.forEachRemaining(keyValue -> {
       for (String traceId : keyValue.value) {
         if (!traceIds.contains(traceId)) {

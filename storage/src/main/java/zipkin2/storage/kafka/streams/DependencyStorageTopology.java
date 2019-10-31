@@ -49,7 +49,8 @@ public final class DependencyStorageTopology implements Supplier<Topology> {
       String dependencyTopic,
       Duration dependencyTtl,
       Duration dependencyWindowSize,
-      boolean dependencyQueryEnabled) {
+      boolean dependencyQueryEnabled
+  ) {
     this.dependencyTopic = dependencyTopic;
     this.dependencyTtl = dependencyTtl;
     this.dependencyWindowSize = dependencyWindowSize;

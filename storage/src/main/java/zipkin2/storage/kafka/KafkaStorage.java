@@ -60,7 +60,7 @@ public class KafkaStorage extends StorageComponent {
     return new KafkaStorageBuilder();
   }
 
-  // Kafka Storage modes
+  // Kafka Storage flags
   final boolean partitioningEnabled;
   final boolean aggregationEnabled;
   final boolean traceByIdQueryEnabled;
@@ -107,7 +107,6 @@ public class KafkaStorage extends StorageComponent {
     this.storageSpansTopic = builder.traceStorage.spansTopic;
     this.storageDependencyTopic = builder.dependencyStorage.dependencyTopic;
     // Storage directories
-    //this.storageDir = builder.storageStateDir;
     this.minTracesStored = builder.traceStorage.minTracesStored;
     this.httpBaseUrl = builder.httpBaseUrl;
     this.hostname = builder.hostname;
@@ -213,18 +212,10 @@ public class KafkaStorage extends StorageComponent {
   void doClose() {
     try {
       if (adminClient != null) adminClient.close(Duration.ofSeconds(1));
-      if (producer != null) {
-        producer.close(Duration.ofSeconds(1));
-      }
-      if (traceStoreStream != null) {
-        traceStoreStream.close(Duration.ofSeconds(1));
-      }
-      if (dependencyStoreStream != null) {
-        dependencyStoreStream.close(Duration.ofSeconds(1));
-      }
-      if (aggregationStream != null) {
-        aggregationStream.close(Duration.ofSeconds(1));
-      }
+      if (producer != null) producer.close(Duration.ofSeconds(1));
+      if (traceStoreStream != null) traceStoreStream.close(Duration.ofSeconds(1));
+      if (dependencyStoreStream != null) dependencyStoreStream.close(Duration.ofSeconds(1));
+      if (aggregationStream != null) aggregationStream.close(Duration.ofSeconds(1));
       if (server != null) server.close();
     } catch (Exception | Error e) {
       LOG.debug("error closing client {}", e.getMessage(), e);
@@ -234,9 +225,7 @@ public class KafkaStorage extends StorageComponent {
   Producer<String, byte[]> getProducer() {
     if (producer == null) {
       synchronized (this) {
-        if (producer == null) {
-          producer = new KafkaProducer<>(producerConfig);
-        }
+        if (producer == null) producer = new KafkaProducer<>(producerConfig);
       }
     }
     return producer;
@@ -245,9 +234,7 @@ public class KafkaStorage extends StorageComponent {
   AdminClient getAdminClient() {
     if (adminClient == null) {
       synchronized (this) {
-        if (adminClient == null) {
-          adminClient = AdminClient.create(adminConfig);
-        }
+        if (adminClient == null) adminClient = AdminClient.create(adminConfig);
       }
     }
     return adminClient;
@@ -260,7 +247,7 @@ public class KafkaStorage extends StorageComponent {
           try {
             traceStoreStream = new KafkaStreams(traceStoreTopology, traceStoreStreamConfig);
             traceStoreStream.start();
-            LOG.info("Trace storage topology: {}", traceStoreTopology.describe());
+            LOG.info("Trace storage topology:\n{}", traceStoreTopology.describe());
           } catch (Exception e) {
             LOG.debug("Error starting trace storage process", e);
             traceStoreStream = null;
@@ -279,7 +266,7 @@ public class KafkaStorage extends StorageComponent {
             dependencyStoreStream =
                 new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
             dependencyStoreStream.start();
-            LOG.info("Dependency storage topology: {}", dependencyStoreTopology.describe());
+            LOG.info("Dependency storage topology:\n{}", dependencyStoreTopology.describe());
           } catch (Exception e) {
             LOG.debug("Error starting dependency storage", e);
             dependencyStoreStream = null;
@@ -297,7 +284,7 @@ public class KafkaStorage extends StorageComponent {
           try {
             aggregationStream = new KafkaStreams(aggregationTopology, aggregationStreamConfig);
             aggregationStream.start();
-            LOG.info("Aggregation topology: {}", aggregationTopology.describe());
+            LOG.info("Aggregation topology:\n{}", aggregationTopology.describe());
           } catch (Exception e) {
             LOG.debug("Error loading aggregation process", e);
             aggregationStream = null;

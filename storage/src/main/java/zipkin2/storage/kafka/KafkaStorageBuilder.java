@@ -114,12 +114,12 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     return this;
   }
 
-  public KafkaStorageBuilder spanPartitioningBuilder(SpanPartitioningBuilder builder) {
-    if (builder == null) throw new NullPointerException("builder == null");
-    this.spanPartitioning = builder;
-    return this;
-  }
-
+  /**
+   * Use this hostname to locate zipkin server between each other when forming a cluster.
+   * <p>
+   * When running multiple instances server local IP might not be the same as the external IP. e.g.
+   * Kubernetes Pod IP not been accessible from other Pods, and Service IPs that are accessible.
+   */
   public KafkaStorageBuilder hostname(String hostname) {
     if (hostname == null) throw new NullPointerException("hostname == null");
     this.hostname = hostname;
@@ -128,11 +128,20 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
     return this;
   }
 
+  /**
+   * Same port as Zipkin Server. To be changed only when Zipkin Server port is changed.
+   */
   public KafkaStorageBuilder serverPort(int serverPort) {
     if (serverPort <= 0) throw new IllegalArgumentException("serverPort <= 0");
     this.serverPort = serverPort;
     traceStorage.hostInfo(hostname, serverPort);
     dependencyStorage.hostInfo(hostname, serverPort);
+    return this;
+  }
+
+  public KafkaStorageBuilder spanPartitioningBuilder(SpanPartitioningBuilder builder) {
+    if (builder == null) throw new NullPointerException("builder == null");
+    this.spanPartitioning = builder;
     return this;
   }
 
