@@ -1,10 +1,10 @@
-.PHONY: all
-all: build
-
+# Variables
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
-
-## Create topics on local kafka
+KAFKA_BOOTSTRAP_SERVERS := 'localhost:19092'
+.PHONY: all
+all: build test
+# Create topics on local kafka
 .PHONY: kafka-topics
 kafka-topics-local:
 	${KAFKA_HOME}/bin/kafka-topics.sh \
@@ -13,7 +13,6 @@ kafka-topics-local:
 		--zookeeper localhost:2181 --create --topic zipkin-trace --partitions 2 --replication-factor 1 --if-not-exists
 	${KAFKA_HOME}/bin/kafka-topics.sh \
 		--zookeeper localhost:2181 --create --topic zipkin-dependency --partitions 2 --replication-factor 1 --if-not-exists
-
 # Maven tasks
 ## add license headers
 .PHONY: license-header
@@ -36,7 +35,7 @@ get-zipkin:
 .PHONY: zipkin-local
 zipkin-local:
 	STORAGE_TYPE=kafka \
-	KAFKA_BOOTSTRAP_SERVERS=localhost:19092 \
+	KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS} \
 	java \
 	-Dloader.path='autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar,autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar!/lib' \
 	-Dspring.profiles.active=kafka \
@@ -53,7 +52,7 @@ docker-build:
 ## Run single instance compose
 .PHONY: docker-up-single
 docker-up-single:
-	docker-compose -f docker/single-instance/docker-compose.yml up -d
+	docker-compose -f docker/single/docker-compose.yml up -d
 ## Run single instance compose
 .PHONY: docker-up-distributed
 docker-up-distributed:

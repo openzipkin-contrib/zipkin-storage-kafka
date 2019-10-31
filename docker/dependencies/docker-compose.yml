@@ -35,46 +35,20 @@ services:
       "
     depends_on:
       - kafka-zookeeper
-  zipkin-aggregation:
+  zipkin:
     image: openzipkincontrib/zipkin-storage-kafka
-    container_name: zipkin-aggregation
+    container_name: zipkin
+    hostname: zipkin # required to route call to scatter-gather endpoint properly. should not be needed after #40 is solved
     ports:
       - 9411:9411
     environment:
+      MODULE_OPTS: "-Dloader.path=lib -Dspring.profiles.active=kafka-only-dependencies"
       KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
-      KAFKA_STORAGE_SPAN_CONSUMER_ENABLED: 'true'
-      QUERY_ENABLED: 'false'
-    depends_on:
-      - kafka-zookeeper
-      - kafka-topics
-  zipkin-storage-1:
-    image: openzipkincontrib/zipkin-storage-kafka
-    container_name: zipkin-storage-1
-    hostname: zipkin-storage-1
-    ports:
-      - 19411:9411
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
-      KAFKA_STORAGE_SPAN_CONSUMER_ENABLED: 'false'
+      KAFKA_STORAGE_DIR: /data
     volumes:
-      - zipkin1:/data
-    depends_on:
-      - kafka-zookeeper
-      - kafka-topics
-  zipkin-storage-2:
-    image: openzipkincontrib/zipkin-storage-kafka
-    container_name: zipkin-storage-2
-    hostname: zipkin-storage-2
-    ports:
-      - 29411:9411
-    environment:
-      KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
-      KAFKA_STORAGE_SPAN_CONSUMER_ENABLED: 'false'
-    volumes:
-      - zipkin2:/data
+      - zipkin:/data
     depends_on:
       - kafka-zookeeper
       - kafka-topics
 volumes:
-  zipkin1:
-  zipkin2:
+  zipkin:

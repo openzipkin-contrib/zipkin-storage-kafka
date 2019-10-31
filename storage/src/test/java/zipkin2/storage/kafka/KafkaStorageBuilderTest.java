@@ -15,7 +15,6 @@ package zipkin2.storage.kafka;
 
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class KafkaStorageBuilderTest {
@@ -27,21 +26,20 @@ class KafkaStorageBuilderTest {
 
   @Test void buildDefaultBuilder() {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
-    assertThat(builder.storageDir).isNotNull();
 
-    assertThatThrownBy(() -> builder.partitionedSpansTopic(null))
+    assertThatThrownBy(() -> builder.spanPartitioning.spansTopic(null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> builder.aggregationSpansTopic(null))
+    assertThatThrownBy(() -> builder.spanAggregation.spansTopic(null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> builder.aggregationTraceTopic(null))
+    assertThatThrownBy(() -> builder.spanAggregation.traceTopic(null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> builder.aggregationDependencyTopic(null))
+    assertThatThrownBy(() -> builder.spanAggregation.dependencyTopic(null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> builder.storageSpansTopic(null))
+    assertThatThrownBy(() -> builder.traceStorage.spansTopic(null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> builder.storageDependencyTopic(null))
+    assertThatThrownBy(() -> builder.dependencyStorage.dependencyTopic(null))
         .isInstanceOf(NullPointerException.class);
-    assertThatThrownBy(() -> builder.storageDir(null))
+    assertThatThrownBy(() -> builder.storageStateDir(null))
         .isInstanceOf(NullPointerException.class);
   }
 }

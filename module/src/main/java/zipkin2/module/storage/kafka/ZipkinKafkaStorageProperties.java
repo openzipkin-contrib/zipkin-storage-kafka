@@ -20,109 +20,36 @@ import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import zipkin2.storage.kafka.KafkaStorage;
 import zipkin2.storage.kafka.KafkaStorageBuilder;
+import zipkin2.storage.kafka.KafkaStorageBuilder.DependencyStorageBuilder;
+import zipkin2.storage.kafka.KafkaStorageBuilder.SpanAggregationBuilder;
+import zipkin2.storage.kafka.KafkaStorageBuilder.SpanPartitioningBuilder;
+import zipkin2.storage.kafka.KafkaStorageBuilder.TraceStorageBuilder;
 
 @ConfigurationProperties("zipkin.storage.kafka")
 public class ZipkinKafkaStorageProperties implements Serializable {
   private static final long serialVersionUID = 0L;
-
-  private Boolean spanConsumerEnabled;
-
   private String hostname;
-
-  private String bootstrapServers;
-
-  private Long traceTtlCheckInterval;
-  private Long traceTtl;
-  private Long traceTimeout;
-
-  private Long dependencyTtl;
-
-  private String partitionedSpansTopic;
-  private String aggregationSpansTopic;
-  private String aggregationTraceTopic;
-  private String aggregationDependencyTopic;
-  private String storageSpansTopic;
-  private String storageDependencyTopic;
-
   private String storageDir;
-
-  private String aggregationStreamAppId;
-  private String traceStoreStreamAppId;
-  private String dependencyStoreStreamAppId;
-
-  /**
-   * Additional Kafka configuration.
-   */
-  private Map<String, String> adminOverrides = new LinkedHashMap<>();
-  private Map<String, String> producerOverrides = new LinkedHashMap<>();
-  private Map<String, String> aggregationStreamOverrides = new LinkedHashMap<>();
-  private Map<String, String> traceStoreStreamOverrides = new LinkedHashMap<>();
-  private Map<String, String> dependencyStoreStreamOverrides = new LinkedHashMap<>();
+  // Kafka properties
+  private String bootstrapServers;
+  private Map<String, String> overrides = new LinkedHashMap<>();
+  // Component-specific properties
+  private SpanPartitioningProperties spanPartitioning = new SpanPartitioningProperties();
+  private SpanAggregationProperties spanAggregation = new SpanAggregationProperties();
+  private TraceStorageProperties traceStorage = new TraceStorageProperties();
+  private DependencyStorageProperties dependencyStorage = new DependencyStorageProperties();
 
   KafkaStorageBuilder toBuilder() {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
-    if (spanConsumerEnabled != null) builder.spanConsumerEnabled(spanConsumerEnabled);
+    builder.spanPartitioningBuilder(spanPartitioning.toBuilder());
+    builder.spanAggregationBuilder(spanAggregation.toBuilder());
+    builder.traceStorageBuilder(traceStorage.toBuilder());
+    builder.dependencyStorageBuilder(dependencyStorage.toBuilder());
     if (hostname != null) builder.hostname(hostname);
+    if (storageDir != null) builder.storageStateDir(storageDir);
     if (bootstrapServers != null) builder.bootstrapServers(bootstrapServers);
-    if (traceTimeout != null) {
-      builder.traceTimeout(Duration.ofMillis(traceTimeout));
-    }
-    if (traceTtlCheckInterval != null) {
-      builder.traceTtlCheckInterval(Duration.ofMillis(traceTtlCheckInterval));
-    }
-    if (traceTtl != null) {
-      builder.traceTtl(Duration.ofMillis(traceTtl));
-    }
-    if (dependencyTtl != null) {
-      builder.dependencyTtl(Duration.ofMillis(dependencyTtl));
-    }
-    if (aggregationStreamAppId != null) builder.aggregationStreamAppId(aggregationStreamAppId);
-    if (traceStoreStreamAppId != null) builder.aggregationStreamAppId(traceStoreStreamAppId);
-    if (dependencyStoreStreamAppId != null) {
-      builder.aggregationStreamAppId(dependencyStoreStreamAppId);
-    }
-    if (storageDir != null) builder.storageDir(storageDir);
-    if (partitionedSpansTopic != null) builder.partitionedSpansTopic(partitionedSpansTopic);
-    if (aggregationSpansTopic != null) builder.aggregationSpansTopic(aggregationSpansTopic);
-    if (aggregationTraceTopic != null) builder.aggregationTraceTopic(aggregationTraceTopic);
-    if (aggregationDependencyTopic != null) {
-      builder.aggregationDependencyTopic(aggregationDependencyTopic);
-    }
-    if (storageSpansTopic != null) builder.storageSpansTopic(storageSpansTopic);
-    if (storageDependencyTopic != null) builder.storageDependencyTopic(storageDependencyTopic);
-    if (adminOverrides != null) builder.adminOverrides(adminOverrides);
-    if (producerOverrides != null) builder.producerOverrides(producerOverrides);
-    if (aggregationStreamOverrides != null) {
-      builder.aggregationStreamOverrides(aggregationStreamOverrides);
-    }
-    if (traceStoreStreamOverrides != null) {
-      builder.traceStoreStreamOverrides(traceStoreStreamOverrides);
-    }
-    if (dependencyStoreStreamOverrides != null) {
-      builder.dependencyStoreStreamOverrides(dependencyStoreStreamOverrides);
-    }
-    if (aggregationStreamAppId != null) builder.aggregationStreamAppId(aggregationStreamAppId);
-    if (traceStoreStreamAppId != null) builder.traceStoreStreamAppId(traceStoreStreamAppId);
-    if (dependencyStoreStreamAppId != null) {
-      builder.dependencyStoreStreamAppId(dependencyStoreStreamAppId);
-    }
+    if (overrides != null) builder.overrides(overrides);
     return builder;
-  }
-
-  public Boolean getSpanConsumerEnabled() {
-    return spanConsumerEnabled;
-  }
-
-  public void setSpanConsumerEnabled(Boolean spanConsumerEnabled) {
-    this.spanConsumerEnabled = spanConsumerEnabled;
-  }
-
-  public String getBootstrapServers() {
-    return bootstrapServers;
-  }
-
-  public void setBootstrapServers(String bootstrapServers) {
-    this.bootstrapServers = bootstrapServers;
   }
 
   public String getHostname() {
@@ -133,52 +60,12 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.hostname = hostname;
   }
 
-  public Long getTraceTtlCheckInterval() {
-    return traceTtlCheckInterval;
+  public String getBootstrapServers() {
+    return bootstrapServers;
   }
 
-  public void setTraceTtlCheckInterval(Long traceTtlCheckInterval) {
-    this.traceTtlCheckInterval = traceTtlCheckInterval;
-  }
-
-  public Long getTraceTtl() {
-    return traceTtl;
-  }
-
-  public void setTraceTtl(Long traceTtl) {
-    this.traceTtl = traceTtl;
-  }
-
-  public Long getTraceTimeout() {
-    return traceTimeout;
-  }
-
-  public void setTraceTimeout(Long traceTimeout) {
-    this.traceTimeout = traceTimeout;
-  }
-
-  public String getAggregationSpansTopic() {
-    return aggregationSpansTopic;
-  }
-
-  public void setAggregationSpansTopic(String aggregationSpansTopic) {
-    this.aggregationSpansTopic = aggregationSpansTopic;
-  }
-
-  public String getAggregationTraceTopic() {
-    return aggregationTraceTopic;
-  }
-
-  public void setAggregationTraceTopic(String aggregationTraceTopic) {
-    this.aggregationTraceTopic = aggregationTraceTopic;
-  }
-
-  public String getAggregationDependencyTopic() {
-    return aggregationDependencyTopic;
-  }
-
-  public void setAggregationDependencyTopic(String aggregationDependencyTopic) {
-    this.aggregationDependencyTopic = aggregationDependencyTopic;
+  public void setBootstrapServers(String bootstrapServers) {
+    this.bootstrapServers = bootstrapServers;
   }
 
   public String getStorageDir() {
@@ -189,100 +76,259 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     this.storageDir = storageDir;
   }
 
-  public Long getDependencyTtl() {
-    return dependencyTtl;
+  public Map<String, String> getOverrides() {
+    return overrides;
   }
 
-  public void setDependencyTtl(Long dependencyTtl) {
-    this.dependencyTtl = dependencyTtl;
+  public void setOverrides(Map<String, String> overrides) {
+    this.overrides = overrides;
   }
 
-  public Map<String, String> getAdminOverrides() {
-    return adminOverrides;
+  public SpanPartitioningProperties getSpanPartitioning() {
+    return spanPartitioning;
   }
 
-  public void setAdminOverrides(Map<String, String> adminOverrides) {
-    this.adminOverrides = adminOverrides;
+  public void setSpanPartitioning(
+      SpanPartitioningProperties spanPartitioning) {
+    this.spanPartitioning = spanPartitioning;
   }
 
-  public Map<String, String> getProducerOverrides() {
-    return producerOverrides;
+  public SpanAggregationProperties getSpanAggregation() {
+    return spanAggregation;
   }
 
-  public void setProducerOverrides(Map<String, String> producerOverrides) {
-    this.producerOverrides = producerOverrides;
+  public void setSpanAggregation(
+      SpanAggregationProperties spanAggregation) {
+    this.spanAggregation = spanAggregation;
   }
 
-  public Map<String, String> getAggregationStreamOverrides() {
-    return aggregationStreamOverrides;
+  public TraceStorageProperties getTraceStorage() {
+    return traceStorage;
   }
 
-  public void setAggregationStreamOverrides(Map<String, String> aggregationStreamOverrides) {
-    this.aggregationStreamOverrides = aggregationStreamOverrides;
+  public void setTraceStorage(
+      TraceStorageProperties traceStorage) {
+    this.traceStorage = traceStorage;
   }
 
-  public Map<String, String> getTraceStoreStreamOverrides() {
-    return traceStoreStreamOverrides;
+  public DependencyStorageProperties getDependencyStorage() {
+    return dependencyStorage;
   }
 
-  public void setTraceStoreStreamOverrides(Map<String, String> traceStoreStreamOverrides) {
-    this.traceStoreStreamOverrides = traceStoreStreamOverrides;
+  public void setDependencyStorage(
+      DependencyStorageProperties dependencyStorage) {
+    this.dependencyStorage = dependencyStorage;
   }
 
-  public Map<String, String> getDependencyStoreStreamOverrides() {
-    return dependencyStoreStreamOverrides;
+  static class SpanPartitioningProperties {
+    private Boolean enabled;
+    private String spansTopic;
+    private Map<String, String> overrides = new LinkedHashMap<>();
+
+    public Boolean getEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public String getSpansTopic() {
+      return spansTopic;
+    }
+
+    public void setSpansTopic(String spansTopic) {
+      this.spansTopic = spansTopic;
+    }
+
+    public Map<String, String> getOverrides() {
+      return overrides;
+    }
+
+    public void setOverrides(Map<String, String> overrides) {
+      this.overrides = overrides;
+    }
+
+    SpanPartitioningBuilder toBuilder() {
+      SpanPartitioningBuilder builder = new SpanPartitioningBuilder();
+      if (enabled != null) builder.enabled(enabled);
+      if (spansTopic != null) builder.spansTopic(spansTopic);
+      if (overrides != null) builder.overrides(overrides);
+      return builder;
+    }
   }
 
-  public void setDependencyStoreStreamOverrides(
-      Map<String, String> dependencyStoreStreamOverrides) {
-    this.dependencyStoreStreamOverrides = dependencyStoreStreamOverrides;
+  static class SpanAggregationProperties {
+    private Boolean enabled;
+    private String spansTopic;
+    private String traceTopic;
+    private String dependencyTopic;
+    private Long traceTimeout;
+    private Map<String, String> overrides = new LinkedHashMap<>();
+
+    public Boolean getEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public String getSpansTopic() {
+      return spansTopic;
+    }
+
+    public void setSpansTopic(String spansTopic) {
+      this.spansTopic = spansTopic;
+    }
+
+    public String getTraceTopic() {
+      return traceTopic;
+    }
+
+    public void setTraceTopic(String traceTopic) {
+      this.traceTopic = traceTopic;
+    }
+
+    public String getDependencyTopic() {
+      return dependencyTopic;
+    }
+
+    public void setDependencyTopic(String dependencyTopic) {
+      this.dependencyTopic = dependencyTopic;
+    }
+
+    public Long getTraceTimeout() {
+      return traceTimeout;
+    }
+
+    public void setTraceTimeout(Long traceTimeout) {
+      this.traceTimeout = traceTimeout;
+    }
+
+    public Map<String, String> getOverrides() {
+      return overrides;
+    }
+
+    public void setOverrides(Map<String, String> overrides) {
+      this.overrides = overrides;
+    }
+
+    SpanAggregationBuilder toBuilder() {
+      SpanAggregationBuilder builder = new SpanAggregationBuilder();
+      if (enabled != null) builder.enabled(enabled);
+      if (traceTimeout != null) builder.traceTimeout(Duration.ofMillis(traceTimeout));
+      if (spansTopic != null) builder.spansTopic(spansTopic);
+      if (traceTopic != null) builder.traceTopic(traceTopic);
+      if (dependencyTopic != null) builder.dependencyTopic(dependencyTopic);
+      if (overrides != null) builder.overrides(overrides);
+      return builder;
+    }
   }
 
-  public String getAggregationStreamAppId() {
-    return aggregationStreamAppId;
+  static class TraceStorageProperties {
+    private Boolean enabled;
+    private String spansTopic;
+    private Long ttlCheckInterval;
+    private Long ttl;
+    private Map<String, String> overrides = new LinkedHashMap<>();
+
+    public Boolean getEnabled() {
+      return enabled;
+    }
+
+    public void setEnabled(Boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    public String getSpansTopic() {
+      return spansTopic;
+    }
+
+    public void setSpansTopic(String spansTopic) {
+      this.spansTopic = spansTopic;
+    }
+
+    public Long getTtlCheckInterval() {
+      return ttlCheckInterval;
+    }
+
+    public void setTtlCheckInterval(Long ttlCheckInterval) {
+      this.ttlCheckInterval = ttlCheckInterval;
+    }
+
+    public Long getTtl() {
+      return ttl;
+    }
+
+    public void setTtl(Long ttl) {
+      this.ttl = ttl;
+    }
+
+    public Map<String, String> getOverrides() {
+      return overrides;
+    }
+
+    public void setOverrides(Map<String, String> overrides) {
+      this.overrides = overrides;
+    }
+
+    TraceStorageBuilder toBuilder() {
+      TraceStorageBuilder builder = new TraceStorageBuilder();
+      if (enabled != null) builder.enabled(enabled);
+      if (ttlCheckInterval != null) builder.ttlCheckInterval(Duration.ofMillis(ttlCheckInterval));
+      if (ttl != null) builder.ttl(Duration.ofMillis(ttl));
+      if (spansTopic != null) builder.spansTopic(spansTopic);
+      if (overrides != null) builder.overrides(overrides);
+      return builder;
+    }
   }
 
-  public void setAggregationStreamAppId(String aggregationStreamAppId) {
-    this.aggregationStreamAppId = aggregationStreamAppId;
-  }
+  static class DependencyStorageProperties {
+    private Boolean enabled;
+    private String dependencyTopic;
+    private Long ttl;
+    private Map<String, String> overrides = new LinkedHashMap<>();
 
-  public String getTraceStoreStreamAppId() {
-    return traceStoreStreamAppId;
-  }
+    public Boolean getEnabled() {
+      return enabled;
+    }
 
-  public void setTraceStoreStreamAppId(String traceStoreStreamAppId) {
-    this.traceStoreStreamAppId = traceStoreStreamAppId;
-  }
+    public void setEnabled(Boolean enabled) {
+      this.enabled = enabled;
+    }
 
-  public String getDependencyStoreStreamAppId() {
-    return dependencyStoreStreamAppId;
-  }
+    public String getDependencyTopic() {
+      return dependencyTopic;
+    }
 
-  public void setDependencyStoreStreamAppId(String dependencyStoreStreamAppId) {
-    this.dependencyStoreStreamAppId = dependencyStoreStreamAppId;
-  }
+    public void setDependencyTopic(String dependencyTopic) {
+      this.dependencyTopic = dependencyTopic;
+    }
 
-  public String getPartitionedSpansTopic() {
-    return partitionedSpansTopic;
-  }
+    public Long getTtl() {
+      return ttl;
+    }
 
-  public void setPartitionedSpansTopic(String partitionedSpansTopic) {
-    this.partitionedSpansTopic = partitionedSpansTopic;
-  }
+    public void setTtl(Long ttl) {
+      this.ttl = ttl;
+    }
 
-  public String getStorageSpansTopic() {
-    return storageSpansTopic;
-  }
+    public Map<String, String> getOverrides() {
+      return overrides;
+    }
 
-  public void setStorageSpansTopic(String storageSpansTopic) {
-    this.storageSpansTopic = storageSpansTopic;
-  }
+    public void setOverrides(Map<String, String> overrides) {
+      this.overrides = overrides;
+    }
 
-  public String getStorageDependencyTopic() {
-    return storageDependencyTopic;
-  }
-
-  public void setStorageDependencyTopic(String storageDependencyTopic) {
-    this.storageDependencyTopic = storageDependencyTopic;
+    DependencyStorageBuilder toBuilder() {
+      DependencyStorageBuilder builder = new DependencyStorageBuilder();
+      if (enabled != null) builder.enabled(enabled);
+      if (dependencyTopic != null) builder.dependencyTopic(dependencyTopic);
+      if (ttl != null) builder.ttl(Duration.ofMillis(ttl));
+      if (overrides != null) builder.overrides(overrides);
+      return builder;
+    }
   }
 }

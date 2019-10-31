@@ -61,6 +61,7 @@ class KafkaStorageIT {
   @Container KafkaContainer kafka = new KafkaContainer("5.3.0");
 
   Duration traceTimeout;
+  KafkaStorageBuilder storageBuilder;
   KafkaStorage storage;
   Server server;
   Properties consumerConfig;
@@ -69,7 +70,7 @@ class KafkaStorageIT {
   SpansSerde spansSerde = new SpansSerde();
   DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
 
-  @BeforeEach void start() throws Exception {
+  @BeforeEach void setUp() throws Exception {
     consumerConfig = new Properties();
     consumerConfig.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
     consumerConfig.put(ConsumerConfig.GROUP_ID_CONFIG, "test");
@@ -79,23 +80,24 @@ class KafkaStorageIT {
     assertThat(kafka.isRunning()).isTrue();
 
     traceTimeout = Duration.ofSeconds(5);
-    int httpPort = randomPort();
-    storage = (KafkaStorage) KafkaStorage.newBuilder()
-      .bootstrapServers(kafka.getBootstrapServers())
-      .storageDir("target/zipkin_" + System.currentTimeMillis())
-      .traceTimeout(traceTimeout)
-      .serverPort(httpPort)
-      .build();
+    int serverPort = randomPort();
+    storageBuilder = KafkaStorage.newBuilder()
+        .bootstrapServers(kafka.getBootstrapServers())
+        .storageStateDir("target/zipkin_" + System.currentTimeMillis())
+        .hostname("localhost")
+        .serverPort(serverPort);
+    storageBuilder.spanAggregation.traceTimeout(traceTimeout);
+    storage = (KafkaStorage) storageBuilder.build();
     server = Server.builder()
-        .http(httpPort)
-        .annotatedService(KafkaStorage.HTTP_PATH_PREFIX, storage.httpService())
+        .annotatedService("/storage/kafka", new KafkaStorageHttpService(storage))
+        .http(serverPort)
         .build();
     server.start();
 
     Collection<NewTopic> newTopics = new ArrayList<>();
-    newTopics.add(new NewTopic(storage.aggregationSpansTopic, 1, (short) 1));
-    newTopics.add(new NewTopic(storage.aggregationTraceTopic, 1, (short) 1));
-    newTopics.add(new NewTopic(storage.aggregationDependencyTopic, 1, (short) 1));
+    newTopics.add(new NewTopic(storageBuilder.spanAggregation.spansTopic, 1, (short) 1));
+    newTopics.add(new NewTopic(storageBuilder.spanAggregation.traceTopic, 1, (short) 1));
+    newTopics.add(new NewTopic(storageBuilder.spanAggregation.dependencyTopic, 1, (short) 1));
     storage.getAdminClient().createTopics(newTopics).all().get();
 
     await().atMost(10, TimeUnit.SECONDS).until(() -> storage.check().ok());
@@ -136,7 +138,7 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: they are partitioned
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.partitionedSpansTopic, 1, 10000);
+      consumerConfig, storageBuilder.spanPartitioning.spansTopic, 1, 10000);
     // Given: some time for stream processes to kick in
     Thread.sleep(traceTimeout.toMillis() * 2);
     // Given: another span to move 'event time' forward
@@ -149,15 +151,15 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: a trace is published
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.aggregationSpansTopic, 1, 1000);
+      consumerConfig, storageBuilder.spanAggregation.spansTopic, 1, 1000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.aggregationTraceTopic, 1, 30000);
+      consumerConfig, storageBuilder.spanAggregation.traceTopic, 1, 30000);
     // Then: and a dependency link created
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.aggregationDependencyTopic, 1, 1000);
+      consumerConfig, storageBuilder.spanAggregation.dependencyTopic, 1, 1000);
   }
 
-  @Test void should_return_traces_query() throws Exception {
+  @Test void should_returnTraces_whenQuery() throws Exception {
     // Given: a trace prepared to be published
     Span parent = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
       .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
@@ -176,13 +178,13 @@ class KafkaStorageIT {
     // When: and stores running
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
     // When: been published
-    tracesProducer.send(new ProducerRecord<>(storage.storageSpansTopic, parent.traceId(), spans));
-    tracesProducer.send(new ProducerRecord<>(storage.storageSpansTopic, other.traceId(),
+    tracesProducer.send(new ProducerRecord<>(storageBuilder.traceStorage.spansTopic, parent.traceId(), spans));
+    tracesProducer.send(new ProducerRecord<>(storageBuilder.traceStorage.spansTopic, other.traceId(),
       Collections.singletonList(other)));
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.storageSpansTopic, 2, 10000);
+      consumerConfig, storageBuilder.traceStorage.spansTopic, 2, 10000);
     // Then: services names are searchable
     await().atMost(100, TimeUnit.SECONDS).until(() -> {
       List<List<Span>> traces = storage.spanStore().getTraces(QueryRequest.newBuilder()
@@ -215,11 +217,11 @@ class KafkaStorageIT {
     assertThat(manyTraces).hasSize(2);
   }
 
-  @Test void should_find_dependencies() throws Exception {
+  @Test void should_findDependencies() throws Exception {
     //Given: two related dependency links
     // When: sent first one
     dependencyProducer.send(
-      new ProducerRecord<>(storage.storageDependencyTopic, "svc_a:svc_b",
+      new ProducerRecord<>(storageBuilder.dependencyStorage.dependencyTopic, "svc_a:svc_b",
         DependencyLink.newBuilder()
           .parent("svc_a")
           .child("svc_b")
@@ -228,7 +230,7 @@ class KafkaStorageIT {
           .build()));
     // When: and another one
     dependencyProducer.send(
-      new ProducerRecord<>(storage.storageDependencyTopic, "svc_a:svc_b",
+      new ProducerRecord<>(storageBuilder.dependencyStorage.dependencyTopic, "svc_a:svc_b",
         DependencyLink.newBuilder()
           .parent("svc_a")
           .child("svc_b")
@@ -238,7 +240,7 @@ class KafkaStorageIT {
     dependencyProducer.flush();
     // Then: stored in topic
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storage.storageDependencyTopic, 2, 10000);
+      consumerConfig, storageBuilder.dependencyStorage.dependencyTopic, 2, 10000);
     // Then:
     await().atMost(10, TimeUnit.SECONDS).until(() -> {
       List<DependencyLink> links = new ArrayList<>();
@@ -256,7 +258,7 @@ class KafkaStorageIT {
     });
   }
 
-  @Test void shouldFailWhenKafkaNotAvailable() {
+  @Test void shouldFail_whenKafkaNotAvailable() {
     CheckResult checked = storage.check();
     assertThat(checked.ok()).isTrue();
 

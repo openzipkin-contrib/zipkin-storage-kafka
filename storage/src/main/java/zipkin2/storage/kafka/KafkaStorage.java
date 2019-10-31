@@ -20,6 +20,7 @@ import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.common.KafkaFuture;
@@ -35,11 +36,9 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.SpanStore;
 import zipkin2.storage.StorageComponent;
 import zipkin2.storage.Traces;
-import zipkin2.storage.kafka.internal.NoopServiceAndSpanNames;
-import zipkin2.storage.kafka.internal.NoopSpanStore;
-import zipkin2.storage.kafka.streams.AggregationTopologySupplier;
-import zipkin2.storage.kafka.streams.DependencyStoreTopologySupplier;
-import zipkin2.storage.kafka.streams.TraceStoreTopologySupplier;
+import zipkin2.storage.kafka.streams.DependencyStorageTopology;
+import zipkin2.storage.kafka.streams.SpanAggregationTopology;
+import zipkin2.storage.kafka.streams.TraceStorageTopology;
 
 /**
  * Zipkin's Kafka Storage.
@@ -62,16 +61,19 @@ public class KafkaStorage extends StorageComponent {
   }
 
   // Kafka Storage modes
-  final boolean spanConsumerEnabled, searchEnabled;
+  final boolean partitioningEnabled;
+  final boolean aggregationEnabled;
+  final boolean traceByIdQueryEnabled;
+  final boolean traceSearchEnabled;
+  final boolean dependencyQueryEnabled;
   // Autocomplete Tags
   final List<String> autocompleteKeys;
   // Kafka Storage configs
-  final String storageDir;
   final long minTracesStored;
   final String hostname;
   final int httpPort;
   // Kafka Topics
-  final String partitionedSpansTopic;
+  final String partitioningSpansTopic;
   final String aggregationSpansTopic, aggregationTraceTopic, aggregationDependencyTopic;
   final String storageSpansTopic, storageDependencyTopic;
   // Kafka Clients config
@@ -84,130 +86,113 @@ public class KafkaStorage extends StorageComponent {
   // Resources
   volatile AdminClient adminClient;
   volatile Producer<String, byte[]> producer;
-  volatile KafkaStreams traceAggregationStream, traceStoreStream, dependencyStoreStream;
+  volatile KafkaStreams aggregationStream, traceStoreStream, dependencyStoreStream;
   volatile Server server;
   volatile boolean closeCalled;
 
   KafkaStorage(KafkaStorageBuilder builder) {
     // Kafka Storage modes
-    this.spanConsumerEnabled = builder.spanConsumerEnabled;
-    this.searchEnabled = builder.searchEnabled;
+    this.partitioningEnabled = builder.spanPartitioning.enabled;
+    this.aggregationEnabled = builder.spanAggregation.enabled;
+    this.traceByIdQueryEnabled = builder.traceStorage.traceByIdQueryEnabled;
+    this.traceSearchEnabled = builder.traceStorage.traceSearchEnabled;
+    this.dependencyQueryEnabled = builder.dependencyStorage.enabled;
     // Autocomplete tags
     this.autocompleteKeys = builder.autocompleteKeys;
     // Kafka Topics config
-    this.partitionedSpansTopic = builder.partitionedSpansTopic;
-    this.aggregationSpansTopic = builder.aggregationSpansTopic;
-    this.aggregationTraceTopic = builder.aggregationTraceTopic;
-    this.aggregationDependencyTopic = builder.aggregationDependencyTopic;
-    this.storageSpansTopic = builder.storageSpansTopic;
-    this.storageDependencyTopic = builder.storageDependencyTopic;
+    this.partitioningSpansTopic = builder.spanPartitioning.spansTopic;
+    this.aggregationSpansTopic = builder.spanAggregation.spansTopic;
+    this.aggregationTraceTopic = builder.spanAggregation.traceTopic;
+    this.aggregationDependencyTopic = builder.spanAggregation.dependencyTopic;
+    this.storageSpansTopic = builder.traceStorage.spansTopic;
+    this.storageDependencyTopic = builder.dependencyStorage.dependencyTopic;
     // Storage directories
-    this.storageDir = builder.storageDir;
-    this.minTracesStored = builder.minTracesStored;
-    this.hostname = builder.hostname;
-    this.httpPort = builder.httpPort;
+    //this.storageDir = builder.storageStateDir;
+    this.minTracesStored = builder.traceStorage.minTracesStored;
     this.httpBaseUrl = builder.httpBaseUrl;
+    this.hostname = builder.hostname;
+    this.httpPort = builder.serverPort;
     // Kafka Configs
     this.adminConfig = builder.adminConfig;
-    this.producerConfig = builder.producerConfig;
-    this.aggregationStreamConfig = builder.aggregationStreamConfig;
-    this.traceStoreStreamConfig = builder.traceStoreStreamConfig;
-    this.dependencyStoreStreamConfig = builder.dependencyStoreStreamConfig;
+    this.producerConfig = builder.spanPartitioning.producerConfig;
+    this.aggregationStreamConfig = builder.spanAggregation.streamConfig;
+    this.traceStoreStreamConfig = builder.traceStorage.streamConfig;
+    this.dependencyStoreStreamConfig = builder.dependencyStorage.streamConfig;
 
-    aggregationTopology = new AggregationTopologySupplier(
-        aggregationSpansTopic,
-        aggregationTraceTopic,
-        aggregationDependencyTopic,
-        builder.traceTimeout).get();
-    traceStoreTopology = new TraceStoreTopologySupplier(
-        storageSpansTopic,
+    aggregationTopology = new SpanAggregationTopology(
+        builder.spanAggregation.spansTopic,
+        builder.spanAggregation.traceTopic,
+        builder.spanAggregation.dependencyTopic,
+        builder.spanAggregation.traceTimeout,
+        builder.spanAggregation.enabled).get();
+    traceStoreTopology = new TraceStorageTopology(
+        builder.traceStorage.spansTopic,
         autocompleteKeys,
-        builder.traceTtl,
-        builder.traceTtlCheckInterval,
-        builder.minTracesStored).get();
-    dependencyStoreTopology = new DependencyStoreTopologySupplier(
-        storageDependencyTopic,
-        builder.dependencyTtl,
-        builder.dependencyWindowSize).get();
+        builder.traceStorage.traceTtl,
+        builder.traceStorage.traceTtlCheckInterval,
+        builder.traceStorage.minTracesStored,
+        builder.traceStorage.traceByIdQueryEnabled,
+        builder.traceStorage.traceSearchEnabled).get();
+    dependencyStoreTopology = new DependencyStorageTopology(
+        builder.dependencyStorage.dependencyTopic,
+        builder.dependencyStorage.dependencyTtl,
+        builder.dependencyStorage.dependencyWindowSize,
+        builder.dependencyStorage.enabled).get();
   }
 
   @Override public SpanConsumer spanConsumer() {
     checkResources();
-    if (spanConsumerEnabled) {
+    if (partitioningEnabled) {
       return new KafkaSpanConsumer(this);
     } else { // NoopSpanConsumer
-      return list -> Call.create(null);
+      return spans -> Call.create(null);
     }
   }
 
   @Override public SpanStore spanStore() {
     checkResources();
-    if (searchEnabled) { // not exactly correct. See https://github.com/openzipkin/zipkin/pull/2803
-      return new KafkaSpanStore(this);
-    } else {
-      return new NoopSpanStore();
-    }
+    return new KafkaSpanStore(this);
   }
 
   @Override public Traces traces() {
     checkResources();
-    if (searchEnabled) {
-      return new KafkaSpanStore(this);
-    } else {
-      return new NoopSpanStore();
-    }
+    return new KafkaSpanStore(this);
   }
 
   @Override public ServiceAndSpanNames serviceAndSpanNames() {
     checkResources();
-    if (searchEnabled) {
-      return new KafkaSpanStore(this);
-    } else {
-      return new NoopServiceAndSpanNames();
-    }
+    return new KafkaSpanStore(this);
   }
 
   @Override public AutocompleteTags autocompleteTags() {
     checkResources();
-    if (searchEnabled) {
-      return new KafkaAutocompleteTags(this);
-    } else {
-      return super.autocompleteTags();
-    }
+    return new KafkaAutocompleteTags(this);
   }
 
   void checkResources() {
-    if (spanConsumerEnabled) {
-      getAggregationStream();
-    }
-    if (searchEnabled) {
-      getTraceStoreStream();
-      getDependencyStoreStream();
-    }
+    getAggregationStream();
+    getTraceStoreStream();
+    getDependencyStoreStream();
   }
 
   @Override public CheckResult check() {
     try {
       KafkaFuture<String> maybeClusterId = getAdminClient().describeCluster().clusterId();
       maybeClusterId.get(1, TimeUnit.SECONDS);
-      if (spanConsumerEnabled) {
-        KafkaStreams.State state = getAggregationStream().state();
-        if (!state.isRunning()) {
-          return CheckResult.failed(
-              new IllegalStateException("Aggregation stream not running. " + state));
-        }
+      KafkaStreams.State state = getAggregationStream().state();
+      if (!state.isRunning()) {
+        return CheckResult.failed(
+            new IllegalStateException("Aggregation stream not running. " + state));
       }
-      if (searchEnabled) {
-        KafkaStreams.State traceStateStore = getTraceStoreStream().state();
-        if (!traceStateStore.isRunning()) {
-          return CheckResult.failed(
-              new IllegalStateException("Store stream not running. " + traceStateStore));
-        }
-        KafkaStreams.State dependencyStateStore = getDependencyStoreStream().state();
-        if (!dependencyStateStore.isRunning()) {
-          return CheckResult.failed(
-              new IllegalStateException("Store stream not running. " + dependencyStateStore));
-        }
+      KafkaStreams.State traceStateStore = getTraceStoreStream().state();
+      if (!traceStateStore.isRunning()) {
+        return CheckResult.failed(
+            new IllegalStateException("Store stream not running. " + traceStateStore));
+      }
+      KafkaStreams.State dependencyStateStore = getDependencyStoreStream().state();
+      if (!dependencyStateStore.isRunning()) {
+        return CheckResult.failed(
+            new IllegalStateException("Store stream not running. " + dependencyStateStore));
       }
       return CheckResult.OK;
     } catch (Exception e) {
@@ -237,8 +222,8 @@ public class KafkaStorage extends StorageComponent {
       if (dependencyStoreStream != null) {
         dependencyStoreStream.close(Duration.ofSeconds(1));
       }
-      if (traceAggregationStream != null) {
-        traceAggregationStream.close(Duration.ofSeconds(1));
+      if (aggregationStream != null) {
+        aggregationStream.close(Duration.ofSeconds(1));
       }
       if (server != null) server.close();
     } catch (Exception | Error e) {
@@ -275,8 +260,9 @@ public class KafkaStorage extends StorageComponent {
           try {
             traceStoreStream = new KafkaStreams(traceStoreTopology, traceStoreStreamConfig);
             traceStoreStream.start();
+            LOG.info("Trace storage topology: {}", traceStoreTopology.describe());
           } catch (Exception e) {
-            LOG.debug("Error starting trace store process", e);
+            LOG.debug("Error starting trace storage process", e);
             traceStoreStream = null;
           }
         }
@@ -293,8 +279,9 @@ public class KafkaStorage extends StorageComponent {
             dependencyStoreStream =
                 new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
             dependencyStoreStream.start();
+            LOG.info("Dependency storage topology: {}", dependencyStoreTopology.describe());
           } catch (Exception e) {
-            LOG.debug("Error starting dependency store", e);
+            LOG.debug("Error starting dependency storage", e);
             dependencyStoreStream = null;
           }
         }
@@ -304,21 +291,21 @@ public class KafkaStorage extends StorageComponent {
   }
 
   KafkaStreams getAggregationStream() {
-    if (traceAggregationStream == null) {
+    if (aggregationStream == null) {
       synchronized (this) {
-        if (traceAggregationStream == null) {
+        if (aggregationStream == null) {
           try {
-            traceAggregationStream =
-                new KafkaStreams(aggregationTopology, aggregationStreamConfig);
-            traceAggregationStream.start();
+            aggregationStream = new KafkaStreams(aggregationTopology, aggregationStreamConfig);
+            aggregationStream.start();
+            LOG.info("Aggregation topology: {}", aggregationTopology.describe());
           } catch (Exception e) {
             LOG.debug("Error loading aggregation process", e);
-            traceAggregationStream = null;
+            aggregationStream = null;
           }
         }
       }
     }
-    return traceAggregationStream;
+    return aggregationStream;
   }
 
   public KafkaStorageHttpService httpService() {
@@ -327,9 +314,18 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public String toString() {
     return "KafkaStorage{" +
-        "spanConsumerEnabled=" + spanConsumerEnabled +
-        ", searchEnabled=" + searchEnabled +
-        ", storageDir='" + storageDir + '\'' +
+        " bootstrapServers=" + adminConfig.getProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG) +
+        ", spanPartitioning{ enabled=" + partitioningEnabled +
+        ", spansTopic=" + partitioningSpansTopic + "}" +
+        ", spanAggregation{ enabled=" + aggregationEnabled +
+        ", spansTopic=" + aggregationSpansTopic +
+        ", traceTopic=" + aggregationTraceTopic +
+        ", dependencyTopic=" + aggregationDependencyTopic + "}" +
+        ", traceStore { traceByIdQueryEnabled=" + traceByIdQueryEnabled +
+        ", traceSearchEnabled=" + traceSearchEnabled +
+        ", spansTopic=" + storageSpansTopic + "}" +
+        ", dependencyStore { dependencyQueryEnabled=" + dependencyQueryEnabled +
+        ", dependencyTopic=" + storageDependencyTopic + "}" +
         '}';
   }
 }

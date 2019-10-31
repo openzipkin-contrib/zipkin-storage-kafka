@@ -50,10 +50,11 @@
     <main.basedir>${project.basedir}</main.basedir>
 
     <!-- groupId overrinds allow testing feature branches with jitpack -->
+    <!-- TODO: update armeria to 0.95 when zipkin >2.18.3 -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
     <zipkin.version>2.18.3</zipkin.version>
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
-    <armeria.version>0.95.0</armeria.version>
+    <armeria.version>0.94.0</armeria.version>
     <spring-boot.version>2.2.0.RELEASE</spring-boot.version>
 
     <log4j.version>2.12.1</log4j.version>

@@ -46,5 +46,8 @@ services:
       KAFKA_STORAGE_DIR: /data
     volumes:
       - zipkin:/data
+    depends_on:
+      - kafka-zookeeper
+      - kafka-topics
 volumes:
   zipkin:
