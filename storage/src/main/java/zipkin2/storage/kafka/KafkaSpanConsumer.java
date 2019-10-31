@@ -35,9 +35,7 @@ import zipkin2.storage.kafka.internal.AwaitableCallback;
  * processing of spans as part of a trace.
  */
 final class KafkaSpanConsumer implements SpanConsumer {
-  // Topic names
   final String spansTopicName;
-  // Kafka producers
   final Producer<String, byte[]> producer;
 
   KafkaSpanConsumer(KafkaStorage storage) {
@@ -69,7 +67,8 @@ final class KafkaSpanConsumer implements SpanConsumer {
         Producer<String, byte[]> kafkaProducer,
         String topic,
         String key,
-        byte[] value) {
+        byte[] value
+    ) {
       this.kafkaProducer = kafkaProducer;
       this.topic = topic;
       this.key = key;
@@ -80,7 +79,8 @@ final class KafkaSpanConsumer implements SpanConsumer {
         Producer<String, byte[]> producer,
         String topic,
         String key,
-        byte[] value) {
+        byte[] value
+    ) {
       return new KafkaProducerCall(producer, topic, key, value);
     }
 

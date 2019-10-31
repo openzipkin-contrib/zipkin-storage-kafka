@@ -60,7 +60,8 @@ public final class SpanAggregationTopology implements Supplier<Topology> {
       String traceTopic,
       String dependencyTopic,
       Duration traceTimeout,
-      boolean aggregationEnabled) {
+      boolean aggregationEnabled
+  ) {
     this.spansTopic = spansTopic;
     this.traceTopic = traceTopic;
     this.dependencyTopic = dependencyTopic;
