@@ -26,8 +26,8 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.Topology;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.CheckResult;
 import zipkin2.storage.AutocompleteTags;
@@ -54,7 +54,7 @@ import zipkin2.storage.kafka.streams.TraceStorageTopology;
 public class KafkaStorage extends StorageComponent {
   public static final String HTTP_PATH_PREFIX = "/storage/kafka";
 
-  static final Logger LOG = LogManager.getLogger();
+  static final Logger LOG = LoggerFactory.getLogger(KafkaStorage.class);
 
   public static KafkaStorageBuilder newBuilder() {
     return new KafkaStorageBuilder();
@@ -171,8 +171,8 @@ public class KafkaStorage extends StorageComponent {
 
   void checkResources() {
     getAggregationStream();
-    getTraceStoreStream();
-    getDependencyStoreStream();
+    getTraceStorageStream();
+    getDependencyStorageStream();
   }
 
   @Override public CheckResult check() {
@@ -184,12 +184,12 @@ public class KafkaStorage extends StorageComponent {
         return CheckResult.failed(
             new IllegalStateException("Aggregation stream not running. " + state));
       }
-      KafkaStreams.State traceStateStore = getTraceStoreStream().state();
+      KafkaStreams.State traceStateStore = getTraceStorageStream().state();
       if (!traceStateStore.isRunning()) {
         return CheckResult.failed(
             new IllegalStateException("Store stream not running. " + traceStateStore));
       }
-      KafkaStreams.State dependencyStateStore = getDependencyStoreStream().state();
+      KafkaStreams.State dependencyStateStore = getDependencyStorageStream().state();
       if (!dependencyStateStore.isRunning()) {
         return CheckResult.failed(
             new IllegalStateException("Store stream not running. " + dependencyStateStore));
@@ -253,7 +253,7 @@ public class KafkaStorage extends StorageComponent {
     return adminClient;
   }
 
-  KafkaStreams getTraceStoreStream() {
+  KafkaStreams getTraceStorageStream() {
     if (traceStoreStream == null) {
       synchronized (this) {
         if (traceStoreStream == null) {
@@ -271,7 +271,7 @@ public class KafkaStorage extends StorageComponent {
     return traceStoreStream;
   }
 
-  KafkaStreams getDependencyStoreStream() {
+  KafkaStreams getDependencyStorageStream() {
     if (dependencyStoreStream == null) {
       synchronized (this) {
         if (dependencyStoreStream == null) {

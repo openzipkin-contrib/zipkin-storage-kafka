@@ -47,7 +47,7 @@ final class KafkaAutocompleteTags implements AutocompleteTags {
 
   @Override public Call<List<String>> getKeys() {
     if (traceSearchEnabled) {
-      return new GetTagKeysCall(storage.getTraceStoreStream(), httpBaseUrl);
+      return new GetTagKeysCall(storage.getTraceStorageStream(), httpBaseUrl);
     } else {
       return Call.emptyList();
     }
@@ -55,7 +55,7 @@ final class KafkaAutocompleteTags implements AutocompleteTags {
 
   @Override public Call<List<String>> getValues(String key) {
     if (traceSearchEnabled) {
-      return new GetTagValuesCall(storage.getTraceStoreStream(), httpBaseUrl, key);
+      return new GetTagValuesCall(storage.getTraceStorageStream(), httpBaseUrl, key);
     } else {
       return Call.emptyList();
     }

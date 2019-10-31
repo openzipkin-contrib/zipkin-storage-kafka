@@ -32,13 +32,14 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.kafka.streams.errors.InvalidStateStoreException;
+import org.apache.kafka.streams.kstream.Windowed;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.QueryableStoreTypes;
 import org.apache.kafka.streams.state.ReadOnlyKeyValueStore;
 import org.apache.kafka.streams.state.ReadOnlyWindowStore;
 import org.apache.kafka.streams.state.StreamsMetadata;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
 import zipkin2.codec.DependencyLinkBytesEncoder;
@@ -64,7 +65,7 @@ import static zipkin2.storage.kafka.streams.TraceStorageTopology.TRACES_STORE_NA
  * KafkaSpanStore}
  */
 final class KafkaStorageHttpService {
-  static final Logger LOG = LogManager.getLogger();
+  static final Logger LOG = LoggerFactory.getLogger(KafkaStorageHttpService.class);
   static final ObjectMapper MAPPER = new ObjectMapper();
 
   final KafkaStorage storage;
@@ -80,14 +81,16 @@ final class KafkaStorageHttpService {
       @Param("endTs") long endTs,
       @Param("lookback") long lookback) {
     try {
-      ReadOnlyWindowStore<Long, DependencyLink> dependenciesStore =
-          storage.getDependencyStoreStream()
+      if (!storage.dependencyQueryEnabled) return AggregatedHttpResponse.of(HttpStatus.NOT_FOUND);
+      ReadOnlyWindowStore<Long, DependencyLink> store =
+          storage.getDependencyStorageStream()
               .store(DEPENDENCIES_STORE_NAME, QueryableStoreTypes.windowStore());
       List<DependencyLink> links = new ArrayList<>();
       Instant from = Instant.ofEpochMilli(endTs - lookback);
       Instant to = Instant.ofEpochMilli(endTs);
-      dependenciesStore.fetchAll(from, to)
-          .forEachRemaining(keyValue -> links.add(keyValue.value));
+      try (KeyValueIterator<Windowed<Long>, DependencyLink> iterator = store.fetchAll(from, to)) {
+        iterator.forEachRemaining(keyValue -> links.add(keyValue.value));
+      }
       List<DependencyLink> mergedLinks = DependencyLinker.merge(links);
       LOG.debug("Dependencies found from={}-to={}: {}", from, to, mergedLinks.size());
       return AggregatedHttpResponse.of(
@@ -104,10 +107,13 @@ final class KafkaStorageHttpService {
   @ProducesJson
   public JsonNode getServiceNames() {
     try {
-      ReadOnlyKeyValueStore<String, String> store = storage.getTraceStoreStream()
+      if (!storage.traceSearchEnabled) return MAPPER.createArrayNode();
+      ReadOnlyKeyValueStore<String, String> store = storage.getTraceStorageStream()
           .store(SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       ArrayNode array = MAPPER.createArrayNode();
-      store.all().forEachRemaining(keyValue -> array.add(keyValue.value));
+      try (KeyValueIterator<String, String> all = store.all()) {
+        all.forEachRemaining(keyValue -> array.add(keyValue.value));
+      }
       return array;
     } catch (InvalidStateStoreException e) {
       LOG.debug("State store is not ready", e);
@@ -119,7 +125,8 @@ final class KafkaStorageHttpService {
   @ProducesJson
   public JsonNode getSpanNames(@Param("service_name") String serviceName) {
     try {
-      ReadOnlyKeyValueStore<String, Set<String>> store = storage.getTraceStoreStream()
+      if (!storage.traceSearchEnabled) return MAPPER.createArrayNode();
+      ReadOnlyKeyValueStore<String, Set<String>> store = storage.getTraceStorageStream()
           .store(SPAN_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
@@ -135,7 +142,8 @@ final class KafkaStorageHttpService {
   @ProducesJson
   public JsonNode getRemoteServiceNames(@Param("service_name") String serviceName) {
     try {
-      ReadOnlyKeyValueStore<String, Set<String>> store = storage.getTraceStoreStream()
+      if (!storage.traceSearchEnabled) return MAPPER.createArrayNode();
+      ReadOnlyKeyValueStore<String, Set<String>> store = storage.getTraceStorageStream()
           .store(REMOTE_SERVICE_NAMES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       Set<String> names = store.get(serviceName);
       ArrayNode array = MAPPER.createArrayNode();
@@ -159,6 +167,7 @@ final class KafkaStorageHttpService {
       @Default("86400000") @Param("lookback") Long lookback,
       @Default("10") @Param("limit") int limit) {
     try {
+      if (!storage.traceSearchEnabled) return AggregatedHttpResponse.of(HttpStatus.NOT_FOUND);
       QueryRequest request =
           QueryRequest.newBuilder()
               .serviceName(serviceName.orElse(null))
@@ -172,11 +181,11 @@ final class KafkaStorageHttpService {
               .limit(limit)
               .build();
       ReadOnlyKeyValueStore<String, List<Span>> tracesStore =
-          storage.getTraceStoreStream()
+          storage.getTraceStorageStream()
               .store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       ReadOnlyKeyValueStore<Long, Set<String>> traceIdsByTsStore =
-          storage.getTraceStoreStream().store(SPAN_IDS_BY_TS_STORE_NAME,
-              QueryableStoreTypes.keyValueStore());
+          storage.getTraceStorageStream()
+              .store(SPAN_IDS_BY_TS_STORE_NAME, QueryableStoreTypes.keyValueStore());
       List<List<Span>> traces = new ArrayList<>();
       List<String> traceIds = new ArrayList<>();
       long from = MILLISECONDS.toMicros(request.endTs() - request.lookback());
@@ -231,8 +240,9 @@ final class KafkaStorageHttpService {
   @Get("/traces/:trace_id")
   public AggregatedHttpResponse getTrace(@Param("trace_id") String traceId) {
     try {
+      if (!storage.traceByIdQueryEnabled) return AggregatedHttpResponse.of(HttpStatus.NOT_FOUND);
       ReadOnlyKeyValueStore<String, List<Span>> store =
-          storage.getTraceStoreStream()
+          storage.getTraceStorageStream()
               .store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       List<Span> spans = store.get(traceId);
       return AggregatedHttpResponse.of(
@@ -248,7 +258,8 @@ final class KafkaStorageHttpService {
   @Get("/traceMany")
   public AggregatedHttpResponse getTraces(@Param("traceIds") String traceIds) {
     try {
-      ReadOnlyKeyValueStore<String, List<Span>> store = storage.getTraceStoreStream()
+      if (!storage.traceByIdQueryEnabled) return AggregatedHttpResponse.of(HttpStatus.NOT_FOUND);
+      ReadOnlyKeyValueStore<String, List<Span>> store = storage.getTraceStorageStream()
           .store(TRACES_STORE_NAME, QueryableStoreTypes.keyValueStore());
       List<List<Span>> result = new ArrayList<>();
       for (String traceId : traceIds.split(",", 1000)) {
@@ -265,11 +276,14 @@ final class KafkaStorageHttpService {
   @ProducesJson
   public JsonNode getAutocompleteTags() {
     try {
+      if (!storage.traceSearchEnabled) return MAPPER.createArrayNode();
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-          storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
+          storage.getTraceStorageStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
               QueryableStoreTypes.keyValueStore());
       ArrayNode array = MAPPER.createArrayNode();
-      autocompleteTagsStore.all().forEachRemaining(keyValue -> array.add(keyValue.key));
+      try (KeyValueIterator<String, Set<String>> all = autocompleteTagsStore.all()) {
+        all.forEachRemaining(keyValue -> array.add(keyValue.key));
+      }
       return array;
     } catch (InvalidStateStoreException e) {
       LOG.debug("State store is not ready", e);
@@ -281,8 +295,9 @@ final class KafkaStorageHttpService {
   @ProducesJson
   public JsonNode getAutocompleteValues(@Param("key") String key) {
     try {
+      if (!storage.traceSearchEnabled) return MAPPER.createArrayNode();
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-          storage.getTraceStoreStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
+          storage.getTraceStorageStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
               QueryableStoreTypes.keyValueStore());
       Set<String> values = autocompleteTagsStore.get(key);
       ArrayNode array = MAPPER.createArrayNode();
@@ -298,16 +313,16 @@ final class KafkaStorageHttpService {
   @ProducesJson
   public KafkaStreamsMetadata getInstancesByStore(@Param("store_name") String storeName) {
     Collection<StreamsMetadata> metadata =
-        storage.getTraceStoreStream().allMetadataForStore(storeName);
-    metadata.addAll(storage.getDependencyStoreStream().allMetadataForStore(storeName));
+        storage.getTraceStorageStream().allMetadataForStore(storeName);
+    metadata.addAll(storage.getDependencyStorageStream().allMetadataForStore(storeName));
     return KafkaStreamsMetadata.create(metadata);
   }
 
   @Get("/instances")
   @ProducesJson
   public KafkaStreamsMetadata getInstances() {
-    Collection<StreamsMetadata> metadata = storage.getTraceStoreStream().allMetadata();
-    metadata.addAll(storage.getDependencyStoreStream().allMetadata());
+    Collection<StreamsMetadata> metadata = storage.getTraceStorageStream().allMetadata();
+    metadata.addAll(storage.getDependencyStorageStream().allMetadata());
     return KafkaStreamsMetadata.create(metadata);
   }
 

@@ -74,7 +74,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
 
   @Override public Call<List<List<Span>>> getTraces(QueryRequest request) {
     if (traceSearchEnabled) {
-      return new GetTracesCall(storage.getTraceStoreStream(), httpBaseUrl, request);
+      return new GetTracesCall(storage.getTraceStorageStream(), httpBaseUrl, request);
     } else {
       return Call.emptyList();
     }
@@ -83,7 +83,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
   @SuppressWarnings("deprecation")
   @Override public Call<List<Span>> getTrace(String traceId) {
     if (traceByIdQueryEnabled) {
-      return new GetTraceCall(storage.getTraceStoreStream(), httpBaseUrl,
+      return new GetTraceCall(storage.getTraceStorageStream(), httpBaseUrl,
           Span.normalizeTraceId(traceId));
     } else {
       return Call.emptyList();
@@ -98,7 +98,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
       }
 
       if (joiner.length() == 0) return Call.emptyList();
-      return new GetTraceManyCall(storage.getTraceStoreStream(), httpBaseUrl, joiner.toString());
+      return new GetTraceManyCall(storage.getTraceStorageStream(), httpBaseUrl, joiner.toString());
     } else {
       return Call.emptyList();
     }
@@ -106,7 +106,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
 
   @Deprecated @Override public Call<List<String>> getServiceNames() {
     if (traceSearchEnabled) {
-      return new GetServiceNamesCall(storage.getTraceStoreStream(), httpBaseUrl);
+      return new GetServiceNamesCall(storage.getTraceStorageStream(), httpBaseUrl);
     } else {
       return Call.emptyList();
     }
@@ -114,7 +114,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
 
   @Deprecated @Override public Call<List<String>> getSpanNames(String serviceName) {
     if (traceSearchEnabled) {
-      return new GetSpanNamesCall(storage.getTraceStoreStream(), serviceName, httpBaseUrl);
+      return new GetSpanNamesCall(storage.getTraceStorageStream(), serviceName, httpBaseUrl);
     } else {
       return Call.emptyList();
     }
@@ -122,7 +122,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
 
   @Override public Call<List<String>> getRemoteServiceNames(String serviceName) {
     if (traceSearchEnabled) {
-      return new GetRemoteServiceNamesCall(storage.getTraceStoreStream(), serviceName, httpBaseUrl);
+      return new GetRemoteServiceNamesCall(storage.getTraceStorageStream(), serviceName, httpBaseUrl);
     } else {
       return Call.emptyList();
     }
@@ -130,7 +130,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
 
   @Override public Call<List<DependencyLink>> getDependencies(long endTs, long lookback) {
     if (dependencyQueryEnabled) {
-      return new GetDependenciesCall(storage.getDependencyStoreStream(), httpBaseUrl, endTs, lookback);
+      return new GetDependenciesCall(storage.getDependencyStorageStream(), httpBaseUrl, endTs, lookback);
     } else {
       return Call.emptyList();
     }

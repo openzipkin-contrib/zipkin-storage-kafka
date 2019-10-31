@@ -91,22 +91,23 @@ public final class DependencyStorageTopology implements Supplier<Topology> {
               // Event time
               Instant now = Instant.ofEpochMilli(context.timestamp());
               Instant from = now.minus(dependencyWindowSize);
-              WindowStoreIterator<DependencyLink> currentLinkWindow =
-                  dependenciesStore.fetch(linkKey, from, now);
-              // Get latest window. Only two are possible.
-              KeyValue<Long, DependencyLink> windowAndValue = null;
-              if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
-              if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
-              // Persist dependency link per window
-              if (windowAndValue != null) {
-                DependencyLink currentLink = windowAndValue.value;
-                DependencyLink aggregated = currentLink.toBuilder()
-                    .callCount(currentLink.callCount() + link.callCount())
-                    .errorCount(currentLink.errorCount() + link.errorCount())
-                    .build();
-                dependenciesStore.put(linkKey, aggregated, windowAndValue.key);
-              } else {
-                dependenciesStore.put(linkKey, link);
+              try (WindowStoreIterator<DependencyLink> currentLinkWindow =
+                  dependenciesStore.fetch(linkKey, from, now)) {
+                // Get latest window. Only two are possible.
+                KeyValue<Long, DependencyLink> windowAndValue = null;
+                if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
+                if (currentLinkWindow.hasNext()) windowAndValue = currentLinkWindow.next();
+                // Persist dependency link per window
+                if (windowAndValue != null) {
+                  DependencyLink currentLink = windowAndValue.value;
+                  DependencyLink aggregated = currentLink.toBuilder()
+                      .callCount(currentLink.callCount() + link.callCount())
+                      .errorCount(currentLink.errorCount() + link.errorCount())
+                      .build();
+                  dependenciesStore.put(linkKey, aggregated, windowAndValue.key);
+                } else {
+                  dependenciesStore.put(linkKey, link);
+                }
               }
             }
 
