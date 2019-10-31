@@ -28,13 +28,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import org.apache.kafka.streams.KafkaStreams;
 import org.apache.kafka.streams.state.HostInfo;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import zipkin2.Call;
 import zipkin2.Callback;
 
 public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
-  static final Logger LOG = LogManager.getLogger();
+  static final Logger LOG = LoggerFactory.getLogger(KafkaStoreListCall.class);
   static final ObjectMapper MAPPER = new ObjectMapper();
 
   final KafkaStreams kafkaStreams;
