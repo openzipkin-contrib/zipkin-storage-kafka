@@ -5,7 +5,7 @@ zipkin:
       kafka: zipkin2.module.storage.kafka.ZipkinKafkaStorageModule
   storage:
     kafka:
-      hostname: ${KAFKA_STORAGE_HOST_NAME:${HOSTNAME:localhost}}
+      hostname: ${KAFKA_STORAGE_HOSTNAME:${HOSTNAME:localhost}}
       # Connection to Kafka
       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
       storage-dir: ${KAFKA_STORAGE_DIR:/tmp/zipkin-storage-kafka}

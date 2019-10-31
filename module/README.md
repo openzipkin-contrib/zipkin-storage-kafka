@@ -16,7 +16,7 @@
 
 | Configuration | Description | Default |
 |---------------|-------------|---------|
-| `KAFKA_STORAGE_HOST_NAME` | Host name used by storage instances to scatter-gather results | `localhost` |
+| `KAFKA_STORAGE_HOSTNAME` | Host name used by storage instances to scatter-gather results | `localhost` |
 | `KAFKA_STORAGE_DIR` | Root path where Zipkin stores tracing data | `/tmp/zipkin-storage-kafka` |
 | `KAFKA_STORAGE_PARTITIONING_ENABLED` | Flag to enable [Span partitioning](../storage/README.md#span-consumer). | `true` |
 | `KAFKA_STORAGE_AGGREGATION_ENABLED` | Flag to enable [Span aggregation](../storage/README.md#span-aggregation). | `true` |
@@ -47,6 +47,6 @@ For instances to access other pods on the stateful set, we have to use valid DNS
                   fieldPath: metadata.name
             # Mapping hostname to Kubernetes DNS defined service name (${NAME}-${POD_ID}.${SVC}.${NAMESPACE}.svc.cluster.local),
             # then instance storage becomes accessible between them
-            - name: KAFKA_STORAGE_HOST_NAME
+            - name: KAFKA_STORAGE_HOSTNAME
               value: $(HOSTNAME).zipkin.default.svc.cluster.local
 ```
