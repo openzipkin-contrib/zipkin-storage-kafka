@@ -57,6 +57,8 @@
     <armeria.version>0.94.0</armeria.version>
     <spring-boot.version>2.2.0.RELEASE</spring-boot.version>
 
+    <kafka.version>2.3.1</kafka.version>
+
     <log4j.version>2.12.1</log4j.version>
     <junit-jupiter.version>5.5.2</junit-jupiter.version>
     <testcontainers.version>1.12.1</testcontainers.version>
