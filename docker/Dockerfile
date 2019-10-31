@@ -24,7 +24,7 @@ RUN cd /code && mkdir -p /zipkin-storage-kafka && \
     jar xf *.jar && \
     rm *.jar
 
-FROM openzipkin/zipkin:2.18.3
+FROM openzipkin/zipkin:2.19.0
 MAINTAINER Zipkin "https://zipkin.io/"
 
 COPY --from=0 /zipkin-storage-kafka/ /zipkin/lib/
