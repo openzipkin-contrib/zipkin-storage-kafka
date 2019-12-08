@@ -13,7 +13,7 @@
  */
 package zipkin2.storage.kafka.internal;
 
-import com.linecorp.armeria.client.HttpClient;
+import com.linecorp.armeria.client.WebClient;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
@@ -44,7 +44,7 @@ public abstract class KafkaStoreSingleKeyListCall<V> extends KafkaStoreListCall<
 
   @Override protected CompletableFuture<List<V>> listFuture() {
     StreamsMetadata metadata = kafkaStreams.metadataForKey(storeName, key, STRING_SERIALIZER);
-    HttpClient httpClient = httpClient(metadata.hostInfo());
+    WebClient httpClient = httpClient(metadata.hostInfo());
     return httpClient.get(httpPath)
       .aggregate()
       .thenApply(response -> {

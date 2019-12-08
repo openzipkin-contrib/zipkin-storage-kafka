@@ -17,7 +17,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.linecorp.armeria.client.HttpClient;
+import com.linecorp.armeria.client.WebClient;
 import com.linecorp.armeria.common.AggregatedHttpResponse;
 import com.linecorp.armeria.common.HttpStatus;
 import java.io.IOException;
@@ -75,8 +75,8 @@ public abstract class KafkaStoreListCall<V> extends Call.Base<List<V>> {
     return response.contentUtf8();
   }
 
-  protected HttpClient httpClient(HostInfo hostInfo) {
-    return HttpClient.of(httpBaseUrl.apply(hostInfo.host(), hostInfo.port()));
+  protected WebClient httpClient(HostInfo hostInfo) {
+    return WebClient.of(httpBaseUrl.apply(hostInfo.host(), hostInfo.port()));
   }
 
   @Override protected List<V> doExecute() {
