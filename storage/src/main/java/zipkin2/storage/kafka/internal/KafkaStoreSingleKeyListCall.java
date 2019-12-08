@@ -13,9 +13,7 @@
  */
 package zipkin2.storage.kafka.internal;
 
-import com.linecorp.armeria.client.HttpClient;
 import com.linecorp.armeria.client.WebClient;
-
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
