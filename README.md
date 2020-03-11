@@ -52,7 +52,7 @@ Docker image includes a environment variable to set the profile:
 MODULE_OPTS="-Dloader.path=lib -Dspring.profiles.active=kafka-only-dependencies"
 ```
 
-To try out, there is a [Docker compose](docker/dependencies/docker-compose.yml) configuration ready to test.
+To try out, there is a [Docker compose](docker/examples/dependencies/docker-compose.yml) configuration ready to test.
 
 If an existing Kafka collector is in place downstreaming traces into an existing storage, another Kafka consumer group id can be used for `zipkin-storage-kafka` to consume traces in parallel. Otherwise, you can [forward spans from another Zipkin server](https://github.com/openzipkin-contrib/zipkin-storage-forwarder)  to `zipkin-storage-kafka` if Kafka transport is not available.
 
@@ -129,9 +129,9 @@ make zipkin-test-distributed
 
 ### Examples
 
-+ [Single-node](docker/single/docker-compose.yml): span partitioning, aggregation, and storage happening on the same containers.
-+ [Distributed-mode](docker/distributed/docker-compose.yml): partitioning and aggregation is in a different container than storage.
-+ [Only-dependencies](docker/dependencies/docker-compose.yml): only components to support aggregation and search of dependency graphs.
++ [Single-node](docker/examples/single/docker-compose.yml): span partitioning, aggregation, and storage happening on the same containers.
++ [Distributed-mode](docker/examples/distributed/docker-compose.yml): partitioning and aggregation is in a different container than storage.
++ [Only-dependencies](docker/examples/dependencies/docker-compose.yml): only components to support aggregation and search of dependency graphs.
 
 ## Acknowledgments
 

@@ -45,6 +45,14 @@ zipkin-local:
 .PHONY: run-local
 run-local: build zipkin-local
 # Docker tasks
+## Build test image
+.PHONY: docker-build-test
+docker-build-test:
+	docker build -t openzipkincontrib/zipkin-storage-kafka:test -f docker/Dockerfile .
+## Run test distributed compose
+.PHONY: docker-up-test
+docker-up-test:
+	docker-compose -f docker/docker-compose.test.yml up -d
 ## Build local image
 .PHONY: docker-build
 docker-build:
@@ -52,11 +60,11 @@ docker-build:
 ## Run single instance compose
 .PHONY: docker-up-single
 docker-up-single:
-	docker-compose -f docker/single/docker-compose.yml up -d
+	docker-compose -f docker/examples/single/docker-compose.yml up -d
 ## Run single instance compose
 .PHONY: docker-up-distributed
 docker-up-distributed:
-	docker-compose -f docker/distributed/docker-compose.yml up -d
+	docker-compose -f docker/examples/distributed/docker-compose.yml up -d
 ## Task to build and run on docker
 .PHONY: run-docker
 run-docker: build docker-build docker-up-single
