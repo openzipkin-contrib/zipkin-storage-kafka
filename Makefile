@@ -24,7 +24,7 @@ build: license-header
 	${MAVEN} clean install -DskipTests
 ## testing
 .PHONY: test
-test:
+test: license-header
 	${MAVEN} test verify
 # Tasks to run Zipkin locally
 ## Download zipkin jar
