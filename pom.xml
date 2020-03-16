@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright 2019 The OpenZipkin Authors
+    Copyright 2019-2020 The OpenZipkin Authors
 
     Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
     in compliance with the License. You may obtain a copy of the License at
@@ -51,31 +51,30 @@
 
     <!-- groupId overrinds allow testing feature branches with jitpack -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
-    <zipkin.version>2.19.1</zipkin.version>
+    <zipkin.version>2.20.2</zipkin.version>
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
-    <armeria.version>0.97.0</armeria.version>
-    <spring-boot.version>2.2.0.RELEASE</spring-boot.version>
+    <armeria.version>0.98.4</armeria.version>
+    <spring-boot.version>2.2.5.RELEASE</spring-boot.version>
 
-    <kafka.version>2.3.1</kafka.version>
+    <kafka.version>2.4.1</kafka.version>
 
-    <log4j.version>2.12.1</log4j.version>
-    <junit-jupiter.version>5.5.2</junit-jupiter.version>
-    <testcontainers.version>1.12.1</testcontainers.version>
-    <assertj.version>3.13.2</assertj.version>
+    <junit-jupiter.version>5.6.0</junit-jupiter.version>
+    <testcontainers.version>1.13.0</testcontainers.version>
+    <assertj.version>3.15.0</assertj.version>
 
     <!-- override to set exclusions per-project -->
     <errorprone.args />
-    <errorprone.version>2.3.3</errorprone.version>
+    <errorprone.version>2.3.4</errorprone.version>
 
     <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
     <maven-install-plugin.version>3.0.0-M1</maven-install-plugin.version>
     <maven-deploy-plugin.version>3.0.0-M1</maven-deploy-plugin.version>
-    <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
-    <maven-source-plugin.version>3.1.0</maven-source-plugin.version>
+    <maven-release-plugin.version>3.0.0-M1</maven-release-plugin.version>
+    <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
     <maven-javadoc-plugin.version>3.1.1</maven-javadoc-plugin.version>
-    <maven-jar-plugin.version>3.1.2</maven-jar-plugin.version>
-    <maven-failsafe-plugin.version>3.0.0-M3</maven-failsafe-plugin.version>
-    <maven-enforcer-plugin.version>3.0.0-M2</maven-enforcer-plugin.version>
+    <maven-jar-plugin.version>3.2.0</maven-jar-plugin.version>
+    <maven-failsafe-plugin.version>3.0.0-M4</maven-failsafe-plugin.version>
+    <maven-enforcer-plugin.version>3.0.0-M3</maven-enforcer-plugin.version>
     <license-maven-plugin.version>3.0</license-maven-plugin.version>
   </properties>
 
@@ -131,19 +130,6 @@
   </dependencyManagement>
 
   <dependencies>
-    <!-- Zipkin server uses log4j 2 -->
-    <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-api</artifactId>
-      <version>${log4j.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-slf4j-impl</artifactId>
-      <version>${log4j.version}</version>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
