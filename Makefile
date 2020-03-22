@@ -2,6 +2,7 @@
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
 KAFKA_BOOTSTRAP_SERVERS := 'localhost:19092'
+VERSION := '0.8.1-SNAPSHOT'
 .PHONY: all
 all: build test
 # Create topics on local kafka
@@ -37,7 +38,7 @@ zipkin-local:
 	STORAGE_TYPE=kafka \
 	KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS} \
 	java \
-	-Dloader.path='autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar,autoconfigure/target/zipkin-autoconfigure-storage-kafka-${VERSION}-module.jar!/lib' \
+	-Dloader.path='module/target/zipkin-module-storage-kafka-${VERSION}-module.jar,module/target/zipkin-module-storage-kafka-${VERSION}-module.jar!/lib' \
 	-Dspring.profiles.active=kafka \
 	-cp zipkin.jar \
 	org.springframework.boot.loader.PropertiesLauncher
