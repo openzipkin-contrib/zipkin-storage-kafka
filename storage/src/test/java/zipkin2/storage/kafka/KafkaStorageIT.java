@@ -14,16 +14,6 @@
 package zipkin2.storage.kafka;
 
 import com.linecorp.armeria.server.Server;
-import java.io.IOException;
-import java.net.ServerSocket;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -36,7 +26,9 @@ import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.KafkaContainer;
+import org.testcontainers.containers.FixedHostPortGenericContainer;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import zipkin2.CheckResult;
@@ -49,6 +41,12 @@ import zipkin2.storage.SpanConsumer;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.time.Duration;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -56,9 +54,11 @@ import static org.awaitility.Awaitility.await;
 @Testcontainers
 class KafkaStorageIT {
   static final long TODAY = System.currentTimeMillis();
+  static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:19092";
 
-  // TODO: does this need to be confluent container? #45
-  @Container KafkaContainer kafka = new KafkaContainer("5.3.0");
+  @Container GenericContainer kafkaContainer = new FixedHostPortGenericContainer<>("openzipkin/zipkin-kafka")
+    .withFixedExposedPort(19092, 19092)
+    .waitingFor(new LogMessageWaitStrategy().withRegEx(".*INFO \\[KafkaServer id=0\\] started.*"));
 
   Duration traceTimeout;
   KafkaStorageBuilder storageBuilder;
@@ -72,17 +72,17 @@ class KafkaStorageIT {
 
   @BeforeEach void setUp() throws Exception {
     consumerConfig = new Properties();
-    consumerConfig.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
+    consumerConfig.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
     consumerConfig.put(ConsumerConfig.GROUP_ID_CONFIG, "test");
     consumerConfig.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
     consumerConfig.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ByteArrayDeserializer.class);
 
-    assertThat(kafka.isRunning()).isTrue();
+    assertThat(kafkaContainer.isRunning()).isTrue();
 
     traceTimeout = Duration.ofSeconds(5);
     int serverPort = randomPort();
     storageBuilder = KafkaStorage.newBuilder()
-        .bootstrapServers(kafka.getBootstrapServers())
+        .bootstrapServers(KAFKA_BOOTSTRAP_SERVERS)
         .storageStateDir("target/zipkin_" + System.currentTimeMillis())
         .hostname("localhost")
         .serverPort(serverPort);
@@ -103,7 +103,7 @@ class KafkaStorageIT {
     await().atMost(10, TimeUnit.SECONDS).until(() -> storage.check().ok());
     storage.checkResources();
     Properties producerConfig = new Properties();
-    producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers());
+    producerConfig.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA_BOOTSTRAP_SERVERS);
     tracesProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
       spansSerde.serializer());
     dependencyProducer = new KafkaProducer<>(producerConfig, new StringSerializer(),
@@ -151,12 +151,12 @@ class KafkaStorageIT {
     storage.getProducer().flush();
     // Then: a trace is published
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storageBuilder.spanAggregation.spansTopic, 1, 1000);
+      consumerConfig, storageBuilder.spanAggregation.spansTopic, 1, 10000);
     IntegrationTestUtils.waitUntilMinRecordsReceived(
       consumerConfig, storageBuilder.spanAggregation.traceTopic, 1, 30000);
     // Then: and a dependency link created
     IntegrationTestUtils.waitUntilMinRecordsReceived(
-      consumerConfig, storageBuilder.spanAggregation.dependencyTopic, 1, 1000);
+      consumerConfig, storageBuilder.spanAggregation.dependencyTopic, 1, 10000);
   }
 
   @Test void should_returnTraces_whenQuery() throws Exception {
@@ -262,7 +262,7 @@ class KafkaStorageIT {
     CheckResult checked = storage.check();
     assertThat(checked.ok()).isTrue();
 
-    kafka.stop();
+    kafkaContainer.stop();
     await().atMost(5, TimeUnit.SECONDS)
       .until(() -> {
         CheckResult check = storage.check();
