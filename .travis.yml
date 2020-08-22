@@ -8,7 +8,7 @@ services: docker
 
 language: java
 
-jdk: openjdk11
+jdk: openjdk14
 
 before_install:
   - echo checks.disable=true > ~/.testcontainers.properties

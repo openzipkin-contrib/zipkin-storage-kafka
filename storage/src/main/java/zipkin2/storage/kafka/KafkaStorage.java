@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -179,17 +179,17 @@ public class KafkaStorage extends StorageComponent {
       KafkaFuture<String> maybeClusterId = getAdminClient().describeCluster().clusterId();
       maybeClusterId.get(1, TimeUnit.SECONDS);
       KafkaStreams.State state = getAggregationStream().state();
-      if (!state.isRunning()) {
+      if (!state.isRunningOrRebalancing()) {
         return CheckResult.failed(
             new IllegalStateException("Aggregation stream not running. " + state));
       }
       KafkaStreams.State traceStateStore = getTraceStorageStream().state();
-      if (!traceStateStore.isRunning()) {
+      if (!traceStateStore.isRunningOrRebalancing()) {
         return CheckResult.failed(
             new IllegalStateException("Store stream not running. " + traceStateStore));
       }
       KafkaStreams.State dependencyStateStore = getDependencyStorageStream().state();
-      if (!dependencyStateStore.isRunning()) {
+      if (!dependencyStateStore.isRunningOrRebalancing()) {
         return CheckResult.failed(
             new IllegalStateException("Store stream not running. " + dependencyStateStore));
       }
