@@ -15,10 +15,12 @@ package zipkin2.storage.kafka;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.function.BiFunction;
+import java.util.function.Predicate;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
@@ -26,6 +28,7 @@ import org.apache.kafka.common.serialization.Serdes.ByteArraySerde;
 import org.apache.kafka.common.serialization.Serdes.StringSerde;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.StreamsConfig;
+import zipkin2.Span;
 import zipkin2.storage.StorageComponent;
 
 import static zipkin2.storage.kafka.KafkaStorage.HTTP_PATH_PREFIX;
@@ -230,6 +233,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   }
 
   public static class SpanAggregationBuilder {
+    Predicate<Collection<Span>> tracePredicate = spans -> true;
     boolean enabled = true;
     Duration traceTimeout = Duration.ofMinutes(1);
     String spansTopic = "zipkin-spans";
@@ -244,6 +248,14 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
       streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, "zipkin-aggregation");
       streamConfig.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/zipkin-storage-kafka/aggregation");
       streamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
+    }
+
+    /**
+     * Filter traces based on sampling rules.
+     */
+    public SpanAggregationBuilder tracePredicate(Predicate<Collection<Span>> tracePredicate) {
+      this.tracePredicate = tracePredicate;
+      return this;
     }
 
     /**

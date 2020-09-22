@@ -15,15 +15,24 @@ package zipkin2.module.storage.kafka;
 
 import java.io.Serializable;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Predicate;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import zipkin2.Span;
 import zipkin2.storage.kafka.KafkaStorage;
 import zipkin2.storage.kafka.KafkaStorageBuilder;
 import zipkin2.storage.kafka.KafkaStorageBuilder.DependencyStorageBuilder;
 import zipkin2.storage.kafka.KafkaStorageBuilder.SpanAggregationBuilder;
 import zipkin2.storage.kafka.KafkaStorageBuilder.SpanPartitioningBuilder;
 import zipkin2.storage.kafka.KafkaStorageBuilder.TraceStorageBuilder;
+import zipkin2.storage.kafka.streams.samplers.CompositeTracePredicate;
+import zipkin2.storage.kafka.streams.samplers.ErrorTracePredicate;
+import zipkin2.storage.kafka.streams.samplers.SlowTracePredicate;
+import zipkin2.storage.kafka.streams.samplers.TraceSamplingPredicate;
+
+import static java.util.Arrays.asList;
 
 @ConfigurationProperties("zipkin.storage.kafka")
 public class ZipkinKafkaStorageProperties implements Serializable {
@@ -38,11 +47,13 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   private SpanAggregationProperties spanAggregation = new SpanAggregationProperties();
   private TraceStorageProperties traceStorage = new TraceStorageProperties();
   private DependencyStorageProperties dependencyStorage = new DependencyStorageProperties();
+  private TraceSamplingProperties traceSampling = new TraceSamplingProperties();
 
   KafkaStorageBuilder toBuilder() {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
     builder.spanPartitioningBuilder(spanPartitioning.toBuilder());
-    builder.spanAggregationBuilder(spanAggregation.toBuilder());
+    builder.spanAggregationBuilder(
+      spanAggregation.toBuilder().tracePredicate(traceSampling.tracePredicate()));
     builder.traceStorageBuilder(traceStorage.toBuilder());
     builder.dependencyStorageBuilder(dependencyStorage.toBuilder());
     if (hostname != null) builder.hostname(hostname);
@@ -223,6 +234,35 @@ public class ZipkinKafkaStorageProperties implements Serializable {
       if (dependencyTopic != null) builder.dependencyTopic(dependencyTopic);
       if (overrides != null) builder.overrides(overrides);
       return builder;
+    }
+  }
+
+  static class TraceSamplingProperties {
+    private long maxResponseTime = 1_000_000L;
+    private float sampleRate = 0.1f;
+    private boolean enabled = false;
+
+    public void setMaxResponseTime(long maxResponseTime) {
+      this.maxResponseTime = maxResponseTime;
+    }
+
+    public void setSampleRate(float sampleRate) {
+      this.sampleRate = sampleRate;
+    }
+
+    public void setEnabled(boolean enabled) {
+      this.enabled = enabled;
+    }
+
+    Predicate<Collection<Span>> tracePredicate() {
+      if (enabled) {
+        return new CompositeTracePredicate(asList(
+          new ErrorTracePredicate(),
+          new SlowTracePredicate(maxResponseTime),
+          new TraceSamplingPredicate(sampleRate))
+        );
+      }
+      return spans -> true;
     }
   }
 
