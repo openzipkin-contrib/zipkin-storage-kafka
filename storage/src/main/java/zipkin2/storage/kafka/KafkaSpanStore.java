@@ -49,7 +49,6 @@ import zipkin2.storage.kafka.streams.TraceStorageTopology;
 
 import static zipkin2.storage.kafka.streams.DependencyStorageTopology.DEPENDENCIES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStorageTopology.REMOTE_SERVICE_NAMES_STORE_NAME;
-import static zipkin2.storage.kafka.streams.TraceStorageTopology.SERVICE_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStorageTopology.SPAN_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStorageTopology.TRACES_STORE_NAME;
 
@@ -144,7 +143,7 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
         BiFunction<String, Integer, String> httpBaseUrl) {
       super(
           traceStoreStream,
-          SERVICE_NAMES_STORE_NAME,
+          SPAN_NAMES_STORE_NAME,
           httpBaseUrl,
           "/serviceNames",
           SERVICE_NAMES_LIMIT);
