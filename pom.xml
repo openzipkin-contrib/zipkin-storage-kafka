@@ -63,7 +63,7 @@
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
     <armeria.version>1.2.0</armeria.version>
 
-    <kafka.version>2.6.0</kafka.version>
+    <kafka.version>2.7.0</kafka.version>
 
     <junit-jupiter.version>5.7.0</junit-jupiter.version>
     <testcontainers.version>1.15.0</testcontainers.version>

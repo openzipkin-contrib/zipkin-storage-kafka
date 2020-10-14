@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -243,7 +243,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
       streamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, ByteArraySerde.class);
       streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, "zipkin-aggregation");
       streamConfig.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/zipkin-storage-kafka/aggregation");
-      streamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
+      streamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION_CONFIG, StreamsConfig.OPTIMIZE);
     }
 
     /**

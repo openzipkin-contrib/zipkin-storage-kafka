@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -121,12 +121,9 @@ public class TraceStorageTopology implements Supplier<Topology> {
         // timestamp index for trace IDs
         KeyValueStore<Long, Set<String>> spanIdsByTsStore;
 
-        @SuppressWarnings("unchecked")
         @Override public void init(ProcessorContext context) {
-          tracesStore =
-              (KeyValueStore<String, List<Span>>) context.getStateStore(TRACES_STORE_NAME);
-          spanIdsByTsStore =
-              (KeyValueStore<Long, Set<String>>) context.getStateStore(SPAN_IDS_BY_TS_STORE_NAME);
+          tracesStore = context.getStateStore(TRACES_STORE_NAME);
+          spanIdsByTsStore = context.getStateStore(SPAN_IDS_BY_TS_STORE_NAME);
           // Retention scheduling
           context.schedule(
               traceTtlCheckInterval,
@@ -210,18 +207,11 @@ public class TraceStorageTopology implements Supplier<Topology> {
               KeyValueStore<String, Set<String>> remoteServiceNamesStore;
               KeyValueStore<String, Set<String>> autocompleteTagsStore;
 
-              @SuppressWarnings("unchecked")
               @Override public void init(ProcessorContext context) {
-                serviceNameStore =
-                    (KeyValueStore<String, String>) context.getStateStore(SERVICE_NAMES_STORE_NAME);
-                spanNamesStore =
-                    (KeyValueStore<String, Set<String>>) context.getStateStore(SPAN_NAMES_STORE_NAME);
-                remoteServiceNamesStore =
-                    (KeyValueStore<String, Set<String>>) context.getStateStore(
-                        REMOTE_SERVICE_NAMES_STORE_NAME);
-                autocompleteTagsStore =
-                    (KeyValueStore<String, Set<String>>) context.getStateStore(
-                        AUTOCOMPLETE_TAGS_STORE_NAME);
+                serviceNameStore = context.getStateStore(SERVICE_NAMES_STORE_NAME);
+                spanNamesStore = context.getStateStore(SPAN_NAMES_STORE_NAME);
+                remoteServiceNamesStore = context.getStateStore(REMOTE_SERVICE_NAMES_STORE_NAME);
+                autocompleteTagsStore = context.getStateStore(AUTOCOMPLETE_TAGS_STORE_NAME);
               }
 
               @Override

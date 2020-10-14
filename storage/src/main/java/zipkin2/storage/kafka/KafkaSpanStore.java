@@ -30,8 +30,8 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
+import org.apache.kafka.streams.KeyQueryMetadata;
 import org.apache.kafka.streams.state.HostInfo;
-import org.apache.kafka.streams.state.StreamsMetadata;
 import zipkin2.Call;
 import zipkin2.DependencyLink;
 import zipkin2.Span;
@@ -299,12 +299,12 @@ final class KafkaSpanStore implements SpanStore, Traces, ServiceAndSpanNames {
       // To reduce calls to store instances traceIds are grouped by hostInfo
       Map<HostInfo, List<String>> traceIdsByHost = new LinkedHashMap<>();
       for (String traceId : traceIds.split(",", 1_000)) {
-        StreamsMetadata metadata =
-            traceStoreStream.metadataForKey(TRACES_STORE_NAME, traceId, STRING_SERIALIZER);
-        List<String> collected = traceIdsByHost.get(metadata.hostInfo());
+        KeyQueryMetadata metadata =
+            traceStoreStream.queryMetadataForKey(TRACES_STORE_NAME, traceId, STRING_SERIALIZER);
+        List<String> collected = traceIdsByHost.get(metadata.activeHost());
         if (collected == null) collected = new ArrayList<>();
         collected.add(traceId);
-        traceIdsByHost.put(metadata.hostInfo(), collected);
+        traceIdsByHost.put(metadata.activeHost(), collected);
       }
       // Only calls to hosts that have traceIds are executed
       List<CompletableFuture<AggregatedHttpResponse>> responseFutures =

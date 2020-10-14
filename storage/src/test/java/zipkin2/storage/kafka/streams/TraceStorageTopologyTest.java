@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -21,13 +21,9 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.apache.kafka.streams.StreamsConfig;
-import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.TopologyDescription;
-import org.apache.kafka.streams.TopologyTestDriver;
+import org.apache.kafka.streams.*;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.KeyValueStore;
-import org.apache.kafka.streams.test.ConsumerRecordFactory;
 import org.junit.jupiter.api.Test;
 import zipkin2.Endpoint;
 import zipkin2.Span;
@@ -95,8 +91,8 @@ class TraceStorageTopologyTest {
     // Given: streams config
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     // When: a trace is passed
-    ConsumerRecordFactory<String, List<Span>> factory =
-        new ConsumerRecordFactory<>(spansTopic, new StringSerializer(), spansSerde.serializer());
+    TestInputTopic<String, List<Span>> factory =
+        testDriver.createInputTopic(spansTopic, new StringSerializer(), spansSerde.serializer());
     Span a = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
         .timestamp(10000L).duration(11L)
@@ -112,7 +108,7 @@ class TraceStorageTopologyTest {
         .putTag("environment", "dev")
         .build();
     List<Span> spans = Arrays.asList(a, b, c);
-    testDriver.pipeInput(factory.create(spansTopic, a.traceId(), spans, 10L));
+    factory.pipeInput(a.traceId(), spans, 10L);
     // Then: trace stores are filled
     KeyValueStore<String, List<Span>> traces = testDriver.getKeyValueStore(TRACES_STORE_NAME);
     assertThat(traces.get(a.traceId())).containsExactlyElementsOf(spans);
@@ -157,8 +153,8 @@ class TraceStorageTopologyTest {
     // Given: streams config
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     // When: a trace is passed
-    ConsumerRecordFactory<String, List<Span>> factory =
-        new ConsumerRecordFactory<>(spansTopic, new StringSerializer(), spansSerde.serializer());
+    TestInputTopic<String, List<Span>> factory =
+        testDriver.createInputTopic(spansTopic, new StringSerializer(), spansSerde.serializer());
     Span a = Span.newBuilder().traceId("a").id("a").name("op_a").kind(Span.Kind.CLIENT)
         .localEndpoint(Endpoint.newBuilder().serviceName("svc_a").build())
         .timestamp(10000L).duration(11L)
@@ -174,7 +170,7 @@ class TraceStorageTopologyTest {
         .putTag("environment", "dev")
         .build();
     List<Span> spans = Arrays.asList(a, b, c);
-    testDriver.pipeInput(factory.create(spansTopic, a.traceId(), spans, 10L));
+    factory.pipeInput(a.traceId(), spans, 10L);
     // Then: trace stores are filled
     KeyValueStore<String, List<Span>> traces = testDriver.getKeyValueStore(TRACES_STORE_NAME);
     assertThat(traces.get(a.traceId())).containsExactlyElementsOf(spans);
@@ -205,9 +201,8 @@ class TraceStorageTopologyTest {
         .timestamp(
             MILLISECONDS.toMicros(traceTtlCheckInterval.toMillis()) + MILLISECONDS.toMicros(20))
         .build();
-    testDriver.pipeInput(
-        factory.create(spansTopic, d.traceId(), Collections.singletonList(d),
-            traceTtlCheckInterval.plusMillis(1).toMillis()));
+    factory.pipeInput(d.traceId(), Collections.singletonList(d),
+        traceTtlCheckInterval.plusMillis(1).toMillis());
     // Then: Traces store is empty
     assertThat(traces.get(a.traceId())).isNull();
     // Finally close resources

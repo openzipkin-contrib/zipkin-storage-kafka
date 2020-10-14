@@ -80,12 +80,9 @@ public final class DependencyStorageTopology implements Supplier<Topology> {
             ProcessorContext context;
             WindowStore<String, DependencyLink> dependenciesStore;
 
-            @SuppressWarnings("unchecked")
             @Override public void init(ProcessorContext context) {
               this.context = context;
-              dependenciesStore =
-                  (WindowStore<String, DependencyLink>) context.getStateStore(
-                      DEPENDENCIES_STORE_NAME);
+              dependenciesStore = context.getStateStore(DEPENDENCIES_STORE_NAME);
             }
 
             @Override public void process(String linkKey, DependencyLink link) {

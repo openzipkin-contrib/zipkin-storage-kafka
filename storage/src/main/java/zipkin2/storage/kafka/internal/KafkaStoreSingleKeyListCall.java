@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.KafkaStreams;
-import org.apache.kafka.streams.state.StreamsMetadata;
+import org.apache.kafka.streams.KeyQueryMetadata;
 
 /**
  * Search for store by key and get values.
@@ -43,8 +43,8 @@ public abstract class KafkaStoreSingleKeyListCall<V> extends KafkaStoreListCall<
   }
 
   @Override protected CompletableFuture<List<V>> listFuture() {
-    StreamsMetadata metadata = kafkaStreams.metadataForKey(storeName, key, STRING_SERIALIZER);
-    WebClient httpClient = httpClient(metadata.hostInfo());
+    KeyQueryMetadata metadata = kafkaStreams.queryMetadataForKey(storeName, key, STRING_SERIALIZER);
+    WebClient httpClient = httpClient(metadata.activeHost());
     return httpClient.get(httpPath)
       .aggregate()
       .thenApply(response -> {
