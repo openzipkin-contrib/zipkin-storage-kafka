@@ -54,10 +54,11 @@ import static org.awaitility.Awaitility.await;
 @Testcontainers
 class ITKafkaStorage {
   static final long TODAY = System.currentTimeMillis();
-  static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:19092";
+  static final int KAFKA_PORT = 19092;
+  static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:" + KAFKA_PORT;
 
   @Container GenericContainer kafkaContainer = new FixedHostPortGenericContainer<>("openzipkin/zipkin-kafka")
-    .withFixedExposedPort(19092, 19092)
+    .withFixedExposedPort(KAFKA_PORT, KAFKA_PORT)
     .waitingFor(new LogMessageWaitStrategy().withRegEx(".*INFO \\[KafkaServer id=0\\] started.*"));
 
   Duration traceTimeout;
