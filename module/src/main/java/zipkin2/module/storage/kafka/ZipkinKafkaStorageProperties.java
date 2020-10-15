@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -89,7 +89,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   }
 
   public void setSpanPartitioning(
-      SpanPartitioningProperties spanPartitioning) {
+    SpanPartitioningProperties spanPartitioning) {
     this.spanPartitioning = spanPartitioning;
   }
 
@@ -98,7 +98,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   }
 
   public void setSpanAggregation(
-      SpanAggregationProperties spanAggregation) {
+    SpanAggregationProperties spanAggregation) {
     this.spanAggregation = spanAggregation;
   }
 
@@ -107,7 +107,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   }
 
   public void setTraceStorage(
-      TraceStorageProperties traceStorage) {
+    TraceStorageProperties traceStorage) {
     this.traceStorage = traceStorage;
   }
 
@@ -116,7 +116,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
   }
 
   public void setDependencyStorage(
-      DependencyStorageProperties dependencyStorage) {
+    DependencyStorageProperties dependencyStorage) {
     this.dependencyStorage = dependencyStorage;
   }
 

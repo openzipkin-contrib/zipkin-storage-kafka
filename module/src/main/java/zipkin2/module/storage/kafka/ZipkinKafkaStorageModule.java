@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -33,15 +33,15 @@ import static zipkin2.storage.kafka.KafkaStorage.HTTP_PATH_PREFIX;
 class ZipkinKafkaStorageModule {
 
   @ConditionalOnMissingBean @Bean StorageComponent storage(
-      @Value("${zipkin.storage.search-enabled:true}") boolean searchEnabled,
-      @Value("${zipkin.storage.autocomplete-keys:}") List<String> autocompleteKeys,
-      @Value("${server.port:9411}") int port,
-      ZipkinKafkaStorageProperties properties) {
+    @Value("${zipkin.storage.search-enabled:true}") boolean searchEnabled,
+    @Value("${zipkin.storage.autocomplete-keys:}") List<String> autocompleteKeys,
+    @Value("${server.port:9411}") int port,
+    ZipkinKafkaStorageProperties properties) {
     return properties.toBuilder()
-        .searchEnabled(searchEnabled)
-        .autocompleteKeys(autocompleteKeys)
-        .serverPort(port)
-        .build();
+      .searchEnabled(searchEnabled)
+      .autocompleteKeys(autocompleteKeys)
+      .serverPort(port)
+      .build();
   }
 
   //TODO replace when Armeria supports Consumer<ServerBuilder> #61

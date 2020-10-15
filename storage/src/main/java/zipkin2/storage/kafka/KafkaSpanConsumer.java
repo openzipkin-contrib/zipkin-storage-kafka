@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -64,10 +64,10 @@ final class KafkaSpanConsumer implements SpanConsumer {
     final byte[] value;
 
     KafkaProducerCall(
-        Producer<String, byte[]> kafkaProducer,
-        String topic,
-        String key,
-        byte[] value
+      Producer<String, byte[]> kafkaProducer,
+      String topic,
+      String key,
+      byte[] value
     ) {
       this.kafkaProducer = kafkaProducer;
       this.topic = topic;
@@ -76,10 +76,10 @@ final class KafkaSpanConsumer implements SpanConsumer {
     }
 
     static Call<Void> create(
-        Producer<String, byte[]> producer,
-        String topic,
-        String key,
-        byte[] value
+      Producer<String, byte[]> producer,
+      String topic,
+      String key,
+      byte[] value
     ) {
       return new KafkaProducerCall(producer, topic, key, value);
     }

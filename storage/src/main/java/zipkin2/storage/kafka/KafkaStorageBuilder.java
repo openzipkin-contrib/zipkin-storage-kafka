@@ -37,7 +37,7 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
   String hostname = "localhost";
   int serverPort = 9411;
   BiFunction<String, Integer, String> httpBaseUrl =
-      (hostname, port) -> "http://" + hostname + ":" + port + HTTP_PATH_PREFIX;
+    (hostname, port) -> "http://" + hostname + ":" + port + HTTP_PATH_PREFIX;
 
   SpanPartitioningBuilder spanPartitioning = new SpanPartitioningBuilder();
   SpanAggregationBuilder spanAggregation = new SpanAggregationBuilder();
@@ -457,7 +457,8 @@ public final class KafkaStorageBuilder extends StorageComponent.Builder {
       streamConfig.put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, StringSerde.class);
       streamConfig.put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, ByteArraySerde.class);
       streamConfig.put(StreamsConfig.APPLICATION_ID_CONFIG, "zipkin-dependency-storage");
-      streamConfig.put(StreamsConfig.STATE_DIR_CONFIG, "/tmp/zipkin-storage-kafka/dependency-storage");
+      streamConfig.put(StreamsConfig.STATE_DIR_CONFIG,
+        "/tmp/zipkin-storage-kafka/dependency-storage");
       streamConfig.put(StreamsConfig.TOPOLOGY_OPTIMIZATION, StreamsConfig.OPTIMIZE);
       streamConfig.put(StreamsConfig.APPLICATION_SERVER_CONFIG, "localhost:9411");
     }

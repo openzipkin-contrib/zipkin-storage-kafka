@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -35,10 +35,10 @@ public abstract class KafkaStoreScatterGatherListCall<V> extends KafkaStoreListC
 
   /**
    * @param kafkaStreams Kafka Streams instance where storeName is located.
-   * @param storeName Store name which will be queried on all instances.
-   * @param httpBaseUrl Base URL composed by protocol, hostname and port.
-   * @param httpPath Http path to query other instances.
-   * @param limit Maximum number of results when collecting results from all instances.
+   * @param storeName    Store name which will be queried on all instances.
+   * @param httpBaseUrl  Base URL composed by protocol, hostname and port.
+   * @param httpPath     Http path to query other instances.
+   * @param limit        Maximum number of results when collecting results from all instances.
    */
   protected KafkaStoreScatterGatherListCall(
     KafkaStreams kafkaStreams,

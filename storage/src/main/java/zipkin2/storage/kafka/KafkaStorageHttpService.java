@@ -77,8 +77,8 @@ final class KafkaStorageHttpService {
 
   @Get("/dependencies")
   public AggregatedHttpResponse getDependencies(
-      @Param("endTs") long endTs,
-      @Param("lookback") long lookback
+    @Param("endTs") long endTs,
+    @Param("lookback") long lookback
   ) {
     try {
       if (!storage.dependencyQueryEnabled) return AggregatedHttpResponse.of(HttpStatus.NOT_FOUND);
@@ -95,9 +95,9 @@ final class KafkaStorageHttpService {
       List<DependencyLink> mergedLinks = DependencyLinker.merge(links);
       LOG.debug("Dependencies found from={}-to={}: {}", from, to, mergedLinks.size());
       return AggregatedHttpResponse.of(
-          HttpStatus.OK,
-          MediaType.JSON,
-          DependencyLinkBytesEncoder.JSON_V1.encodeList(mergedLinks));
+        HttpStatus.OK,
+        MediaType.JSON,
+        DependencyLinkBytesEncoder.JSON_V1.encodeList(mergedLinks));
     } catch (InvalidStateStoreException e) {
       LOG.debug("State store is not ready", e);
       return AggregatedHttpResponse.of(HttpStatus.SERVICE_UNAVAILABLE);
@@ -204,26 +204,27 @@ final class KafkaStorageHttpService {
     @Param("minDuration") Optional<Long> minDuration,
     @Param("maxDuration") Optional<Long> maxDuration,
     @Param("endTs") Optional<Long> endTs,
-      @Default("86400000") @Param("lookback") Long lookback,
-      @Default("10") @Param("limit") int limit
+    @Default("86400000") @Param("lookback") Long lookback,
+    @Default("10") @Param("limit") int limit
   ) {
     try {
       if (!storage.traceSearchEnabled) return AggregatedHttpResponse.of(HttpStatus.NOT_FOUND);
       QueryRequest request =
-          QueryRequest.newBuilder()
-            .serviceName(serviceName.orElse(null))
-            .remoteServiceName(remoteServiceName.orElse(null))
-            .spanName(spanName.orElse(null))
-            .parseAnnotationQuery(annotationQuery.orElse(null))
-            .minDuration(minDuration.orElse(null))
-            .maxDuration(maxDuration.orElse(null))
-            .endTs(endTs.orElse(System.currentTimeMillis()))
-            .lookback(lookback)
-            .limit(limit)
-            .build();
+        QueryRequest.newBuilder()
+          .serviceName(serviceName.orElse(null))
+          .remoteServiceName(remoteServiceName.orElse(null))
+          .spanName(spanName.orElse(null))
+          .parseAnnotationQuery(annotationQuery.orElse(null))
+          .minDuration(minDuration.orElse(null))
+          .maxDuration(maxDuration.orElse(null))
+          .endTs(endTs.orElse(System.currentTimeMillis()))
+          .lookback(lookback)
+          .limit(limit)
+          .build();
       ReadOnlyWindowStore<String, List<Span>> tracesStore =
         storage.getTraceStorageStream().store(
-          StoreQueryParameters.fromNameAndType(TRACES_STORE_NAME, QueryableStoreTypes.windowStore()));
+          StoreQueryParameters.fromNameAndType(TRACES_STORE_NAME,
+            QueryableStoreTypes.windowStore()));
       List<List<Span>> traces = new ArrayList<>();
       Instant from = Instant.ofEpochMilli(request.endTs() - request.lookback());
       Instant to = Instant.ofEpochMilli(request.endTs());
@@ -303,8 +304,8 @@ final class KafkaStorageHttpService {
     try {
       if (!storage.traceSearchEnabled) return MAPPER.createArrayNode();
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-          storage.getTraceStorageStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
-              QueryableStoreTypes.keyValueStore());
+        storage.getTraceStorageStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
+          QueryableStoreTypes.keyValueStore());
       ArrayNode array = MAPPER.createArrayNode();
       try (KeyValueIterator<String, Set<String>> all = autocompleteTagsStore.all()) {
         all.forEachRemaining(keyValue -> array.add(keyValue.key));
@@ -320,7 +321,7 @@ final class KafkaStorageHttpService {
   @ProducesJson
   public KafkaStreamsMetadata getInstancesByStore(@Param("store_name") String storeName) {
     Collection<StreamsMetadata> metadata =
-        storage.getTraceStorageStream().allMetadataForStore(storeName);
+      storage.getTraceStorageStream().allMetadataForStore(storeName);
     metadata.addAll(storage.getDependencyStorageStream().allMetadataForStore(storeName));
     return KafkaStreamsMetadata.create(metadata);
   }
