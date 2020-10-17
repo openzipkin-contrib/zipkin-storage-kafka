@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright 2019 The OpenZipkin Authors
+    Copyright 2019-2020 The OpenZipkin Authors
 
     Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
     in compliance with the License. You may obtain a copy of the License at
@@ -40,21 +40,17 @@
       <version>${spring-boot.version}</version>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>${armeria.groupId}</groupId>
+      <artifactId>armeria-spring-boot2-autoconfigure</artifactId>
+      <version>${armeria.version}</version>
+    </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-test</artifactId>
       <version>${spring-boot.version}</version>
       <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>${armeria.groupId}</groupId>
-      <artifactId>armeria</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>${armeria.groupId}</groupId>
-      <artifactId>armeria-spring-boot-autoconfigure</artifactId>
-      <version>${armeria.version}</version>
     </dependency>
   </dependencies>
 
@@ -78,7 +74,7 @@
           <classifier>module</classifier>
           <!-- https://github.com/spring-projects/spring-boot/issues/3426 transitive exclude doesn't work -->
           <!--
-          Not excluding guava right now eventhough there is an overlap to avoid the following conflict
+          Not excluding guava right now even though there is an overlap to avoid the following conflict
 
           java.lang.NoSuchMethodError: com.google.common.base.Preconditions.checkArgument(ZLjava/lang/String;CLjava/lang/Object;)V
              at io.grpc.Metadata$Key.validateName(Metadata.java:629) ~[grpc-core-1.20.0.jar!/:1.20.0]

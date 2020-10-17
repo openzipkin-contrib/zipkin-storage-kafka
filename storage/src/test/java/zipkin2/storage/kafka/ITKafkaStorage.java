@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -52,12 +52,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 @Testcontainers
-class KafkaStorageIT {
+class ITKafkaStorage {
   static final long TODAY = System.currentTimeMillis();
-  static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:19092";
+  static final int KAFKA_PORT = 19092;
+  static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:" + KAFKA_PORT;
 
   @Container GenericContainer kafkaContainer = new FixedHostPortGenericContainer<>("openzipkin/zipkin-kafka")
-    .withFixedExposedPort(19092, 19092)
+    .withFixedExposedPort(KAFKA_PORT, KAFKA_PORT)
     .waitingFor(new LogMessageWaitStrategy().withRegEx(".*INFO \\[KafkaServer id=0\\] started.*"));
 
   Duration traceTimeout;

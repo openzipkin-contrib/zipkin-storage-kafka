@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright 2019 The OpenZipkin Authors
+    Copyright 2019-2020 The OpenZipkin Authors
 
     Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
     in compliance with the License. You may obtain a copy of the License at
@@ -30,7 +30,7 @@
   <distributionManagement>
     <repository>
       <id>bintray</id>
-      <url>https://api.bintray.com/maven/openzipkin/maven/brave/;publish=1</url>
+      <url>https://api.bintray.com/maven/openzipkin/maven/zipkin-storage-kafka/;publish=1</url>
     </repository>
     <snapshotRepository>
       <id>jfrog-snapshots</id>
@@ -51,32 +51,34 @@
 
     <!-- groupId overrinds allow testing feature branches with jitpack -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
-    <zipkin.version>2.19.1</zipkin.version>
+    <zipkin.version>2.21.7</zipkin.version>
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
-    <armeria.version>0.97.0</armeria.version>
-    <spring-boot.version>2.2.0.RELEASE</spring-boot.version>
+    <armeria.version>0.99.9</armeria.version>
+    <spring-boot.version>2.3.3.RELEASE</spring-boot.version>
 
-    <kafka.version>2.3.1</kafka.version>
+    <kafka.version>2.6.0</kafka.version>
 
-    <log4j.version>2.12.1</log4j.version>
-    <junit-jupiter.version>5.5.2</junit-jupiter.version>
-    <testcontainers.version>1.12.1</testcontainers.version>
-    <assertj.version>3.13.2</assertj.version>
+    <junit-jupiter.version>5.6.2</junit-jupiter.version>
+    <!-- TODO: cleanup when https://github.com/testcontainers/testcontainers-java/issues/3166 is fixed -->
+    <testcontainers.version>1.15.0-rc2</testcontainers.version>
+    <assertj.version>3.16.1</assertj.version>
 
     <!-- override to set exclusions per-project -->
     <errorprone.args />
-    <errorprone.version>2.3.3</errorprone.version>
+    <errorprone.version>2.4.0</errorprone.version>
+    <log4j.version>2.13.3</log4j.version>
 
     <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
     <maven-install-plugin.version>3.0.0-M1</maven-install-plugin.version>
     <maven-deploy-plugin.version>3.0.0-M1</maven-deploy-plugin.version>
-    <maven-release-plugin.version>2.5.3</maven-release-plugin.version>
-    <maven-source-plugin.version>3.1.0</maven-source-plugin.version>
-    <maven-javadoc-plugin.version>3.1.1</maven-javadoc-plugin.version>
-    <maven-jar-plugin.version>3.1.2</maven-jar-plugin.version>
-    <maven-failsafe-plugin.version>3.0.0-M3</maven-failsafe-plugin.version>
-    <maven-enforcer-plugin.version>3.0.0-M2</maven-enforcer-plugin.version>
-    <license-maven-plugin.version>3.0</license-maven-plugin.version>
+    <maven-release-plugin.version>3.0.0-M1</maven-release-plugin.version>
+    <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
+    <maven-javadoc-plugin.version>3.2.0</maven-javadoc-plugin.version>
+    <maven-jar-plugin.version>3.2.0</maven-jar-plugin.version>
+    <maven-failsafe-plugin.version>3.0.0-M4</maven-failsafe-plugin.version>
+    <maven-enforcer-plugin.version>3.0.0-M3</maven-enforcer-plugin.version>
+    <!-- TODO: cleanup any redundant ignores now also in the 4.0 release (once final) -->
+    <license-maven-plugin.version>4.0.rc2</license-maven-plugin.version>
   </properties>
 
   <name>Zipkin Storage: Kafka (Parent)</name>
@@ -131,19 +133,6 @@
   </dependencyManagement>
 
   <dependencies>
-    <!-- Zipkin server uses log4j 2 -->
-    <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-api</artifactId>
-      <version>${log4j.version}</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.apache.logging.log4j</groupId>
-      <artifactId>log4j-slf4j-impl</artifactId>
-      <version>${log4j.version}</version>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -179,6 +168,34 @@
       <version>${assertj.version}</version>
       <scope>test</scope>
     </dependency>
+    <!-- Main code uses jul and tests log with log4j -->
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+      <version>${log4j.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- route jul over log4j2 during tests -->
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-jul</artifactId>
+      <version>${log4j.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- route log4j over log4j2 during tests -->
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-1.2-api</artifactId>
+      <version>${log4j.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- route slf4j over log4j2 during tests -->
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-slf4j-impl</artifactId>
+      <version>${log4j.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -188,9 +205,9 @@
         <plugin>
           <groupId>io.takari</groupId>
           <artifactId>maven</artifactId>
-          <version>0.7.6</version>
+          <version>0.7.7</version>
           <configuration>
-            <maven>3.6.2</maven>
+            <maven>3.6.3</maven>
           </configuration>
         </plugin>
 
@@ -201,32 +218,9 @@
           <configuration>
             <source>1.8</source>
             <target>1.8</target>
+            <fork>true</fork>
             <showWarnings>true</showWarnings>
           </configuration>
-          <executions>
-            <execution>
-              <!-- only use errorprone on main source tree -->
-              <id>default-compile</id>
-              <phase>compile</phase>
-              <goals>
-                <goal>compile</goal>
-              </goals>
-              <configuration>
-                <forceJavacCompilerUse>true</forceJavacCompilerUse>
-                <compilerArgs>
-                  <arg>-XDcompilePolicy=simple</arg>
-                  <arg>-Xplugin:ErrorProne ${errorprone.args}</arg>
-                </compilerArgs>
-                <annotationProcessorPaths>
-                  <processorPath>
-                    <groupId>com.google.errorprone</groupId>
-                    <artifactId>error_prone_core</artifactId>
-                    <version>${errorprone.version}</version>
-                  </processorPath>
-                </annotationProcessorPaths>
-              </configuration>
-            </execution>
-          </executions>
         </plugin>
 
         <plugin>
@@ -241,15 +235,20 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-failsafe-plugin.version}</version>
       </plugin>
+
       <plugin>
         <artifactId>maven-failsafe-plugin</artifactId>
         <version>${maven-failsafe-plugin.version}</version>
         <executions>
           <execution>
             <id>integration-test</id>
-            <phase>verify</phase>
             <goals>
               <goal>integration-test</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>verify</id>
+            <goals>
               <goal>verify</goal>
             </goals>
           </execution>
@@ -260,13 +259,14 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>animal-sniffer-maven-plugin</artifactId>
-        <version>1.18</version>
+        <version>1.19</version>
         <configuration>
           <signature>
             <groupId>org.codehaus.mojo.signature</groupId>
             <artifactId>java18</artifactId>
             <version>1.0</version>
           </signature>
+          <checkTestClasses>false</checkTestClasses>
         </configuration>
         <executions>
           <execution>
@@ -287,6 +287,7 @@
         <artifactId>maven-deploy-plugin</artifactId>
         <version>${maven-deploy-plugin.version}</version>
       </plugin>
+
       <plugin>
         <artifactId>maven-release-plugin</artifactId>
         <version>${maven-release-plugin.version}</version>
@@ -356,7 +357,7 @@
             <configuration>
               <rules>
                 <requireJavaVersion>
-                  <version>[11,12)</version>
+                  <version>[11,16)</version>
                 </requireJavaVersion>
               </rules>
             </configuration>
@@ -366,12 +367,50 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.4</version>
+        <version>0.8.5</version>
       </plugin>
     </plugins>
   </build>
 
   <profiles>
+    <profile>
+      <id>error-prone-9+</id>
+      <activation>
+        <jdk>[9,)</jdk>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <executions>
+              <execution>
+                <!-- only use errorprone on main source tree -->
+                <id>default-compile</id>
+                <phase>compile</phase>
+                <goals>
+                  <goal>compile</goal>
+                </goals>
+                <configuration>
+                  <forceJavacCompilerUse>true</forceJavacCompilerUse>
+                  <compilerArgs>
+                    <arg>-XDcompilePolicy=simple</arg>
+                    <arg>-Xplugin:ErrorProne ${errorprone.args}</arg>
+                  </compilerArgs>
+                  <annotationProcessorPaths>
+                    <processorPath>
+                      <groupId>com.google.errorprone</groupId>
+                      <artifactId>error_prone_core</artifactId>
+                      <version>${errorprone.version}</version>
+                    </processorPath>
+                  </annotationProcessorPaths>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
     <profile>
       <id>release</id>
       <build>
