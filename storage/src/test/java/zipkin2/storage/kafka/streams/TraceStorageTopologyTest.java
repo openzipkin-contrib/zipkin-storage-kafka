@@ -38,6 +38,7 @@ import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 import static zipkin2.storage.kafka.streams.TraceStorageTopology.AUTOCOMPLETE_TAGS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStorageTopology.SPAN_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStorageTopology.TRACES_STORE_NAME;
@@ -186,10 +187,11 @@ class TraceStorageTopologyTest {
         serviceNames.put(next.key.key(), next.value);
       }
     }
-    assertThat(serviceNames).hasSize(2);
-    assertThat(serviceNames.keySet()).contains("svc_a", "svc_b");
-    assertThat(serviceNames.get("svc_a")).containsExactly("op_a");
-    assertThat(serviceNames.get("svc_b")).containsExactly("op_b");
+    assertThat(serviceNames)
+      .hasSize(2)
+      .contains(
+        entry("svc_a", Collections.singleton("op_a")),
+        entry("svc_b", Collections.singleton("op_b")));
     WindowStore<String, Set<String>> tagsStore = testDriver.getWindowStore(AUTOCOMPLETE_TAGS_STORE_NAME);
     Map<String, Set<String>> tags = new HashMap<>();
     try (
@@ -199,7 +201,9 @@ class TraceStorageTopologyTest {
         tags.put(next.key.key(), next.value);
       }
     }
-    assertThat(tags.get("environment")).containsExactly("dev");
+    assertThat(tags)
+      .hasSize(1)
+      .contains(entry("environment", Collections.singleton("dev")));
     // Finally close resources
     testDriver.close();
     spansSerde.close();
