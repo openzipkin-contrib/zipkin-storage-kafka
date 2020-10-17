@@ -58,7 +58,7 @@
 
     <kafka.version>2.6.0</kafka.version>
 
-    <junit-jupiter.version>5.6.2</junit-jupiter.version>
+    <junit-jupiter.version>5.7.0</junit-jupiter.version>
     <!-- TODO: cleanup when https://github.com/testcontainers/testcontainers-java/issues/3166 is fixed -->
     <testcontainers.version>1.15.0-rc2</testcontainers.version>
     <assertj.version>3.16.1</assertj.version>
