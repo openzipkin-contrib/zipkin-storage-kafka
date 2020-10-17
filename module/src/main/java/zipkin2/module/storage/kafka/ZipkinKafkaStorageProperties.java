@@ -88,8 +88,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     return spanPartitioning;
   }
 
-  public void setSpanPartitioning(
-    SpanPartitioningProperties spanPartitioning) {
+  public void setSpanPartitioning(SpanPartitioningProperties spanPartitioning) {
     this.spanPartitioning = spanPartitioning;
   }
 
@@ -97,8 +96,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     return spanAggregation;
   }
 
-  public void setSpanAggregation(
-    SpanAggregationProperties spanAggregation) {
+  public void setSpanAggregation(SpanAggregationProperties spanAggregation) {
     this.spanAggregation = spanAggregation;
   }
 
@@ -106,8 +104,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     return traceStorage;
   }
 
-  public void setTraceStorage(
-    TraceStorageProperties traceStorage) {
+  public void setTraceStorage(TraceStorageProperties traceStorage) {
     this.traceStorage = traceStorage;
   }
 
@@ -115,8 +112,7 @@ public class ZipkinKafkaStorageProperties implements Serializable {
     return dependencyStorage;
   }
 
-  public void setDependencyStorage(
-    DependencyStorageProperties dependencyStorage) {
+  public void setDependencyStorage(DependencyStorageProperties dependencyStorage) {
     this.dependencyStorage = dependencyStorage;
   }
 
