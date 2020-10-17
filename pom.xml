@@ -216,10 +216,8 @@
           <version>${maven-compiler-plugin.version}</version>
           <inherited>true</inherited>
           <configuration>
-            <!-- Retrolambda will rewrite lambdas as Java 6 bytecode -->
             <source>1.8</source>
             <target>1.8</target>
-            <!-- or die! com.sun.tools.javac.api.JavacTool -->
             <fork>true</fork>
             <showWarnings>true</showWarnings>
           </configuration>
@@ -359,7 +357,7 @@
             <configuration>
               <rules>
                 <requireJavaVersion>
-                  <version>[11,15)</version>
+                  <version>[11,16)</version>
                 </requireJavaVersion>
               </rules>
             </configuration>
@@ -378,7 +376,7 @@
     <profile>
       <id>error-prone-9+</id>
       <activation>
-        <jdk>[9,15)</jdk>
+        <jdk>[9,)</jdk>
         <activeByDefault>false</activeByDefault>
       </activation>
       <build>

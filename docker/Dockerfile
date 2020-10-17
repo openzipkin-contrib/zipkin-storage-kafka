@@ -33,7 +33,6 @@ RUN cd /code && mkdir -p /zipkin-storage-kafka && \
     rm *.jar
 
 FROM openzipkin/zipkin:2.21.7
-MAINTAINER Zipkin "https://zipkin.io/"
 
 COPY --from=built /zipkin-storage-kafka/ /zipkin/kafka/
 

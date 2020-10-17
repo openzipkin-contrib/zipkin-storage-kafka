@@ -1,19 +1,8 @@
 # Variables
 OPEN := 'xdg-open'
 MAVEN := './mvnw'
-KAFKA_BOOTSTRAP_SERVERS := 'localhost:19092'
-VERSION := '0.8.1-SNAPSHOT'
 .PHONY: all
-all: build test
-# Create topics on local kafka
-.PHONY: kafka-topics
-kafka-topics-local:
-	${KAFKA_HOME}/bin/kafka-topics.sh \
-		--zookeeper localhost:2181 --create --topic zipkin-spans --partitions 2 --replication-factor 1 --if-not-exists
-	${KAFKA_HOME}/bin/kafka-topics.sh \
-		--zookeeper localhost:2181 --create --topic zipkin-trace --partitions 2 --replication-factor 1 --if-not-exists
-	${KAFKA_HOME}/bin/kafka-topics.sh \
-		--zookeeper localhost:2181 --create --topic zipkin-dependency --partitions 2 --replication-factor 1 --if-not-exists
+all: build test docker-build-test
 # Maven tasks
 ## add license headers
 .PHONY: license-header
@@ -27,24 +16,6 @@ build: license-header
 .PHONY: test
 test: license-header
 	${MAVEN} test verify
-# Tasks to run Zipkin locally
-## Download zipkin jar
-.PHONY: get-zipkin
-get-zipkin:
-	curl -sSL https://zipkin.io/quickstart.sh | bash -s
-## Run built storage with local zipkin (note that it requires a kafka instance running)
-.PHONY: zipkin-local
-zipkin-local:
-	STORAGE_TYPE=kafka \
-	KAFKA_BOOTSTRAP_SERVERS=${KAFKA_BOOTSTRAP_SERVERS} \
-	java \
-	-Dloader.path='module/target/zipkin-module-storage-kafka-${VERSION}-module.jar,module/target/zipkin-module-storage-kafka-${VERSION}-module.jar!/lib' \
-	-Dspring.profiles.active=kafka \
-	-cp zipkin.jar \
-	org.springframework.boot.loader.PropertiesLauncher
-## Task to build and run kafka locally
-.PHONY: run-local
-run-local: build zipkin-local
 # Docker tasks
 ## Build test image
 .PHONY: docker-build-test
