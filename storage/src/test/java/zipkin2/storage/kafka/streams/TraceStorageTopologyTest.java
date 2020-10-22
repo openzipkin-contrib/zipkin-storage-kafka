@@ -16,9 +16,7 @@ package zipkin2.storage.kafka.streams;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -38,7 +36,6 @@ import zipkin2.Span;
 import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.entry;
 import static zipkin2.storage.kafka.streams.TraceStorageTopology.AUTOCOMPLETE_TAGS_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStorageTopology.SPAN_NAMES_STORE_NAME;
 import static zipkin2.storage.kafka.streams.TraceStorageTopology.TRACES_STORE_NAME;
@@ -174,36 +171,34 @@ class TraceStorageTopologyTest {
     // Then: trace stores are filled
     WindowStore<String, List<Span>> traces = testDriver.getWindowStore(TRACES_STORE_NAME);
     try (final WindowStoreIterator<List<Span>> fetch = traces.fetch(a.traceId(), 0, 10000L)) {
-      assertThat(fetch.hasNext()).isTrue();
-      final KeyValue<Long, List<Span>> next = fetch.next();
-      assertThat(next.value).isEqualTo(spans);
+      assertThat(fetch).hasNext();
+      assertThat(fetch.next())
+        .extracting(next -> next.value)
+        .isEqualTo(spans);
+      assertThat(fetch).isExhausted();
     }
     WindowStore<String, Set<String>> spanNames = testDriver.getWindowStore(SPAN_NAMES_STORE_NAME);
-    Map<String, Set<String>> serviceNames = new HashMap<>();
     try (
       final KeyValueIterator<Windowed<String>, Set<String>> fetch = spanNames.fetchAll(0, 10000L)) {
-      while (fetch.hasNext()) {
-        final KeyValue<Windowed<String>, Set<String>> next = fetch.next();
-        serviceNames.put(next.key.key(), next.value);
-      }
+      assertThat(fetch).hasNext();
+      assertThat(fetch).hasNext();
+      assertThat(fetch.next())
+        .extracting(next -> next.key.key(), next -> next.value)
+        .containsExactly("svc_a", Collections.singleton("op_a"));
+      assertThat(fetch.next())
+        .extracting(next -> next.key.key(), next -> next.value)
+        .containsExactly("svc_b", Collections.singleton("op_b"));
+      assertThat(fetch).isExhausted();
     }
-    assertThat(serviceNames)
-      .hasSize(2)
-      .contains(
-        entry("svc_a", Collections.singleton("op_a")),
-        entry("svc_b", Collections.singleton("op_b")));
     WindowStore<String, Set<String>> tagsStore = testDriver.getWindowStore(AUTOCOMPLETE_TAGS_STORE_NAME);
-    Map<String, Set<String>> tags = new HashMap<>();
     try (
       final KeyValueIterator<Windowed<String>, Set<String>> fetch = tagsStore.fetchAll(0, 10010L)) {
-      while (fetch.hasNext()) {
-        final KeyValue<Windowed<String>, Set<String>> next = fetch.next();
-        tags.put(next.key.key(), next.value);
-      }
+      assertThat(fetch).hasNext();
+      assertThat(fetch.next())
+        .extracting(next -> next.key.key(), next -> next.value)
+        .containsExactly("environment", Collections.singleton("dev"));
+      assertThat(fetch).isExhausted();
     }
-    assertThat(tags)
-      .hasSize(1)
-      .contains(entry("environment", Collections.singleton("dev")));
     // Finally close resources
     testDriver.close();
     spansSerde.close();
