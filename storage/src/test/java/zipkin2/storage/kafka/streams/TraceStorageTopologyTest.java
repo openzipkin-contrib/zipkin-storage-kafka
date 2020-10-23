@@ -67,7 +67,7 @@ class TraceStorageTopologyTest {
       false).get();
     TopologyDescription description = topology.describe();
     // Then:
-    assertThat(description.subtopologies()).hasSize(0);
+    assertThat(description.subtopologies()).isEmpty();
     // Given: streams config
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     testDriver.close();
@@ -181,10 +181,10 @@ class TraceStorageTopologyTest {
     try (
       final KeyValueIterator<Windowed<String>, Set<String>> fetch = spanNames.fetchAll(0, 10000L)) {
       assertThat(fetch).hasNext();
-      assertThat(fetch).hasNext();
       assertThat(fetch.next())
         .extracting(next -> next.key.key(), next -> next.value)
         .containsExactly("svc_a", Collections.singleton("op_a"));
+      assertThat(fetch).hasNext();
       assertThat(fetch.next())
         .extracting(next -> next.key.key(), next -> next.value)
         .containsExactly("svc_b", Collections.singleton("op_b"));
