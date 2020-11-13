@@ -459,10 +459,9 @@
             <configuration>
               <serverId>ossrh</serverId>
               <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-              <!-- Zipkin release is about ~100M mostly from the two server distributions. Default
-                   will timeout after 5 minutes, which can trigger fairly easily with this size. -->
-              <stagingProgressPauseDurationSeconds>20</stagingProgressPauseDurationSeconds>
-              <stagingProgressTimeoutMinutes>20</stagingProgressTimeoutMinutes>
+              <!-- Double the normal timeout even though we haven't had a problem in this project.
+                   The only outcome of timing out client side is trying again. -->
+              <stagingProgressTimeoutMinutes>10</stagingProgressTimeoutMinutes>
               <autoReleaseAfterClose>true</autoReleaseAfterClose>
             </configuration>
           </plugin>

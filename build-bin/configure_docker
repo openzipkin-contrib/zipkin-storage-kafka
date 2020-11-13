@@ -17,7 +17,7 @@ set -ue
 
 # Defends against build outages caused by Docker Hub (docker.io) pull rate limits.
 #
-# It should not login to anything, as that should be done in `configure_maven_deploy`
+# It should not login to anything, as that should be done in `configure_docker_deploy`
 
 # We don't use any docker.io images, but add a Google's mirror in case something implicitly does
 # * See https://cloud.google.com/container-registry/docs/pulling-cached-images

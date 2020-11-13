@@ -25,6 +25,7 @@ if ! test -f docker/Dockerfile; then
 fi
 
 PROJECT="Zipkin Kafka Storage"
+GH_REPO=openzipkin-contrib/zipkin-storage-kafka
 # update .dockerignore if you ever add another here
 MODULE=storage-kafka
 DOCKER_TARGET=zipkin-${MODULE}
@@ -76,7 +77,7 @@ DOCKER_ARGS="-f ${DOCKERFILE_PATH} --tag ${TAG} \
 --build-arg module=${MODULE} --build-arg group_id=${GROUP_ID} \
 --build-arg release_from_maven_build=${RELEASE_FROM_MAVEN_BUILD} \
 --build-arg java_version=${JAVA_VERSION} --build-arg zipkin_version=${ZIPKIN_VERSION} \
---label org.opencontainers.image.source=https://github.com/openzipkin-contrib/zipkin-storage-kafka \
+--label org.opencontainers.image.source=https://github.com/${GH_REPO} \
 --label org.opencontainers.image.version=${RELEASE_VERSION} ."
 
 # Avoid buildx for two reasons:
