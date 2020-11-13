@@ -12,8 +12,6 @@ git:
 
 cache:
   directories:
-    # zipkin-lens gets dependencies via NPM
-    - $HOME/.npm
     - $HOME/.m2
 
 # Prevent test build of a documentation-only change.
