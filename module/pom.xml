@@ -33,6 +33,28 @@
     <dependency>
       <groupId>${project.groupId}</groupId>
       <artifactId>zipkin-storage-kafka</artifactId>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.kafka</groupId>
+          <artifactId>kafka-clients</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>${armeria.groupId}</groupId>
+          <artifactId>armeria</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.kafka</groupId>
+      <artifactId>kafka-clients</artifactId>
+      <version>${kafka.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>*</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
@@ -44,6 +66,21 @@
       <groupId>${armeria.groupId}</groupId>
       <artifactId>armeria-spring-boot2-autoconfigure</artifactId>
       <version>${armeria.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>${armeria.groupId}</groupId>
+          <artifactId>armeria-logback</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.springframework.boot</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>*</artifactId>
+        </exclusion>
+      </exclusions>
+      <scope>provided</scope>
     </dependency>
 
     <dependency>
@@ -73,32 +110,15 @@
           </layoutFactory>
           <classifier>module</classifier>
           <!-- https://github.com/spring-projects/spring-boot/issues/3426 transitive exclude doesn't work -->
-          <!--
-          Not excluding guava right now even though there is an overlap to avoid the following conflict
-
-          java.lang.NoSuchMethodError: com.google.common.base.Preconditions.checkArgument(ZLjava/lang/String;CLjava/lang/Object;)V
-             at io.grpc.Metadata$Key.validateName(Metadata.java:629) ~[grpc-core-1.20.0.jar!/:1.20.0]
-          -->
           <excludeGroupIds>
-            ${zipkin.groupId},org.springframework.boot,org.springframework,com.fasterxml.jackson.core,com.google.auto.value,com.google.code.gson,org.reactivestreams,com.google.code.findbugs,javax.annotation,org.slf4j,io.netty,io.micrometer,org.hdrhistogram,org.latencyutils,org.apache.logging.log4j,com.github.luben,org.lz4,org.xerial.snappy
+            ${zipkin.groupId},org.springframework.boot,org.springframework,com.fasterxml.jackson.core,com.google.auto.value,com.google.code.gson,org.reactivestreams,com.google.code.findbugs,javax.annotation,org.slf4j,io.netty,io.micrometer,org.hdrhistogram,org.latencyutils,${armeria.groupId},javax.inject,com.fasterxml.jackson.datatype
           </excludeGroupIds>
-          <!-- currently cannot exclude io.opencensus due to https://github.com/googleapis/google-http-java-client/issues/621 -->
           <excludes>
-            <!-- zipkin-server depends on armeria-->
-            <exclude>
-              <groupId>${armeria.groupId}</groupId>
-              <artifactId>armeria</artifactId>
-            </exclude>
-            <!-- See https://github.com/line/armeria/issues/1679 -->
-            <exclude>
-              <groupId>net.bytebuddy</groupId>
-              <artifactId>byte-buddy</artifactId>
-            </exclude>
-            <!-- zipkin-server depends on kafka-clients-->
-            <exclude>
+            <!-- zipkin-server packages this -->
+            <dependency>
               <groupId>org.apache.kafka</groupId>
               <artifactId>kafka-clients</artifactId>
-            </exclude>
+            </dependency>
           </excludes>
         </configuration>
         <dependencies>

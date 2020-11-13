@@ -1,8 +1,8 @@
 # Zipkin Storage: Kafka *[EXPERIMENTAL]*
 
-[![Build Status](https://www.travis-ci.org/openzipkin-contrib/zipkin-storage-kafka.svg?branch=master)](https://www.travis-ci.org/openzipkin-contrib/zipkin-storage-kafka)
-[![](https://jitpack.io/v/openzipkin-contrib/zipkin-storage-kafka.svg)](https://jitpack.io/#openzipkin-contrib/zipkin-storage-kafka)
-[![](https://images.microbadger.com/badges/version/openzipkincontrib/zipkin-storage-kafka.svg)](https://microbadger.com/images/openzipkincontrib/zipkin-storage-kafka "Get your own version badge on microbadger.com")
+[![Gitter chat](http://img.shields.io/badge/gitter-join%20chat%20%E2%86%92-brightgreen.svg)](https://gitter.im/openzipkin/zipkin)
+[![Build Status](https://travis-ci.com/openzipkin-contrib/zipkin-storage-kafka.svg?branch=master)](https://travis-ci.com/openzipkin-contrib/zipkin-storage-kafka)
+[![Maven Central](https://img.shields.io/maven-central/v/io.zipkin.gcp/zipkin-module-storage-stackdriver.svg)](https://search.maven.org/search?q=g:io.zipkin.contrib.zipkin-storage-kafka%20AND%20a:zipkin-module-storage-kafka)
 
 Kafka-based storage for Zipkin.
 
@@ -84,7 +84,7 @@ To run locally, first you need to get Zipkin binaries:
 make get-zipkin
 ```
 
-By default Zipkin will be waiting for a Kafka broker to be running on `localhost:19092`. 
+By default Zipkin will be waiting for a Kafka broker to be running on `localhost:19092`.
 
 Then run Zipkin locally:
 
@@ -138,3 +138,18 @@ make zipkin-test-distributed
 This project is inspired in Adrian Cole's VoltDB storage <https://github.com/adriancole/zipkin-voltdb>
 
 Kafka Streams images are created with <https://zz85.github.io/kafka-streams-viz/>
+
+## Artifacts
+All artifacts publish to the group ID "io.zipkin.contrib.zipkin-storage-kafka". We use a common
+release version for all components.
+
+### Library Releases
+Releases are at [Sonatype](https://oss.sonatype.org/content/repositories/releases) and [Maven Central](http://search.maven.org/#search%7Cga%7C1%7Cg%3A%22io.zipkin.contrib.zipkin-storage-kafka%22)
+
+### Library Snapshots
+Snapshots are uploaded to [Sonatype](https://oss.sonatype.org/content/repositories/snapshots) after
+commits to master.
+
+### Docker Images
+Released versions of zipkin-server are published to Docker Hub as `openzipkincontrib/zipkin-storage-kafka` and GitHub
+Container Registry as `ghcr.io/openzipkincontrib/zipkin-storage-kafka`. See [docker](./docker) for details.

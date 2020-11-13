@@ -1,64 +1,140 @@
-# Run `travis lint` when changing this file to avoid breaking the build.
+# See https://docs.travis-ci.com/user/reference/overview/#for-a-particular-travisyml-configuration
+arch: amd64 # Not arm64 for multi-platform Docker builds (qemu is amd64->arm64, not vice versa)
+os: linux   # required for arch different than amd64
+dist: focal # newest available distribution
+language: java # Re-use JDK 11 from focal release instead of delaying build with installation
+services: docker
 
-dist: focal
-language: java
-# Intentionally don't use "jdk" key as it is coupled to jdk.java.net availability.
-addons:
-  apt:
-    update: true
+# license-maven-plugin needs the full history to generate copyright year range. Ex. 2013-2020
+# Don't do a shallow clone, as it interferes with this.
+git:
+  depth: false
 
 cache:
   directories:
     - $HOME/.m2
 
-services:
-  - docker
+# Prevent test build of a documentation-only change.
+#
+# if: conditions are preferred as they obviate job creation. However, they can only use
+# pre-defined env variables or globals that can be evaluated statically. The other way to skip
+# is to exit early. We do that here to prevent overhead of running tests that only include Markdown
+# (documentation) updates.
+_terminate_if_only_docs: &terminate_if_only_docs |
+  if [ -n "${TRAVIS_COMMIT_RANGE}" ] && ! git diff --name-only "${TRAVIS_COMMIT_RANGE}" -- | grep -qv '\.md$'; then
+    echo "Stopping job as changes only affect documentation (ex. README.md)"
+    travis_terminate 0
+  fi
 
-before_install:
-  # Use OS package to update JDK
-  - export JAVA_VERSION=14
-  - sudo apt-get -y install openjdk-$JAVA_VERSION-jdk
-  - export JAVA_HOME=/usr/lib/jvm/java-$JAVA_VERSION-openjdk-amd64/
-  - ./mvnw -version
-
-  # Reduce time spent verifying Docker environment
-  - echo checks.disable=true > ~/.testcontainers.properties
-
-  # allocate commits to CI, not the owner of the deploy key
-  - git config user.name "zipkinci"
-  - git config user.email "zipkinci+zipkin-dev@googlegroups.com"
-
-  # setup https authentication credentials, used by ./mvnw release:prepare
-  - git config credential.helper "store --file=.git/credentials"
-  - echo "https://$GH_TOKEN:@github.com" > .git/credentials
-
-# Override default travis to use the maven wrapper; skip license on travis due to #1512
-install: ./mvnw install -Dlicense.skip=true -Dmaven.javadoc.skip=true -B -V
-
-script: ./travis/publish.sh
-# Don't build release tags. This avoids publish conflicts because the version commit exists both on master and the release tag.
-# See https://github.com/travis-ci/travis-ci/issues/1532
-branches:
-  except:
-    - /^[0-9]/
+jobs:
+  include:
+    - stage: test
+      # We run tests on non-tagged pushes to master that aren't a commit made by the release plugin
+      # We also run tests on pull requests targeted at the master branch.
+      if: |
+        branch = master AND tag IS blank AND commit_message !~ maven-release-plugin AND \
+        type IN (push, pull_request)
+      name: Run unit and integration tests
+      before_install: *terminate_if_only_docs
+      # To save time and build credits, we continue to deploy after a secure commit to master.
+      # See https://docs-staging.travis-ci.com/user/environment-variables/#convenience-variables
+      install: |
+        if [ "${TRAVIS_SECURE_ENV_VARS}" = "true" ] && [ "${TRAVIS_PULL_REQUEST}" = "false" ]; then
+          export SHOULD_DEPLOY=true
+          ./build-bin/configure_deploy
+        else
+          export SHOULD_DEPLOY=false
+          ./build-bin/configure_test
+        fi
+      script:
+        # Run unit and integration tests
+        - ./build-bin/test || travis_terminate 1
+        - if [ "${SHOULD_DEPLOY}" != "true" ]; then travis_terminate 0; fi
+        # Deploy a SNAPSHOT version
+        - |
+          export POM_VERSION=$(mvn help:evaluate -N -Dexpression=project.version -q -DforceStdout)
+          echo "Deploying version ${POM_VERSION}..."
+          # travis_wait ensures long pauses during uploads aren't mistaken for a hung job
+          travis_wait ./build-bin/deploy ${POM_VERSION}
+    - stage: deploy
+      if: |
+        tag =~ ^[0-9]+\.[0-9]+\.[0-9]+$ AND \
+        type = push AND env(TRAVIS_SECURE_ENV_VARS) = true
+      name: Deploy a release
+      # verify the version tag is coherent
+      before_install: |
+        export POM_VERSION=$(mvn help:evaluate -N -Dexpression=project.version -q -DforceStdout)
+        if [ "${POM_VERSION}" != "${TRAVIS_TAG}" ]; then
+          echo "Invalid version. Git tag ${TRAVIS_TAG} should have project.version ${POM_VERSION}"
+          exit 1
+        else
+      install: ./build-bin/configure_deploy
+      # travis_wait ensures long pauses during uploads aren't mistaken for a hung job
+      script: travis_wait ./build-bin/deploy
+    # Create a release version when a release trigger and in a secure ENV
+    - stage: create release
+      if: |
+        tag =~ ^release-[0-9]+\.[0-9]+\.[0-9]+$ AND \
+        type = push AND env(TRAVIS_SECURE_ENV_VARS) = true
+      name: "Create release version"
+      install: ./build-bin/login_git
+      script:
+        # Delete the trigger tag
+        - git push origin :"${TRAVIS_TAG}"
+        # Get the release version
+        - release_version=$(echo "${TRAVIS_TAG}" | sed 's/^release-//') || travis_terminate 1
+        # Create the release tag
+        - ./build-bin/maven_prepare_release ${release_version}
+    - stage: push docker
+      if: |
+        tag =~ ^docker-[0-9]+\.[0-9]+\.[0-9]+$ AND \
+        type = push AND env(TRAVIS_SECURE_ENV_VARS) = true
+      name: Re-push all Docker images
+      install:
+        - ./build-bin/login_git
+        - ./build-bin/configure_docker_push
+      script:
+        # Delete the trigger tag
+        - git push origin :"${TRAVIS_TAG}"
+        # Get the release version
+        - release_version=$(echo "${TRAVIS_TAG}" | sed 's/^docker-//') || travis_terminate 1
+        # Push the docker images
+        - docker/bin/docker_push ${release_version}
 
 notifications:
   webhooks:
     urls:
       - https://webhooks.gitter.im/e/ead3c37d57527214e9f2
-      - https://webhooks.gitter.im/e/e57478303f87ecd7bffc
+      - https://webhooks.gitter.im/e/9f1ee2f315d32956f8d6
     on_success: change
     on_failure: always
 
-env:
-  global:
-    # Ex. travis encrypt BINTRAY_USER=your_github_account
-    - secure: "p6GAPH5ScTRaHHgHiaJKGBVRig3rSgYs89RPMkUsotN7kK53KmMO20HBoCWJqCpU1HLEXvh7/AusTbFyBSjgEQl2kHbuaTBoPPanQo4Bd7qTaL/j8RAYu5uE0mgEow5guYCCDqA4Z77xTlQTC7jMm8uDyAFO7G9RS5ZnuZXk1iGbmb5h69be/sk22JxX2IhLzM6DT+w9cHah7sLFr9B18A7yvMPImrNdsFOspyNtqu+UzuX2PndRR2yTgwIT34p/+3e69+UtTVHKlmtrduTHX4LmC2Zgslqng38ViKsPI/CVE32bshi0O3NIqF4mnTkQyLjbsjJEF82jdl+Z+v13SGGPUSKMzv68FQHHOKtEwteTteXR804/AJgRGVY+SMZODMKUJGs2F/kt6Q+/p6RLdmKOY+jUAPPhzBIWB2oSH18BwSsWyzLVTf6DAtwPD6xbZD7GAfo5WKIGG66LGPd5TMA79dFN/uaMv2PN+USDQ+DaIp2hk5M3WgzgrmnLH97y0iXwYzKJy7BKpNXewLDHwjGmr6XUA/bSeKwUUDfIZi2MdsXiCyQjbJ7qeFn8FWp1dQBxfH+FVqqgIe5EsFX01CK7VR6JEwdqNTjDwW0BoY606OiLw6sff18M60RJVlfC+x//k1C/5AEjxaB1FWDLE4ul/ydWCsvPTbKnzV+OiCM="
-    # Ex. travis encrypt BINTRAY_KEY=xxx-https://bintray.com/profile/edit-xxx --add
-    - secure: "ezc58DXSSV3fojt2jx+uSW1Qu3BpdB4NEWKbAUNS/j/E+SfEPmPSj5VWKa8cWDAKHw17GCBwjUZTS6fZLNDTNW4eB+VGjKzv0N/yTCwoCVLNjOvQv3cPVIh/G5Uu8vI+QwmoAIAvIg6qKkrE3x8n3Y4T6cBtl5U1g0aE+1euIyXY3IwGv3a2D+Ywn0ezEjl5yfz7NUBVtZzfAhmdtohsXTPlMavDQqysRfWhdmO+DXT9y7vjQdB1uIfYb4fh6EdOOXlTksGS7c1lRnDVZCBusm8+OESMPheltYY/LiB4nCzohqEyshI8SlcYDuenWj1KZXJ3KxrbOa7lWsvJ8GeqWqZQSydsDyiA3CTKaxmryz1I2Q749I4Q+B0wMwTZrfaBke+veB6MUhOaxDx1rgUPN9d3k2voOHpcxbGV+bftK8g72wgkjr2WdWGhIDuFn0VsQqMyGX7h4N2pHOXvAcNHsMytqBE//hsCcczVhyRXelvrD2hcB1JcFaCCLzFlgbWHulqV1nsyaz1XtjJiR/hgCktTtT+RzaE298LgQK1V7bpYldbyW/lQvIKQqd4gFHmYXYecJASUASW+Fv5kUdLud6n7ifnTwNcYRsm+jAjI1gP3nFD7+cVlBtirHKYtXbpctKB4mIwyqWukwCamITlIep5nqrz82zKDqj9a+ATCnZQ="
-    # Ex. travis encrypt GH_TOKEN=XXX-https://github.com/settings/tokens-XXX --add
-    - secure: "mWBDPL3lRPc7LYh/xC9iPkUy+Mr0g2paAjA/XMeYoJ92tkGoTy2EsoF4sxHNGzecdCIk9Dfwtd9wxvBuF1zfYoyScJinNbAojD1w2hkhb+apOH3QcROQrZTv9yUhvnCvQUc303zjPm2P4oqCgV6HI+5djxQPwGAWHq14QKu1qESKWx7YDcz7OvAkhZ//VB3kWeXpZ1QMaAW440BQ+2OBFDlH+X91y8aeDRB1FJwRJ0RfBM5qL/tEGZIwhL+EG7YQN9FR91aRiCVUSKDJjfnkH5Z7b6yZFaAe7pFKNx0gj2S4ycIEvjBJ8EF/+/gATNs/TyWDmi6IK6TEA/O/btRf1z7OQdpqjzR7Vd8Tcexlbm1ykg0FG7jhGgGAf/edoM401jobj8/LU4Bs1I85iofDEqdMLNAttj4S0pBUBE1ergqle/lU4kfD/gfJNeUt+Hn9lYNpSUH9Gw9i5OI81++7pYEbYeIuAECo+hXVTaSS0zCJHi0WgcomAHWyMd8zhQibGqJHDAaM0X/4kmCC9nPr0QpK0WQq3Sw8r1qjkQEIZNP6LEQ1q0itQouCWVx1lFJcoDIu3ZPtIcTvsrcz4PJ2ZEYHBdV+3brPzrrPf3xZ7KZGfMZwifohsQsXq/EipL+31loXDCmKkeOPMGSIRJu10g9jfmqULDxiOJ5dLl1O83I="
-    # Ex. travis encrypt SONATYPE_USER=your_sonatype_account
-    - secure: "KS5WH6i3lkSg/pw7wyuH5WeOtm9g0zcbu5cM9DLKYEh3fbNr0+lRbiQmoJMNSN3RsCb4kL4Tg8YRGBgNnIvX2v76s/SwceOVQTXcIBxM8YAIzjHeGaNXa5j4f8mOOBbLW70o5uEUqlTCPU/zkvXDPsuFAxF4vCn9R4fgb2l5zITaI5+HBsoC7gz8bPsLFIV3w605fEAqgIJB/eka3LVP0QqYRtk+hcxBfrnD/7oTQqf2VMPR1l4EKabDvnp2uYQuD6dKy+gynK+NQpsgvWr9STEqNhYYJlVu2wn+xf9qfXCePkNx7bk79C+X0nqj8Ma/SD/8ESOGWzsgyAO5IW4Xq4HvQRcB9vwr/39/OHS+GZ1H/NA9ZeS/1cGKVExMB2AqQkEmydx+Ithm/9jLK7ZAVK6iSfDk3XxVfpqhZFClsC025ESpVz/wN8pM0LrBY2fIcwXZnKO8ahSnzVSqv6nxtxFsSF7l/3yRoGI8GKq+jbj21/afBGi9yane+OzcmIfjZ2NI6JrvY468qVKWt6y+boq4IPdhrP68ybzO5EazsUzr387SNMSIrUzy43RC81/uoD8tgnf3ZVsVoBsg6h15cvtSl+tPxqrZIyCx99J+AxRLJOHiOjKaTHlk5X+jFc9qGu5OsTqR6NfGcgaPfF06uvNMgayRdJjVig5aaI6L97Y="
-    # Ex. travis encrypt SONATYPE_PASSWORD=your_sonatype_password
-    - secure: "FygOtuZ4A+iY7LmL3kqxoCMPwf/MoZ7802pPZQEtVCWLW7Fxn/wL8NVb1NZ+5Nb8NzZLShs9ZzOfsfbVF4q2kyIsgMsqdmTK8qUIIKqqN5Mq0uDfyrUdhNLV23mu9uJuaeplFQ9q+vcCVYr+jftsMYJzwIUBBGz02MDjMEHIUECPCeYFCKYftyzCaxsiTkBcPth6ymZGmlvSHeOyIztgIOy4l6dI1SUUPw9PyOyAIK2xZ1PqnTN206L5U7/0I86nJhvFL7G04KJfz89D7Nwh9jsaAACGU0FKf6neahhnwE+JALhXSpoVwX8TbREi2cNN2qLth4rxeQ/QrQI1Y9gvNojAuJZBpKL/Ineo9xW+z5f2NpxtPyAAhDaN/h8ZAGcy2lLGzYmSkxtL4F5rPwcg/byTePj/U18MYNR+GKgE5Zk6iSva46kclkhW+0Mg9VuLEeVnb20tebNUHCX3WuxAm0r/ZGk2nz1GbQ/sSCwZ3rA6vGao7OGpuT0N11Gn1wPKV9r0aDhZzvTpDc/IgevVEsxstWGKc32PBffHtkDymvRS3EbBQqw5TGbc/3BqVEp1odJHsfy2+6Ur+q+8i4r8C5EUJfFUPQgpV1soWPRhLNLkKCAf4dMNcgpp3YGWVQeVdIng4+rI8Kn+Glu6SAVNrAQIZbVxfbwBTekLGpoYio0="
+# Secure variables needed for release and publication
+#
+# When Travis, add to https://travis-ci.com/github/openzipkin/${REPO}/settings
+#
+# GH_TOKEN=XXX-https://github.com/settings/tokens-XXX
+#   - makes release commits and tags, also writes to GHCR if Docker
+#   - needs repo:status, public_repo and if Docker write:packages, delete:packages
+#   - referenced in .settings.xml
+#   - store like this: echo "https://$GH_TOKEN:@github.com" > .git/credentials
+# GH_USER=user_that_created_GH_TOKEN
+#   - login like this: echo "$GH_TOKEN"| docker login ghcr.io -u "$GH_USER" --password-stdin
+# GPG_SIGNING_KEY=$(gpg -a --export-secret-keys zipkin-admin@googlegroups.com |base64)
+#   - used to sign jars in release commands
+#   - sent to keyserver.ubuntu.com
+#   - import like this: echo ${GPG_SIGNING_KEY} | base64 --decode | gpg --batch --passphrase ${GPG_PASSPHRASE} --import
+# GPG_PASSPHRASE=passphrase_for_GPG_SIGNING_KEY
+#   - referenced in .settings.xml
+# SONATYPE_USER=your_sonatype_account_token
+#   - used to publish to Maven Central via https://oss.sonatype.org/#stagingRepositories
+#   - needs access to io.zipkin via https://issues.sonatype.org/browse/OSSRH-16669
+#   - generate via https://oss.sonatype.org/#profile;User%20Token
+#   - referenced in .settings.xml
+# SONATYPE_PASSWORD=password_to_SONATYPE_USER
+#   - referenced in .settings.xml
+# DOCKERHUB_USER=typically_dockerzipkindeployer
+#   - only push top-level projects: zipkin zipkin-aws zipkin-dependencies zipkin-gcp to Docker Hub, only on release
+#   - login like this: echo "$DOCKERHUB_TOKEN"| docker login -u "$DOCKERHUB_USER" --password-stdin
+# DOCKERHUB_TOKEN=access_token_for_DOCKERHUB_USER
+#   -  Access Token from here https://hub.docker.com/settings/security

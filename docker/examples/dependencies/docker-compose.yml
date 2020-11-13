@@ -13,42 +13,47 @@
 #
 
 ---
-version: '3'
+# permit depends_on/condition: service_healthy
+version: "2.4"
+
 services:
-  kafka-zookeeper:
-    image: openzipkin/zipkin-kafka
-    container_name: kafka-zookeeper
+  kafka:
+    image: ghcr.io/openzipkin/zipkin-kafka
+    container_name: kafka
     ports:
-      - 2181:2181
-      - 9092:9092
+      # Processes on the Docker host can set bootstrap server list to localhost:19092
       - 19092:19092
   kafka-topics:
-    image: openzipkin/zipkin-kafka
+    image: ghcr.io/openzipkin/zipkin-kafka
     container_name: kafka-topics
-    entrypoint: "/busybox/sh -c"
+    entrypoint: "/bin/sh -c"
     command: "
-      \"/busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper kafka-zookeeper:2181 --create --topic zipkin-spans --partitions 2 --replication-factor 1 --if-not-exists
+      \"/kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --bootstrap-server kafka:9092 --create --topic zipkin-spans --partitions 2 --replication-factor 1 --if-not-exists
       &&
-      /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper kafka-zookeeper:2181 --create --topic zipkin-trace --partitions 2 --replication-factor 1 --if-not-exists
+      /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --bootstrap-server kafka:9092 --create --topic zipkin-trace --partitions 2 --replication-factor 1 --if-not-exists
       &&
-      /busybox/sh /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --zookeeper kafka-zookeeper:2181 --create --topic zipkin-dependency --partitions 2 --replication-factor 1 --if-not-exists\"
+      /kafka/bin/kafka-run-class.sh kafka.admin.TopicCommand --bootstrap-server kafka:9092 --create --topic zipkin-dependency --partitions 2 --replication-factor 1 --if-not-exists\"
       "
     depends_on:
-      - kafka-zookeeper
+      kafka:
+        condition: service_healthy
   zipkin:
-    image: openzipkincontrib/zipkin-storage-kafka
+    image: ghcr.io/openzipkincontrib/zipkin-storage-kafka
     container_name: zipkin
     hostname: zipkin # required to route call to scatter-gather endpoint properly. should not be needed after #40 is solved
     ports:
       - 9411:9411
     environment:
-      MODULE_OPTS: "-Dloader.path=lib -Dspring.profiles.active=kafka-only-dependencies"
-      KAFKA_BOOTSTRAP_SERVERS: kafka-zookeeper:9092
-      KAFKA_STORAGE_DIR: /data
+      MODULE_OPTS: "-Dloader.path=storage-kafka -Dspring.profiles.active=storage-kafka-only-dependencies"
+      STORAGE_TYPE: kafka
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_STORAGE_DIR: /zipkin/data
     volumes:
-      - zipkin:/data
+      - zipkin:/zipkin/data
     depends_on:
-      - kafka-zookeeper
-      - kafka-topics
+      kafka:
+        condition: service_healthy
+      kafka-topics:
+        condition: service_started
 volumes:
   zipkin:

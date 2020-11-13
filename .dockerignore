@@ -1,11 +1,7 @@
-**/\.*
-!.git
+# https://docs.docker.com/engine/reference/builder/#dockerignore-file
+**
+# Install script runs within Docker
+!docker/bin/install_zipkin_module
 
-**/target
-**/*.iml
-
-*.md
-
-**/Dockerfile
-travis
-mvnw*
+# Allow re-use of built artifacts when building docker from master or a release tag
+!./module/target/zipkin-module-storage-kafka-*-module.jar
