@@ -25,7 +25,6 @@ set -ue
 # This should be done once per CI job, but the script is idempotent so not harmful to execute twice.
 
 echo "$GH_TOKEN"| docker login ghcr.io -u "$GH_USER" --password-stdin
-echo "$DOCKERHUB_TOKEN"| docker login -u "$DOCKERHUB_USER" --password-stdin
 
 # Verify we are on an arch that can publish multi-arch images
 ARCH=$(uname -m)
