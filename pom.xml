@@ -28,14 +28,14 @@
   </modules>
 
   <distributionManagement>
-    <repository>
-      <id>bintray</id>
-      <url>https://api.bintray.com/maven/openzipkin/maven/zipkin-storage-kafka/;publish=1</url>
-    </repository>
     <snapshotRepository>
-      <id>jfrog-snapshots</id>
-      <url>https://oss.jfrog.org/artifactory/oss-snapshot-local</url>
+      <id>ossrh</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
     </snapshotRepository>
+    <repository>
+      <id>ossrh</id>
+      <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+    </repository>
   </distributionManagement>
 
   <issueManagement>
@@ -50,23 +50,26 @@
     <main.basedir>${project.basedir}</main.basedir>
 
     <!-- groupId overrinds allow testing feature branches with jitpack -->
+    <!-- matching armeria/grpc/zipkin -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
-    <zipkin.version>2.21.7</zipkin.version>
+    <zipkin.version>2.22.2</zipkin.version>
+    <zipkin-reporter.version>2.16.0</zipkin-reporter.version>
+    <spring-boot.version>2.3.4.RELEASE</spring-boot.version>
+    <!-- armeria.groupId allows you to test feature branches with jitpack -->
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
-    <armeria.version>0.99.9</armeria.version>
-    <spring-boot.version>2.3.3.RELEASE</spring-boot.version>
+    <armeria.version>1.2.0</armeria.version>
 
     <kafka.version>2.6.0</kafka.version>
 
     <junit-jupiter.version>5.7.0</junit-jupiter.version>
     <!-- TODO: cleanup when https://github.com/testcontainers/testcontainers-java/issues/3166 is fixed -->
     <testcontainers.version>1.15.0-rc2</testcontainers.version>
-    <assertj.version>3.16.1</assertj.version>
+    <assertj.version>3.18.0</assertj.version>
 
     <!-- override to set exclusions per-project -->
     <errorprone.args />
     <errorprone.version>2.4.0</errorprone.version>
-    <log4j.version>2.13.3</log4j.version>
+    <log4j.version>2.14.0</log4j.version>
 
     <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
     <maven-install-plugin.version>3.0.0-M1</maven-install-plugin.version>
@@ -79,6 +82,7 @@
     <maven-enforcer-plugin.version>3.0.0-M3</maven-enforcer-plugin.version>
     <!-- TODO: cleanup any redundant ignores now also in the 4.0 release (once final) -->
     <license-maven-plugin.version>4.0.rc2</license-maven-plugin.version>
+    <nexus-staging-maven-plugin.version>1.6.8</nexus-staging-maven-plugin.version>
   </properties>
 
   <name>Zipkin Storage: Kafka (Parent)</name>
@@ -128,6 +132,7 @@
         <groupId>${armeria.groupId}</groupId>
         <artifactId>armeria</artifactId>
         <version>${armeria.version}</version>
+        <scope>provided</scope>
       </dependency>
     </dependencies>
   </dependencyManagement>
@@ -211,6 +216,13 @@
           </configuration>
         </plugin>
 
+        <!-- mvn de.qaware.maven:go-offline-maven-plugin:resolve-dependencies -->
+        <plugin>
+          <groupId>de.qaware.maven</groupId>
+          <artifactId>go-offline-maven-plugin</artifactId>
+          <version>1.2.7</version>
+        </plugin>
+
         <plugin>
           <artifactId>maven-compiler-plugin</artifactId>
           <version>${maven-compiler-plugin.version}</version>
@@ -226,6 +238,12 @@
         <plugin>
           <artifactId>maven-jar-plugin</artifactId>
           <version>${maven-jar-plugin.version}</version>
+        </plugin>
+
+        <plugin>
+          <groupId>org.sonatype.plugins</groupId>
+          <artifactId>nexus-staging-maven-plugin</artifactId>
+          <version>${nexus-staging-maven-plugin.version}</version>
         </plugin>
       </plugins>
     </pluginManagement>
@@ -309,6 +327,25 @@
           <mapping>
             <!-- Don't use javadoc style as this makes code formatters break it by adding tags! -->
             <java>SLASHSTAR_STYLE</java>
+            <!-- build-bin -->
+            <build>SCRIPT_STYLE</build>
+            <push>SCRIPT_STYLE</push>
+            <test>SCRIPT_STYLE</test>
+            <deploy>SCRIPT_STYLE</deploy>
+            <login_git>SCRIPT_STYLE</login_git>
+            <maven_prepare_release>SCRIPT_STYLE</maven_prepare_release>
+            <configure_deploy>SCRIPT_STYLE</configure_deploy>
+            <configure_maven>SCRIPT_STYLE</configure_maven>
+            <configure_maven_deploy>SCRIPT_STYLE</configure_maven_deploy>
+            <configure_docker_push>SCRIPT_STYLE</configure_docker_push>
+            <configure_docker>SCRIPT_STYLE</configure_docker>
+            <maven_deploy>SCRIPT_STYLE</maven_deploy>
+            <docker_push>SCRIPT_STYLE</docker_push>
+            <configure_test>SCRIPT_STYLE</configure_test>
+            <!-- docker and docker/bin -->
+            <build_image>SCRIPT_STYLE</build_image>
+            <block_on_health>SCRIPT_STYLE</block_on_health>
+            <install_zipkin_module>SCRIPT_STYLE</install_zipkin_module>
           </mapping>
           <excludes>
             <exclude>.travis.yml</exclude>
@@ -367,7 +404,7 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.5</version>
+        <version>0.8.6</version>
       </plugin>
     </plugins>
   </build>
@@ -415,6 +452,42 @@
       <id>release</id>
       <build>
         <plugins>
+          <plugin>
+            <groupId>org.sonatype.plugins</groupId>
+            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <extensions>true</extensions>
+            <configuration>
+              <serverId>ossrh</serverId>
+              <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+              <!-- Zipkin release is about ~100M mostly from the two server distributions. Default
+                   will timeout after 5 minutes, which can trigger fairly easily with this size. -->
+              <stagingProgressPauseDurationSeconds>20</stagingProgressPauseDurationSeconds>
+              <stagingProgressTimeoutMinutes>20</stagingProgressTimeoutMinutes>
+              <autoReleaseAfterClose>true</autoReleaseAfterClose>
+            </configuration>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <version>1.6</version>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+                <configuration>
+                  <gpgArguments>
+                    <arg>--pinentry-mode</arg>
+                    <arg>loopback</arg>
+                  </gpgArguments>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
           <!-- Creates source jar -->
           <plugin>
             <artifactId>maven-source-plugin</artifactId>
@@ -428,14 +501,22 @@
               </execution>
             </executions>
           </plugin>
-          <!-- Creates javadoc jar -->
+
+          <!-- Creates javadoc jar, skipping internal classes -->
           <plugin>
             <artifactId>maven-javadoc-plugin</artifactId>
             <version>${maven-javadoc-plugin.version}</version>
             <configuration>
+              <sourceFileExcludes>
+                <exclude>**/internal/*.java</exclude>
+                <exclude>**/Internal*.java</exclude>
+              </sourceFileExcludes>
+              <excludePackageNames>*.internal.*</excludePackageNames>
               <failOnError>false</failOnError>
               <!-- hush pedantic warnings: we don't put param and return on everything! -->
               <doclint>none</doclint>
+              <!-- While we publish modules, our source is pre-Java9 so tell javadoc that. -->
+              <source>8</source>
             </configuration>
             <executions>
               <execution>

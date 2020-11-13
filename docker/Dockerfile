@@ -12,6 +12,9 @@
 # the License.
 #
 
+ARG java_version
+ARG zipkin_version
+
 # We copy files from the context into a scratch container first to avoid a problem where docker and
 # docker-compose don't share layer hashes https://github.com/docker/compose/issues/883 normally.
 # COPY --from= works around the issue.
@@ -19,32 +22,30 @@ FROM scratch as scratch
 
 COPY . /code/
 
-FROM openzipkin/zipkin-builder as built
+FROM ghcr.io/openzipkin/java:${java_version} as install
 
+WORKDIR /install
+
+# Conditions aren't supported in Dockerfile instructions, so we copy source even if it isn't used.
 COPY --from=scratch /code /code
 
-WORKDIR /code
-RUN mvn -B --no-transfer-progress package -DskipTests=true -pl module -am
+# This will either be a snapshot like 2.4.5-SNAPSHOT or a real version ex. "2.4.5"
+ARG release_version
+ENV RELEASE_VERSION=$release_version
+# When true, main images reuse module jars in the context root
+ARG release_from_maven_build=false
+ENV RELEASE_FROM_MAVEN_BUILD=$release_from_maven_build
+ARG module
+ARG group_id
+RUN GROUP_ID=$group_id MODULE=$module /code/docker/bin/install_zipkin_module
 
-RUN cd /code && mkdir -p /zipkin-storage-kafka && \
-    cp module/target/zipkin-module-storage-kafka-*-module.jar /zipkin-storage-kafka && \
-    cd /zipkin-storage-kafka && \
-    jar xf *.jar && \
-    rm *.jar
+FROM ghcr.io/openzipkin/zipkin:${zipkin_version} as zipkin-storage-kafka
+LABEL org.opencontainers.image.description="Zipkin with Kafka Trace storage on OpenJDK and Alpine Linux"
 
-FROM openzipkin/zipkin:2.21.7
+COPY --from=install /install/ /zipkin/
 
-COPY --from=built /zipkin-storage-kafka/ /zipkin/kafka/
+ENV KAFKA_STORAGE_DIR /zipkin/data
+RUN mkdir /zipkin/data
 
-RUN echo > .kafka_profile
-
-ENV MODULE_OPTS="-Dloader.path=kafka -Dspring.profiles.active=kafka"
-ENV STORAGE_TYPE=kafka
-ENV KAFKA_STORAGE_DIR /data
-
-# Prepare state dir
-USER root
-RUN mkdir /data && chown zipkin:zipkin /data
-VOLUME /data
-# back to zipkin user
-USER zipkin
+ARG module
+ENV MODULE_OPTS="-Dloader.path=${module} -Dspring.profiles.active=${module}"

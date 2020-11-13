@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# Copyright 2019-2020 The OpenZipkin Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+# in compliance with the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+#
+
+set -ue
+
+# Ensures Docker is logged in, buildx is available and it can build multi-architecture.
+# This should be used instead of `configure_docker` when a push will occur.
+#
+# This should only happen when we are publishing multi-arch builds, as otherwise the setup could use
+# Docker Hub pull quota and possibly cause a build outage.
+
+# Log in to GitHub Container Registry and Docker Hub for releasing images
+# This should be done once per CI job, but the script is idempotent so not harmful to execute twice.
+
+echo "$GH_TOKEN"| docker login ghcr.io -u "$GH_USER" --password-stdin
+echo "$DOCKERHUB_TOKEN"| docker login -u "$DOCKERHUB_USER" --password-stdin
+
+# Verify we are on an arch that can publish multi-arch images
+ARCH=$(uname -m)
+if [ "$ARCH" != "x86_64" ]; then
+  echo "multiarch/qemu-user-static doesn't support arch $ARCH"
+  exit 1
+fi
+
+# Enable experimental features on the server (multi-arch)
+echo '{ "experimental":true, "registry-mirrors": ["https://mirror.gcr.io"] }' | sudo tee /etc/docker/daemon.json
+
+sudo service docker restart
+# Enable experimental client features (eg docker buildx)
+mkdir -p ${HOME}/.docker && echo '{"experimental":"enabled"}' > ${HOME}/.docker/config.json
+
+# Add buildx plugin
+BUILDX_VERSION=0.4.2
+BUILDX_URL=https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-${TRAVIS_CPU_ARCH}
+mkdir -p $HOME/.docker/cli-plugins
+( cd $HOME/.docker/cli-plugins && wget -qO- $BUILDX_URL > docker-buildx && chmod 755 docker-buildx)
+docker version
+
+# Enable execution of different multi-architecture containers by QEMU and binfmt_misc
+# See https://github.com/multiarch/qemu-user-static
+docker run --rm --privileged ghcr.io/openzipkin/multiarch-qemu-user-static --reset -p yes
+docker buildx create --name builder --use

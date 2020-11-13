@@ -20,15 +20,15 @@ test: license-header
 ## Build test image
 .PHONY: docker-build-test
 docker-build-test:
-	docker build -t openzipkincontrib/zipkin-storage-kafka:test -f docker/Dockerfile .
+	docker/build_image openzipkincontrib/zipkin-storage-kafka:test
 ## Run test distributed compose
 .PHONY: docker-up-test
 docker-up-test:
-	docker-compose -f docker/docker-compose.test.yml up -d
+	docker-compose -f ./.github/workflows/docker/docker-compose.test.yml up -d
 ## Build local image
 .PHONY: docker-build
 docker-build:
-	docker build -t openzipkincontrib/zipkin-storage-kafka -f docker/Dockerfile .
+	docker/build_image openzipkincontrib/zipkin-storage-kafka:latest
 ## Run single instance compose
 .PHONY: docker-up-single
 docker-up-single:
