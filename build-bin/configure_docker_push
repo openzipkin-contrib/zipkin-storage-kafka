@@ -21,11 +21,6 @@ set -ue
 # This should only happen when we are publishing multi-arch builds, as otherwise the setup could use
 # Docker Hub pull quota and possibly cause a build outage.
 
-# Log in to GitHub Container Registry and Docker Hub for releasing images
-# This should be done once per CI job, but the script is idempotent so not harmful to execute twice.
-
-echo "$GH_TOKEN"| docker login ghcr.io -u "$GH_USER" --password-stdin
-
 # Verify we are on an arch that can publish multi-arch images
 ARCH=$(uname -m)
 if [ "$ARCH" != "x86_64" ]; then
@@ -39,6 +34,12 @@ echo '{ "experimental":true, "registry-mirrors": ["https://mirror.gcr.io"] }' | 
 sudo service docker restart
 # Enable experimental client features (eg docker buildx)
 mkdir -p ${HOME}/.docker && echo '{"experimental":"enabled"}' > ${HOME}/.docker/config.json
+
+# Log in to GitHub Container Registry and Docker Hub for releasing images
+# This effects ${HOME}/.docker/config.json, which was created above
+
+echo "$GH_TOKEN"| docker login ghcr.io -u "$GH_USER" --password-stdin
+echo "$DOCKERHUB_TOKEN"| docker login -u "$DOCKERHUB_USER" --password-stdin
 
 # Add buildx plugin
 BUILDX_VERSION=0.4.2
