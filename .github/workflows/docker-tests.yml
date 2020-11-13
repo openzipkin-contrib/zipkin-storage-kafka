@@ -36,7 +36,7 @@ jobs:
           path: ~/.docker
           key: ${{ runner.os }}-docker-${{ hashFiles('**/Dockerfile') }}
           restore-keys: ${{ runner.os }}-docker
-      - name: Execute Zipkin storage-kafka Build
+      - name: Execute Zipkin Storage Kafka Build
         # Skips tests and license to run faster and allow shallow clones
         run: ./mvnw -T1C -q --batch-mode -DskipTests -Dlicense.skip=true clean package
         shell: bash
