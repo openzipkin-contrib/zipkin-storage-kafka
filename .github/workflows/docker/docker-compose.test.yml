@@ -25,7 +25,7 @@ services:
   # Use fixed service and container name 'sut; so our test script can copy/pasta
   sut:
     # This is the image just built. It is not in a remote repository.
-    image: openzipkincontrib/zipkin-storage-kafka:test
+    image: openzipkin-contrib/zipkin-storage-kafka:test
     container_name: sut
     ports:
       - 9411:9411

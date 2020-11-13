@@ -38,7 +38,7 @@ services:
       kafka:
         condition: service_healthy
   zipkin:
-    image: ghcr.io/openzipkincontrib/zipkin-kafka
+    image: ghcr.io/openzipkin-contrib/zipkin-kafka
     container_name: zipkin-aggregation
     ports:
       - 9411:9411
@@ -52,7 +52,7 @@ services:
       kafka-topics:
         condition: service_started
   zipkin-1:
-    image: ghcr.io/openzipkincontrib/zipkin-kafka
+    image: ghcr.io/openzipkin-contrib/zipkin-kafka
     container_name: zipkin-1
     hostname: zipkin-1
     ports:
@@ -68,7 +68,7 @@ services:
       kafka-topics:
         condition: service_started
   zipkin-2:
-    image: ghcr.io/openzipkincontrib/zipkin-kafka
+    image: ghcr.io/openzipkin-contrib/zipkin-kafka
     container_name: zipkin-2
     hostname: zipkin-2
     ports:

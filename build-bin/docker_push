@@ -36,7 +36,7 @@ case ${release_version} in
     minor_tag=$(echo "${release_version}" | cut -f1-2 -d. -s)
     subminor_tag="${release_version}"
     DOCKER_TAGS="$subminor_tag $minor_tag $major_tag latest"
-    DOCKER_REPOS="ghcr.io docker.io"
+    DOCKER_REPOS="ghcr.io"
     ;;
 esac
 
@@ -44,7 +44,7 @@ TAGS=""
 for repo in ${DOCKER_REPOS}; do
   TAGS="${TAGS}\n"
   for tag in ${DOCKER_TAGS}; do
-    TAGS="${TAGS} ${repo}/openzipkincontrib/zipkin-storage-kafka:${tag}"
+    TAGS="${TAGS} ${repo}/openzipkin-contrib/zipkin-storage-kafka:${tag}"
   done
 done
 

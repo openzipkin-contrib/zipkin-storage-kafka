@@ -151,5 +151,5 @@ Snapshots are uploaded to [Sonatype](https://oss.sonatype.org/content/repositori
 commits to master.
 
 ### Docker Images
-Released versions of zipkin-server are published to Docker Hub as `openzipkincontrib/zipkin-storage-kafka` and GitHub
-Container Registry as `ghcr.io/openzipkincontrib/zipkin-storage-kafka`. See [docker](./docker) for details.
+Released versions of zipkin-storage-kafka are published to GitHub Container Registry as
+`ghcr.io/openzipkin-contrib/zipkin-storage-kafka`. See [docker](./docker) for details.
