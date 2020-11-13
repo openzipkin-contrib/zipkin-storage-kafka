@@ -107,4 +107,4 @@ case ${ARCH} in
 esac
 
 echo "Pushing image ${TAG} with platforms ${PLATFORMS} and Zipkin version ${ZIPKIN_VERSION}"
-docker buildx build --progress plain --platform=${PLATFORMS} --build-arg ${DOCKER_ARGS} --push
+docker buildx build --progress plain --platform=${PLATFORMS} ${DOCKER_ARGS} --push
