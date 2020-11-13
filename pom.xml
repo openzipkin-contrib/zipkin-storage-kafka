@@ -344,10 +344,12 @@
             <configure_test>SCRIPT_STYLE</configure_test>
             <!-- docker and docker/bin -->
             <build_image>SCRIPT_STYLE</build_image>
+            <build_module_image>SCRIPT_STYLE</build_module_image>
             <block_on_health>SCRIPT_STYLE</block_on_health>
             <install_zipkin_module>SCRIPT_STYLE</install_zipkin_module>
           </mapping>
           <excludes>
+            <exclude>.docker.env</exclude>
             <exclude>.travis.yml</exclude>
             <exclude>.gitignore</exclude>
             <exclude>.editorconfig</exclude>

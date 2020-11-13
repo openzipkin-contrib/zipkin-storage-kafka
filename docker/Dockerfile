@@ -35,17 +35,18 @@ ENV RELEASE_VERSION=$release_version
 # When true, main images reuse module jars in the context root
 ARG release_from_maven_build=false
 ENV RELEASE_FROM_MAVEN_BUILD=$release_from_maven_build
-ARG module
+
 ARG group_id
-RUN GROUP_ID=$group_id MODULE=$module /code/docker/bin/install_zipkin_module
+ARG artifact_id
+RUN GROUP_ID=$group_id ARTIFACT_ID=$artifact_id /code/docker/bin/install_zipkin_module
 
-FROM ghcr.io/openzipkin/zipkin:${zipkin_version} as zipkin-storage-kafka
-LABEL org.opencontainers.image.description="Zipkin with Kafka Trace storage on OpenJDK and Alpine Linux"
-
+# The image built starts here:
+FROM ghcr.io/openzipkin/zipkin:${zipkin_version}
 COPY --from=install /install/ /zipkin/
 
+# Instructions specific to this image starts here:
+
+# * Active profile typically corresponds $1 in module/src/main/resources/zipkin-server-(.*).yml
+ENV MODULE_OPTS="-Dloader.path=${artifact_id} -Dspring.profiles.active=storage-kafka"
 ENV KAFKA_STORAGE_DIR /zipkin/data
 RUN mkdir /zipkin/data
-
-ARG module
-ENV MODULE_OPTS="-Dloader.path=${module} -Dspring.profiles.active=${module}"

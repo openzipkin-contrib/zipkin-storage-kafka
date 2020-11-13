@@ -40,11 +40,13 @@ case ${release_version} in
     ;;
 esac
 
+. docker/.docker.env
+
 TAGS=""
 for repo in ${DOCKER_REPOS}; do
   TAGS="${TAGS}\n"
   for tag in ${DOCKER_TAGS}; do
-    TAGS="${TAGS} ${repo}/openzipkin-contrib/zipkin-storage-kafka:${tag}"
+    TAGS="${TAGS} ${repo}/${DOCKER_IMAGE}:${tag}"
   done
 done
 

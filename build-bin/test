@@ -23,5 +23,4 @@ set -ue
 # if certain OpenZipkin projects need slight adjustments here.
 
 # * verify - runs all tests including Docker
-# * -DskipActuator - ensures no tests rely on the actuator library
-exec ./mvnw -nsu -DskipActuator verify
+exec ./mvnw -nsu verify

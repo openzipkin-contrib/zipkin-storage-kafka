@@ -19,7 +19,9 @@ set -eux
 # download the binaries we need.
 if [ "$RELEASE_FROM_MAVEN_BUILD" = "true" ]; then
   echo "*** Reusing zipkin module in the Docker context..."
-  cp "/code/module/target/zipkin-module-${MODULE}-${RELEASE_VERSION}-module.jar" ${MODULE}.jar
+  # If this fails, it is possible the .gitignore is missing a line like:
+  #   !./module/target/zipkin-module-storage-kafka-*-module.jar
+  cp "/code/module/target/${ARTIFACT_ID}-${RELEASE_VERSION}-module.jar" ${ARTIFACT_ID}.jar
 else
   case ${RELEASE_VERSION} in
     *-SNAPSHOT )
@@ -30,13 +32,13 @@ else
     * )
       echo "*** Downloading from Maven..."
         mvn -q --batch-mode --batch-mode org.apache.maven.plugins:maven-dependency-plugin:3.1.2:get \
-          -Dtransitive=false -Dartifact=${GROUP_ID}:zipkin-module-${MODULE}:${RELEASE_VERSION}:jar:module
-        find ~/.m2/repository -name zipkin-module-${MODULE}-${RELEASE_VERSION}-module.jar -exec cp {} ${MODULE}.jar \;
+          -Dtransitive=false -Dartifact=${GROUP_ID}:${ARTIFACT_ID}:${RELEASE_VERSION}:jar:module
+        find ~/.m2/repository -name ${ARTIFACT_ID}-${RELEASE_VERSION}-module.jar -exec cp {} ${ARTIFACT_ID}.jar \;
       ;;
     esac
 fi
 
 # sanity check
-test -f ${MODULE}.jar
+test -f ${ARTIFACT_ID}.jar
 
-(mkdir ${MODULE} && cd ${MODULE} && jar -xf ../${MODULE}.jar) && rm ${MODULE}.jar
+(mkdir ${ARTIFACT_ID} && cd ${ARTIFACT_ID} && jar -xf ../${ARTIFACT_ID}.jar) && rm ${ARTIFACT_ID}.jar

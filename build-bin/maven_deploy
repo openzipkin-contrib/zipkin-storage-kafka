@@ -27,12 +27,3 @@ release_version=${1}
 
 # openzipkin/zipkin pushes Docker images
 RELEASE_FROM_MAVEN_BUILD=true $(dirname "$0")/docker_push ${release_version}
-
-# openzipkin/zipkin publishes Javadoc to https://zipkin.io/zipkin/ on release
-case ${release_version} in
-  *-SNAPSHOT )
-    ;;
-  * )
-    javadoc_to_gh_pages ${release_version}
-    ;;
-esac
