@@ -57,7 +57,7 @@ jobs:
           travis_wait ./build-bin/deploy ${POM_VERSION}
     - stage: deploy
       if: |
-        tag =~ ^[0-9]+\.[0-9]+\.[0-9]+$ AND \
+        tag =~ ^[0-9]+\.[0-9]+\.[0-9]+ AND \
         type = push AND env(TRAVIS_SECURE_ENV_VARS) = true
       name: Deploy a release
       # verify the version tag is coherent
@@ -73,7 +73,7 @@ jobs:
     # Create a release version when a release trigger and in a secure ENV
     - stage: create release
       if: |
-        tag =~ ^release-[0-9]+\.[0-9]+\.[0-9]+$ AND \
+        tag =~ ^release-[0-9]+\.[0-9]+\.[0-9]+ AND \
         type = push AND env(TRAVIS_SECURE_ENV_VARS) = true
       name: "Create release version"
       install: ./build-bin/git/login_git
@@ -86,7 +86,7 @@ jobs:
         - ./build-bin/maven_prepare_release ${release_version}
     - stage: push docker
       if: |
-        tag =~ ^docker-[0-9]+\.[0-9]+\.[0-9]+$ AND \
+        tag =~ ^docker-[0-9]+\.[0-9]+\.[0-9]+ AND \
         type = push AND env(TRAVIS_SECURE_ENV_VARS) = true
       name: Re-push all Docker images
       install:
