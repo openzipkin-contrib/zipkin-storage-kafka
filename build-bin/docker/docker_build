@@ -13,6 +13,18 @@
 # the License.
 #
 
-. $(dirname "$0")/.docker.env
-export DOCKER_IMAGE DOCKER_IMAGE_SOURCE DOCKER_IMAGE_DESCRIPTION
-$(dirname "$0")/bin/build_module_image ${1:-${DOCKER_IMAGE}:test} ${2:-} ${3:-}
+set -ue
+
+if ! test -f docker/Dockerfile; then
+  echo Please execute this script from the repository root
+  exit 1
+fi
+
+docker_tag=${1?docker_tag is required. Ex openzipkin/zipkin:test}
+version=${2:-}
+
+# Avoid buildx on load for two reasons:
+#  * It only supports one platform/arch on load https://github.com/docker/buildx/issues/59
+#  * It would pull Docker Hub for moby/buildkit or multiarch/qemu-user-static images, using up quota
+echo "Building image ${docker_tag}"
+DOCKER_BUILDKIT=0 docker build -f docker/Dockerfile --tag ${docker_tag} --build-arg version=${version} .

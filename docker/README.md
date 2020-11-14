@@ -9,12 +9,12 @@ To build a zipkin-storage-kafka Docker image from source, in the top level of th
 
 
 ```bash
-$ docker/build_image openzipkin-contrib/zipkin-storage-kafka:test
+$ build-bin/docker/docker_build openzipkin-contrib/zipkin-storage-kafka:test
 ```
 
 To build from a published version, run this instead:
 
 ```bash
-$ docker/build_image openzipkin-contrib/zipkin-storage-kafka:test 0.18.1
+$ build-bin/docker/docker_build openzipkin-contrib/zipkin-storage-kafka:test 0.18.1
 ```
 

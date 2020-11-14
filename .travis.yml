@@ -77,7 +77,7 @@ jobs:
         tag =~ ^release-[0-9]+\.[0-9]+\.[0-9]+$ AND \
         type = push AND env(TRAVIS_SECURE_ENV_VARS) = true
       name: "Create release version"
-      install: ./build-bin/login_git
+      install: ./build-bin/git/login_git
       script:
         # Delete the trigger tag
         - git push origin :"${TRAVIS_TAG}"
@@ -91,8 +91,8 @@ jobs:
         type = push AND env(TRAVIS_SECURE_ENV_VARS) = true
       name: Re-push all Docker images
       install:
-        - ./build-bin/login_git
-        - ./build-bin/configure_docker_push
+        - ./build-bin/git/login_git
+        - ./build-bin/docker/configure_docker_push
       script:
         # Delete the trigger tag
         - git push origin :"${TRAVIS_TAG}"

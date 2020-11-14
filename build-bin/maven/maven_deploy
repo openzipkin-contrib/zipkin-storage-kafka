@@ -17,13 +17,5 @@ set -ue
 
 # This script deploys a SNAPSHOT or release version to Sonatype.
 #
-# Note: In CI, `configure_deploy` must be called before invoking this.
-#
-# This script primarily helps `.travis.yml` and `RELEASE.md` contain nearly the same contents, even
-# if certain OpenZipkin projects need slight adjustments here.
-release_version=${1}
-
+# Note: In CI, `configure_maven_deploy` must be called before invoking this.
 ./mvnw --batch-mode -s ./.settings.xml -Prelease -nsu -DskipTests deploy
-
-# openzipkin/zipkin pushes Docker images
-RELEASE_FROM_MAVEN_BUILD=true $(dirname "$0")/docker_push ${release_version}

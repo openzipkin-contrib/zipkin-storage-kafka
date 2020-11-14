@@ -17,11 +17,8 @@ set -ue
 
 # This script creates a release tag N.N.N which later will have `deploy` run against it.
 #
-# Note: In CI, `login_git` must be called before invoking this.
-#
-# This script primarily helps `.travis.yml` and `RELEASE.md` contain nearly the same contents, even
-# if certain OpenZipkin projects need slight adjustments here.
-release_version=${1}
+# Note: In CI, `build-bin/git/login_git` must be called before invoking this.
+release_version=${1?release_version is required. Ex 2.22.2}
 release_branch=${2:-master}
 
 # Checkout master, as we release from master, not a tag ref

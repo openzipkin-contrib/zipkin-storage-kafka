@@ -1,0 +1,77 @@
+#!/bin/sh
+#
+# Copyright 2019-2020 The OpenZipkin Authors
+#
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+# in compliance with the License. You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software distributed under the License
+# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+# or implied. See the License for the specific language governing permissions and limitations under
+# the License.
+#
+
+# This script pushes images to GitHub Container Registry (ghcr.io).
+#
+# When a release, and DOCKER_RELEASE_REPOS is unset they also push to Docker Hub (docker.io).
+#
+# Note: In CI, `configure_docker_push` must be called before invoking this.
+set -ue
+
+if ! test -f docker/Dockerfile; then
+  echo Please execute this script from the repository root
+  exit 1
+fi
+
+docker_image=${1?docker_image is required. Ex openzipkin/zipkin}
+version=${2?version is required. Ex 1.2.3-SNAPSHOT or 2.22.2}
+
+case ${version} in
+  *-SNAPSHOT )
+    docker_tags=master
+    docker_repos=ghcr.io
+    ;;
+  * )
+    major_tag=$(echo "${version}" | cut -f1 -d. -s)
+    minor_tag=$(echo "${version}" | cut -f1-2 -d. -s)
+    subminor_tag="${version}"
+    docker_tags="$subminor_tag $minor_tag $major_tag latest"
+    docker_repos=${DOCKER_RELEASE_REPOS:-ghcr.io docker.io}
+    ;;
+esac
+
+tags=""
+for repo in ${docker_repos}; do
+  tags="${tags}\n"
+  for tag in ${docker_tags}; do
+    tags="${tags} ${repo}/${docker_image}:${tag}"
+  done
+done
+
+# plaforms to eventually push to the registry
+docker_platforms=${DOCKER_PLATFORMS:-linux/amd64,linux/arm64}
+
+# This can be less manual in the future, for example checking buildx to see what it can do.
+arch=${ARCH:-$(uname -m)}
+case ${arch} in
+  x86_64* )
+    ;;
+  amd64* )
+    ;;
+  * )
+    echo Pushing docker_platforms ${docker_platforms} with arch ${arch} is not yet supported.
+    exit 1
+esac
+
+echo "Will push the following tags with platform ${docker_platforms}:${tags}\n"
+
+docker_push="docker buildx build --progress plain --platform=${docker_platforms} \
+--build-arg version=${version} --label org.opencontainers.image.version=$version \
+-f docker/Dockerfile . --push"
+
+for docker_tag in $(echo ${docker_tags}|xargs); do
+  echo "Pushing tag ${docker_tag}..."
+  ${docker_push} --tag ${docker_tag}
+done

@@ -12,9 +12,6 @@
 # the License.
 #
 
-ARG java_version
-ARG zipkin_version
-
 # We copy files from the context into a scratch container first to avoid a problem where docker and
 # docker-compose don't share layer hashes https://github.com/docker/compose/issues/883 normally.
 # COPY --from= works around the issue.
@@ -22,31 +19,33 @@ FROM scratch as scratch
 
 COPY . /code/
 
-FROM ghcr.io/openzipkin/java:${java_version} as install
+# This version is only used during the install process, as the image is layered on whatever Zipkin
+# is built with. However, it is still nice to keep this the same.
+FROM ghcr.io/openzipkin/java:15.0.1_p9 as install
 
-WORKDIR /install
-
+WORKDIR /code
 # Conditions aren't supported in Dockerfile instructions, so we copy source even if it isn't used.
-COPY --from=scratch /code /code
+COPY --from=scratch /code/ .
 
-# This will either be a snapshot like 2.4.5-SNAPSHOT or a real version ex. "2.4.5"
-ARG release_version
-ENV RELEASE_VERSION=$release_version
-# When true, main images reuse module jars in the context root
-ARG release_from_maven_build=false
-ENV RELEASE_FROM_MAVEN_BUILD=$release_from_maven_build
+# Empty to use implicit version. Otherwise a published version ex. "2.4.5"
+ARG version=
+ENV VERSION=$version
+# Build the project and unzip its main contents to /install
+RUN test -z "${VERSION}" && VERSION=$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml| head -1) && \
+ARTIFACT_ID=zipkin-module-storage-kafka && \
+./build-bin/maven/maven_unjar io.zipkin.contrib.zipkin-storage-kafka ${ARTIFACT_ID} ${VERSION} module && \
+mv $ARTIFACT_ID /install
 
-ARG group_id
-ARG artifact_id
-RUN GROUP_ID=$group_id ARTIFACT_ID=$artifact_id /code/docker/bin/install_zipkin_module
+# zipkin version should match zipkin.version in /code/pom.xml
+FROM ghcr.io/openzipkin/zipkin:2.22.2 as zipkin-storage-kafka
+LABEL org.opencontainers.image.description="Zipkin with Kafka Trace storage on OpenJDK and Alpine Linux"
+LABEL org.opencontainers.image.source=https://github.com/openzipkin-contrib/zipkin-storage-kafka
 
-# The image built starts here:
-FROM ghcr.io/openzipkin/zipkin:${zipkin_version}
-COPY --from=install /install/ /zipkin/
-
-# Instructions specific to this image starts here:
+# Add installation root as a module
+ARG module=storage-kafka
+COPY --from=install /install/ /zipkin/${module}/
 
 # * Active profile typically corresponds $1 in module/src/main/resources/zipkin-server-(.*).yml
-ENV MODULE_OPTS="-Dloader.path=${artifact_id} -Dspring.profiles.active=storage-kafka"
+ENV MODULE_OPTS="-Dloader.path=${module} -Dspring.profiles.active=${module}"
 ENV KAFKA_STORAGE_DIR /zipkin/data
 RUN mkdir /zipkin/data
