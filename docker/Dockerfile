@@ -19,8 +19,8 @@ FROM scratch as scratch
 
 COPY . /code/
 
-# This version is only used during the install process, as the image is layered on whatever Zipkin
-# is built with. However, it is still nice to keep this the same.
+# This version is only used during the install process. Try to be consistent as it reduces layers,
+# which reduces downloads.
 FROM ghcr.io/openzipkin/java:15.0.1_p9 as install
 
 WORKDIR /code
@@ -35,10 +35,8 @@ RUN if [ -n "${VERSION}" ]; then echo "${VERSION}" > version; else \
     fi
 
 # Download or build the project's main artifact, then unzip it into /install
-ENV GROUP_ID=io.zipkin.contrib.zipkin-storage-kafka
 ENV ARTIFACT_ID=zipkin-module-storage-kafka
-ENV CLASSIFIER=module
-RUN ./build-bin/maven/maven_build_or_unjar ${GROUP_ID} ${ARTIFACT_ID} $(cat version) ${CLASSIFIER} && \
+RUN ./build-bin/maven/maven_build_or_unjar io.zipkin.contrib.zipkin-storage-kafka ${ARTIFACT_ID} $(cat version) module && \
     mv $ARTIFACT_ID /install
 
 # zipkin version should match zipkin.version in /code/pom.xml
@@ -48,7 +46,7 @@ LABEL org.opencontainers.image.source=https://github.com/openzipkin-contrib/zipk
 
 # Add installation root as a module
 ARG module=storage-kafka
-COPY --from=install /install/ /zipkin/${module}/
+COPY --from=install --chown=${USER} /install/ /zipkin/${module}/
 
 # * Active profile typically corresponds $1 in module/src/main/resources/zipkin-server-(.*).yml
 ENV MODULE_OPTS="-Dloader.path=${module} -Dspring.profiles.active=${module}"
