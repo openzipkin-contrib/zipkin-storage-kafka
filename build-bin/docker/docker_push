@@ -27,6 +27,10 @@ fi
 
 docker_image=${1?docker_image is required. Ex openzipkin/zipkin}
 version=${2?version is required. Ex 1.2.3-SNAPSHOT or 2.22.2}
+# Ex. "module" or "exec" Empty for no classifier.
+# optional classifier arg to ./build-bin/maven/maven_unjar if this image uses it. Allows you to
+# define a single image that builds two classifiers, which is the case in Zipkin (slim vs normal).
+maven_classifier=${MAVEN_CLASSIFIER:-}
 
 case ${version} in
   *-SNAPSHOT )
@@ -68,10 +72,11 @@ esac
 echo "Will push the following tags with platform ${docker_platforms}:${tags}\n"
 
 docker_push="docker buildx build --progress plain --platform=${docker_platforms} \
+--build-arg maven_classifier=${maven_classifier} \
 --build-arg version=${version} --label org.opencontainers.image.version=$version \
 -f docker/Dockerfile . --push"
 
-for docker_tag in $(echo ${docker_tags}|xargs); do
-  echo "Pushing tag ${docker_tag}..."
-  ${docker_push} --tag ${docker_tag}
+for tag in $(echo ${tags}|xargs); do
+  echo "Pushing tag ${tag}..."
+  ${docker_push} --tag ${tag}
 done

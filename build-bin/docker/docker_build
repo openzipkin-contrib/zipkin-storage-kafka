@@ -22,9 +22,16 @@ fi
 
 docker_tag=${1?docker_tag is required. Ex openzipkin/zipkin:test}
 version=${2:-}
+# Ex. "module" or "exec" Empty for no classifier.
+# optional classifier arg to ./build-bin/maven/maven_unjar if this image uses it. Allows you to
+# define a single image that builds two classifiers, which is the case in Zipkin (slim vs normal).
+maven_classifier=${MAVEN_CLASSIFIER:-}
 
 # Avoid buildx on load for two reasons:
 #  * It only supports one platform/arch on load https://github.com/docker/buildx/issues/59
 #  * It would pull Docker Hub for moby/buildkit or multiarch/qemu-user-static images, using up quota
 echo "Building image ${docker_tag}"
-DOCKER_BUILDKIT=0 docker build -f docker/Dockerfile --tag ${docker_tag} --build-arg version=${version} .
+DOCKER_BUILDKIT=0 docker build --tag ${docker_tag} \
+--build-arg maven_classifier=${maven_classifier} \
+--build-arg version=${version} --label org.opencontainers.image.version=$version \
+-f docker/Dockerfile .

@@ -18,6 +18,7 @@ docs
 
 # Install script runs within Docker
 build-bin/**
+!build-bin/maven/maven_build_or_unjar
 !build-bin/maven/maven_unjar
 
 # Allow on-demand "mvn package"

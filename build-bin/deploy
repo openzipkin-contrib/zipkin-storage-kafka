@@ -24,8 +24,8 @@ set -ue
 
 version=${1?version is required}
 
-$(dirname "$0")/maven/maven_deploy ${version}
+build-bin/maven/maven_deploy ${version}
 
 # openzipkin-contrib is named differently in docker.io (openzipkincontrib). Skip the latter for now.
-export DOCKER_RELEASE_REPOS=ghcr.io
-$(dirname "$0")/docker/docker_push openzipkin-contrib/zipkin-storage-kafka ${version}
+DOCKER_RELEASE_REPOS=ghcr.io RELEASE_FROM_MAVEN_BUILD=true build-bin/docker/docker_push \
+openzipkin-contrib/zipkin-storage-kafka ${version}

@@ -30,13 +30,15 @@ COPY --from=scratch /code/ .
 # Ex. "2.4.5" or "2.4.5-SNAPSHOT" Empty to use the pom version.
 ARG version=
 ENV VERSION=$version
-RUN (test -n "${VERSION}" && echo "${VERSION}" || sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml| head -1) > version
+RUN if [ -n "${VERSION}" ]; then echo "${VERSION}" > version; else \
+      sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml| head -1 > version; \
+    fi
 
-# Build the project and unzip its main artifact to /install
+# Download or build the project's main artifact, then unzip it into /install
 ENV GROUP_ID=io.zipkin.contrib.zipkin-storage-kafka
 ENV ARTIFACT_ID=zipkin-module-storage-kafka
 ENV CLASSIFIER=module
-RUN ./build-bin/maven/maven_unjar ${GROUP_ID} ${ARTIFACT_ID} $(cat version) ${CLASSIFIER} && \
+RUN ./build-bin/maven/maven_build_or_unjar ${GROUP_ID} ${ARTIFACT_ID} $(cat version) ${CLASSIFIER} && \
     mv $ARTIFACT_ID /install
 
 # zipkin version should match zipkin.version in /code/pom.xml

@@ -377,6 +377,7 @@
                 <!-- build-bin/maven -->
                 <configure_maven>SCRIPT_STYLE</configure_maven>
                 <configure_maven_deploy>SCRIPT_STYLE</configure_maven_deploy>
+                <maven_build_or_unjar>SCRIPT_STYLE</maven_build_or_unjar>
                 <maven_deploy>SCRIPT_STYLE</maven_deploy>
                 <maven_prepare_release>SCRIPT_STYLE</maven_prepare_release>
                 <maven_unjar>SCRIPT_STYLE</maven_unjar>

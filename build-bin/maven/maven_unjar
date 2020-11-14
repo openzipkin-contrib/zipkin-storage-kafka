@@ -20,12 +20,12 @@ set -eu
 #
 # Ex. ./maven_unjar io.zipkin zipkin-server 2.22.2 slim
 #
-# When the version ends in SNAPSHOT, this searches the current directory instead of resolving
-# remotely. If the intended artifact isn't there, it is built on-demand using `mvn package`.
+# When the version ends in SNAPSHOT or [ "${RELEASE_FROM_MAVEN_BUILD}" = "true" ], this searches the
+# current directory instead of resolving remotely. If the intended artifact isn't there, it is built
+# on-demand using `mvn package`.
 #
-# Note: Be careful building on-demand within Docker, as it can cause high bandwidth usage, pulling
-# dependencies for the project. If you are running this within Docker, ensure you have .dockerignore
-# setup properly to pass the artifact you are looking for.
+# Note: If you are running this within Docker, ensure you have .dockerignore setup properly to pass
+# the artifact you are looking for.
 #
 # Ex.
 # !./module/target/zipkin-module-storage-kafka-*-module.jar
@@ -56,18 +56,9 @@ local_repo_path=${local_repo}/$(echo ${group_id}|tr '.' '/')/${artifact_id}/${ve
 if test -f ${local_repo_path}; then
   echo "*** Reusing ${qualified_jar} from Maven local repository..."
   cp ${local_repo_path} ${artifact_id}.jar
-elif [ "${is_snapshot}" = "true" ]; then
+elif [ "${is_snapshot}" = "true" ] || [ "${RELEASE_FROM_MAVEN_BUILD}" = "true" ]; then
   echo "*** Searching for ${qualified_jar} in ${PWD}"
-  function find_and_copy() {
-    find . -name ${qualified_jar} -exec cp {} ${artifact_id}.jar \;
-  }
-  $(find_and_copy)
-
-  if ! test -f ${artifact_id}.jar; then
-    echo "*** Building ${qualified_jar} from source..."
-    mvn -T1C -q --batch-mode -DskipTests package
-    $(find_and_copy)
-  fi
+  find . -name ${qualified_jar} -exec cp {} ${artifact_id}.jar \;
 else
   mvn_get="mvn -q --batch-mode org.apache.maven.plugins:maven-dependency-plugin:3.1.2:get \
   -Dtransitive=false -DgroupId=${group_id} -DartifactId=${artifact_id} -Dversion=${version}"
