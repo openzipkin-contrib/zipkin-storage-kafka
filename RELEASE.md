@@ -14,24 +14,21 @@ This repo uses semantic versions. Please keep this in mind when choosing version
 
 1. **Wait for Travis CI**
 
-   The `release-N.M.L` tag triggers [`build-bin/maven_prepare_release`](build-bin/maven/maven_prepare_release), which
+   The `release-N.M.L` tag triggers [`build-bin/maven/maven_prepare_release`](build-bin/maven/maven_prepare_release), which
    creates commits, `N.M.L` tag, and increments the version (maven-release-plugin).
 
    The `N.M.L` tag triggers [`build-bin/deploy`](build-bin/deploy), which does the following:
-     * Publishes jars to https://oss.sonatype.org/content/repositories/releases (nexus-staging-maven-plugin)
+     * Publishes jars to https://oss.sonatype.org/content/repositories/releases [`build-bin/maven/maven_deploy`](build-bin/maven/maven_deploy)
        * Later, the same jars synchronize to Maven Central
-     * Pushes images to Docker registries [`build-bin/docker_push`](build-bin/docker/docker_push)
-     * Publishes Javadoc to https://zipkin.io/zipkin into a versioned subdirectory [`build-bin/javadoc_to_gh_pages`](build-bin/javadoc_to_gh_pages)
+     * Pushes images to Docker registries [`build-bin/docker/docker_push`](build-bin/docker/docker_push)
 
    Notes:
      * https://search.maven.org/ index will take longer than direct links like https://repo1.maven.org/maven2/io/zipkin
-     * Javadocs are also published on all builds of master; due to versioning, it doesn't
-   overwrite docs built for releases.
 
 ## Credentials
 
 The release process uses various credentials. If you notice something failing due to unauthorized,
-look at the notes in [.travis.yml] and check the [project settings](https://travis-ci.com/github/openzipkin/zipkin/settings)
+look at the notes in [.travis.yml] and check the [project settings](https://travis-ci.com/github/openzipkin/zipkin-dependencies/settings)
 
 ### Troubleshooting invalid credentials
 
@@ -45,7 +42,7 @@ is a good way to validate that your unencrypted credentials are authorized.
 
 Here's an example of a snapshot deploy with specified credentials.
 ```bash
-$ export GPG_TTY=$(tty) && GPG_PASSPHRASE=whackamole SONATYPE_USER=adrianmole SONATYPE_PASSWORD=ed6f20bde9123bbb2312b221 ./mvnw --batch-mode -s ./.settings.xml -Prelease -nsu -DskipTests deploy
+$ export GPG_TTY=$(tty) && GPG_PASSPHRASE=whackamole SONATYPE_USER=adrianmole SONATYPE_PASSWORD=ed6f20bde9123bbb2312b221 build-bin/build-bin/maven/maven_deploy
 ```
 
 ## First release of the year
@@ -81,7 +78,7 @@ export SONATYPE_PASSWORD=your_sonatype_password
 release_version=xx-version-to-release-xx
 
 # now from latest master, create the release. This creates and pushes the N.M.L tag
-./build-bin/maven_prepare_release ${release_version}
+./build-bin/maven/maven_prepare_release ${release_version}
 
 # once this works, deploy the release
 git checkout ${release_version}

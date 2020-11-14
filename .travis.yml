@@ -31,9 +31,7 @@ jobs:
     - stage: test
       # We run tests on non-tagged pushes to master that aren't a commit made by the release plugin
       # We also run tests on pull requests targeted at the master branch.
-      if: |
-        "branch = master AND tag IS blank AND commit_message !~ maven-release-plugin AND \
-         type IN (push, pull_request)"
+      if: "branch = master AND tag IS blank AND commit_message !~ maven-release-plugin AND type IN (push, pull_request)"
       name: Run unit and integration tests
       before_install: *terminate_if_only_docs
       # To save time and build credits, we continue to deploy after a secure commit to master.
@@ -52,17 +50,15 @@ jobs:
         - if [ "${SHOULD_DEPLOY}" != "true" ]; then travis_terminate 0; fi
         # Deploy a SNAPSHOT version
         - |
-          export POM_VERSION=$(mvn help:evaluate -N -Dexpression=project.version -q -DforceStdout)
+          export POM_VERSION=$(./mvnw help:evaluate -N -Dexpression=project.version -q -DforceStdout)
           # travis_wait ensures long pauses during uploads aren't mistaken for a hung job
           travis_wait ./build-bin/deploy ${POM_VERSION}
     - stage: deploy
-      if: |
-        "tag =~ /^[0-9]+\.[0-9]+\.[0-9]+$/ AND \
-         type = push AND env(TRAVIS_SECURE_ENV_VARS) = true"
+      if: "tag =~ /^[0-9]+\.[0-9]+\.[0-9]+$/ AND type = push AND env(TRAVIS_SECURE_ENV_VARS) = true"
       name: Deploy a release
       # verify the version tag is coherent
       before_install: |
-        export POM_VERSION=$(mvn help:evaluate -N -Dexpression=project.version -q -DforceStdout)
+        export POM_VERSION=$(./mvnw help:evaluate -N -Dexpression=project.version -q -DforceStdout)
         if [ "${POM_VERSION}" != "${TRAVIS_TAG}" ]; then
           echo "Invalid version. Git tag ${TRAVIS_TAG} should have project.version ${POM_VERSION}"
           exit 1
@@ -72,9 +68,7 @@ jobs:
       script: travis_wait ./build-bin/deploy ${POM_VERSION}
     # Create a release version when a release trigger and in a secure ENV
     - stage: create release
-      if: |
-        "tag =~ /^release-[0-9]+\.[0-9]+\.[0-9]+$/ AND \
-         type = push AND env(TRAVIS_SECURE_ENV_VARS) = true"
+      if: "tag =~ /^release-[0-9]+\.[0-9]+\.[0-9]+$/ AND  type = push AND env(TRAVIS_SECURE_ENV_VARS) = true"
       name: "Create release version"
       install: ./build-bin/git/login_git
       script:
@@ -85,9 +79,7 @@ jobs:
         # Create the release tag
         - ./build-bin/maven_prepare_release ${release_version}
     - stage: push docker
-      if: |
-        "tag =~ /^docker-[0-9]+\.[0-9]+\.[0-9]+$/ AND \
-         type = push AND env(TRAVIS_SECURE_ENV_VARS) = true"
+      if: "tag =~ /^docker-[0-9]+\.[0-9]+\.[0-9]+$/ AND type = push AND env(TRAVIS_SECURE_ENV_VARS) = true"
       name: Re-push all Docker images
       install:
         - ./build-bin/git/login_git
