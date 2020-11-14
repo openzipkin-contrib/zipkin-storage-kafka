@@ -56,7 +56,7 @@ local_repo_path=${local_repo}/$(echo ${group_id}|tr '.' '/')/${artifact_id}/${ve
 if test -f ${local_repo_path}; then
   echo "*** Reusing ${qualified_jar} from Maven local repository..."
   cp ${local_repo_path} ${artifact_id}.jar
-elif [ "${is_snapshot}" = "true" ] || [ "${RELEASE_FROM_MAVEN_BUILD}" = "true" ]; then
+elif [ "${is_snapshot}" = "true" ] || [ "${RELEASE_FROM_MAVEN_BUILD:-false}" = "true" ]; then
   echo "*** Searching for ${qualified_jar} in ${PWD}"
   find . -name ${qualified_jar} -exec cp {} ${artifact_id}.jar \;
 else

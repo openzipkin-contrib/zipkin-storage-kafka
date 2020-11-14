@@ -28,7 +28,7 @@ This repo uses semantic versions. Please keep this in mind when choosing version
 ## Credentials
 
 The release process uses various credentials. If you notice something failing due to unauthorized,
-look at the notes in [.travis.yml] and check the [project settings](https://travis-ci.com/github/openzipkin/zipkin-dependencies/settings)
+look at the notes in [.travis.yml] and check the [project settings](https://travis-ci.com/github/openzipkin-contrib/zipkin-storage-kafka/settings)
 
 ### Troubleshooting invalid credentials
 

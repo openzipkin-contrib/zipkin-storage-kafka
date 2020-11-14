@@ -72,6 +72,7 @@ esac
 echo "Will push the following tags with platform ${docker_platforms}:${tags}\n"
 
 docker_push="docker buildx build --progress plain --platform=${docker_platforms} \
+--build-arg release_from_maven_build=${RELEASE_FROM_MAVEN_BUILD:-false} \
 --build-arg maven_classifier=${maven_classifier} \
 --build-arg version=${version} --label org.opencontainers.image.version=$version \
 -f docker/Dockerfile . --push"

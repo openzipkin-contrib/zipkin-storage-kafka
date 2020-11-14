@@ -34,6 +34,10 @@ RUN if [ -n "${VERSION}" ]; then echo "${VERSION}" > version; else \
       sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml| head -1 > version; \
     fi
 
+# When true, if the artifact was built and .dockerignore allows it, re-use instead of downloading
+ARG release_from_maven_build=false
+ENV RELEASE_FROM_MAVEN_BUILD=$RELEASE_FROM_MAVEN_BUILD
+
 # Download or build the project's main artifact, then unzip it into /install
 ENV ARTIFACT_ID=zipkin-module-storage-kafka
 RUN ./build-bin/maven/maven_build_or_unjar io.zipkin.contrib.zipkin-storage-kafka ${ARTIFACT_ID} $(cat version) module && \
