@@ -27,14 +27,17 @@ WORKDIR /code
 # Conditions aren't supported in Dockerfile instructions, so we copy source even if it isn't used.
 COPY --from=scratch /code/ .
 
-# Empty to use implicit version. Otherwise a published version ex. "2.4.5"
+# Ex. "2.4.5" or "2.4.5-SNAPSHOT" Empty to use the pom version.
 ARG version=
 ENV VERSION=$version
-# Build the project and unzip its main contents to /install
-RUN test -z "${VERSION}" && VERSION=$(sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml| head -1) && \
-ARTIFACT_ID=zipkin-module-storage-kafka && \
-./build-bin/maven/maven_unjar io.zipkin.contrib.zipkin-storage-kafka ${ARTIFACT_ID} ${VERSION} module && \
-mv $ARTIFACT_ID /install
+RUN (test -n "${VERSION}" && echo "${VERSION}" || sed -n 's/.*<version>\(.*\)<\/version>.*/\1/p' pom.xml| head -1) > version
+
+# Build the project and unzip its main artifact to /install
+ENV GROUP_ID=io.zipkin.contrib.zipkin-storage-kafka
+ENV ARTIFACT_ID=zipkin-module-storage-kafka
+ENV CLASSIFIER=module
+RUN ./build-bin/maven/maven_unjar ${GROUP_ID} ${ARTIFACT_ID} $(cat version) ${CLASSIFIER} && \
+    mv $ARTIFACT_ID /install
 
 # zipkin version should match zipkin.version in /code/pom.xml
 FROM ghcr.io/openzipkin/zipkin:2.22.2 as zipkin-storage-kafka
