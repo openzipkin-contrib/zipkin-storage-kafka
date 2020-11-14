@@ -22,5 +22,5 @@ set -ue
 # This script primarily helps `.travis.yml` and `RELEASE.md` contain nearly the same contents, even
 # if certain OpenZipkin projects need slight adjustments here.
 
-$(dirname "$0")/configure_docker
-$(dirname "$0")/configure_maven
+build-bin/maven/configure_maven
+build-bin/docker/configure_docker

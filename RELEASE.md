@@ -14,13 +14,13 @@ This repo uses semantic versions. Please keep this in mind when choosing version
 
 1. **Wait for Travis CI**
 
-   The `release-N.M.L` tag triggers [`build-bin/maven_prepare_release`](build-bin/maven_prepare_release), which
+   The `release-N.M.L` tag triggers [`build-bin/maven_prepare_release`](build-bin/maven/maven_prepare_release), which
    creates commits, `N.M.L` tag, and increments the version (maven-release-plugin).
 
    The `N.M.L` tag triggers [`build-bin/deploy`](build-bin/deploy), which does the following:
      * Publishes jars to https://oss.sonatype.org/content/repositories/releases (nexus-staging-maven-plugin)
        * Later, the same jars synchronize to Maven Central
-     * Pushes images to Docker registries [`build-bin/docker_push`](build-bin/docker_push)
+     * Pushes images to Docker registries [`build-bin/docker_push`](build-bin/docker/docker_push)
      * Publishes Javadoc to https://zipkin.io/zipkin into a versioned subdirectory [`build-bin/javadoc_to_gh_pages`](build-bin/javadoc_to_gh_pages)
 
    Notes:

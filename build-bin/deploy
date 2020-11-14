@@ -22,9 +22,10 @@ set -ue
 # This script primarily helps `.travis.yml` and `RELEASE.md` contain nearly the same contents, even
 # if certain OpenZipkin projects need slight adjustments here.
 
-# Note: the pom version should always match the git tag on release
-export POM_VERSION=${POM_VERSION:-$(mvn help:evaluate -N -Dexpression=project.version -q -DforceStdout)}
-release_version=${1:-${POM_VERSION}}
+version=${1?version is required}
 
-./mvnw --batch-mode -s ./.settings.xml -Prelease -nsu -DskipTests deploy
-RELEASE_FROM_MAVEN_BUILD=true $(dirname "$0")/docker_push ${release_version}
+build-bin/maven/maven_deploy ${version}
+
+# openzipkin-contrib is named differently in docker.io (openzipkincontrib). Skip the latter for now.
+DOCKER_RELEASE_REPOS=ghcr.io RELEASE_FROM_MAVEN_BUILD=true build-bin/docker/docker_push \
+openzipkin-contrib/zipkin-storage-kafka ${version}

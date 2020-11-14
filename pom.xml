@@ -52,6 +52,7 @@
     <!-- groupId overrinds allow testing feature branches with jitpack -->
     <!-- matching armeria/grpc/zipkin -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
+    <!-- when updating this, update docker/Dockerfile -->
     <zipkin.version>2.22.2</zipkin.version>
     <zipkin-reporter.version>2.16.0</zipkin-reporter.version>
     <spring-boot.version>2.3.4.RELEASE</spring-boot.version>
@@ -319,70 +320,6 @@
       </plugin>
 
       <plugin>
-        <groupId>com.mycila</groupId>
-        <artifactId>license-maven-plugin</artifactId>
-        <version>${license-maven-plugin.version}</version>
-        <configuration>
-          <header>${main.basedir}/src/etc/header.txt</header>
-          <mapping>
-            <!-- Don't use javadoc style as this makes code formatters break it by adding tags! -->
-            <java>SLASHSTAR_STYLE</java>
-            <!-- build-bin -->
-            <build>SCRIPT_STYLE</build>
-            <push>SCRIPT_STYLE</push>
-            <test>SCRIPT_STYLE</test>
-            <deploy>SCRIPT_STYLE</deploy>
-            <login_git>SCRIPT_STYLE</login_git>
-            <maven_prepare_release>SCRIPT_STYLE</maven_prepare_release>
-            <configure_deploy>SCRIPT_STYLE</configure_deploy>
-            <configure_maven>SCRIPT_STYLE</configure_maven>
-            <configure_maven_deploy>SCRIPT_STYLE</configure_maven_deploy>
-            <configure_docker_push>SCRIPT_STYLE</configure_docker_push>
-            <configure_docker>SCRIPT_STYLE</configure_docker>
-            <maven_deploy>SCRIPT_STYLE</maven_deploy>
-            <docker_push>SCRIPT_STYLE</docker_push>
-            <configure_test>SCRIPT_STYLE</configure_test>
-            <!-- docker and docker/bin -->
-            <build_image>SCRIPT_STYLE</build_image>
-            <block_on_health>SCRIPT_STYLE</block_on_health>
-            <install_zipkin_module>SCRIPT_STYLE</install_zipkin_module>
-          </mapping>
-          <excludes>
-            <exclude>.travis.yml</exclude>
-            <exclude>.gitignore</exclude>
-            <exclude>.editorconfig</exclude>
-            <exclude>.mvn/**</exclude>
-            <exclude>mvnw*</exclude>
-            <exclude>etc/header.txt</exclude>
-            <exclude>**/.idea/**</exclude>
-            <exclude>LICENSE</exclude>
-            <exclude>**/*.md</exclude>
-            <exclude>src/test/resources/**</exclude>
-            <exclude>src/main/resources/**</exclude>
-            <exclude>**/*.puml</exclude>
-            <exclude>Makefile</exclude>
-            <exclude>.dockerignore</exclude>
-          </excludes>
-          <strictCheck>true</strictCheck>
-        </configuration>
-        <dependencies>
-          <dependency>
-            <groupId>com.mycila</groupId>
-            <artifactId>license-maven-plugin-git</artifactId>
-            <version>${license-maven-plugin.version}</version>
-          </dependency>
-        </dependencies>
-        <executions>
-          <execution>
-            <goals>
-              <goal>check</goal>
-            </goals>
-            <phase>compile</phase>
-          </execution>
-        </executions>
-      </plugin>
-
-      <plugin>
         <artifactId>maven-enforcer-plugin</artifactId>
         <version>${maven-enforcer-plugin.version}</version>
         <executions>
@@ -410,6 +347,85 @@
   </build>
 
   <profiles>
+    <!-- -DskipTests ensures license libraries aren't required when packaging -->
+    <profile>
+      <id>check-license</id>
+      <activation>
+        <property>
+          <name>!skipTests</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>com.mycila</groupId>
+            <artifactId>license-maven-plugin</artifactId>
+            <version>${license-maven-plugin.version}</version>
+            <configuration>
+              <header>${main.basedir}/src/etc/header.txt</header>
+              <mapping>
+                <!-- Don't use javadoc style as this makes code formatters break it by adding tags! -->
+                <java>SLASHSTAR_STYLE</java>
+                <!-- build-bin/docker -->
+                <block_on_health>SCRIPT_STYLE</block_on_health>
+                <configure_docker>SCRIPT_STYLE</configure_docker>
+                <configure_docker_push>SCRIPT_STYLE</configure_docker_push>
+                <docker_build>SCRIPT_STYLE</docker_build>
+                <docker_push>SCRIPT_STYLE</docker_push>
+                <!-- build-bin/git -->
+                <login_git>SCRIPT_STYLE</login_git>
+                <!-- build-bin/maven -->
+                <configure_maven>SCRIPT_STYLE</configure_maven>
+                <configure_maven_deploy>SCRIPT_STYLE</configure_maven_deploy>
+                <maven_build_or_unjar>SCRIPT_STYLE</maven_build_or_unjar>
+                <maven_deploy>SCRIPT_STYLE</maven_deploy>
+                <maven_prepare_release>SCRIPT_STYLE</maven_prepare_release>
+                <maven_unjar>SCRIPT_STYLE</maven_unjar>
+                <!-- build-bin -->
+                <configure_deploy>SCRIPT_STYLE</configure_deploy>
+                <configure_test>SCRIPT_STYLE</configure_test>
+                <deploy>SCRIPT_STYLE</deploy>
+                <test>SCRIPT_STYLE</test>
+              </mapping>
+              <excludes>
+                <exclude>.docker.env</exclude>
+                <exclude>.travis.yml</exclude>
+                <exclude>.gitignore</exclude>
+                <exclude>.editorconfig</exclude>
+                <exclude>.mvn/**</exclude>
+                <exclude>mvnw*</exclude>
+                <exclude>etc/header.txt</exclude>
+                <exclude>**/.idea/**</exclude>
+                <exclude>LICENSE</exclude>
+                <exclude>**/*.md</exclude>
+                <exclude>src/test/resources/**</exclude>
+                <exclude>src/main/resources/**</exclude>
+                <exclude>**/*.puml</exclude>
+                <exclude>Makefile</exclude>
+                <exclude>.dockerignore</exclude>
+              </excludes>
+              <strictCheck>true</strictCheck>
+            </configuration>
+            <dependencies>
+              <dependency>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin-git</artifactId>
+                <version>${license-maven-plugin.version}</version>
+              </dependency>
+            </dependencies>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>check</goal>
+                </goals>
+                <phase>compile</phase>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
     <profile>
       <id>error-prone-9+</id>
       <activation>
