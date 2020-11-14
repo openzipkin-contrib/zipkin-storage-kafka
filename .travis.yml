@@ -53,7 +53,6 @@ jobs:
         # Deploy a SNAPSHOT version
         - |
           export POM_VERSION=$(mvn help:evaluate -N -Dexpression=project.version -q -DforceStdout)
-          echo "Deploying version ${POM_VERSION}..."
           # travis_wait ensures long pauses during uploads aren't mistaken for a hung job
           travis_wait ./build-bin/deploy ${POM_VERSION}
     - stage: deploy
@@ -70,7 +69,7 @@ jobs:
         else
       install: ./build-bin/configure_deploy
       # travis_wait ensures long pauses during uploads aren't mistaken for a hung job
-      script: travis_wait ./build-bin/deploy
+      script: travis_wait ./build-bin/deploy ${POM_VERSION}
     # Create a release version when a release trigger and in a secure ENV
     - stage: create release
       if: |
