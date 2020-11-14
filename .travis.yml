@@ -62,7 +62,7 @@ jobs:
         if [ "${POM_VERSION}" != "${TRAVIS_TAG}" ]; then
           echo "Invalid version. Git tag ${TRAVIS_TAG} should have project.version ${POM_VERSION}"
           exit 1
-        else
+        fi
       install: ./build-bin/configure_deploy
       # travis_wait ensures long pauses during uploads aren't mistaken for a hung job
       script: travis_wait ./build-bin/deploy ${POM_VERSION}
@@ -90,7 +90,7 @@ jobs:
         # Get the release version
         - release_version=$(echo "${TRAVIS_TAG}" | sed 's/^docker-//') || travis_terminate 1
         # Push the docker images
-        - docker/bin/docker_push ${release_version}
+        - ./build-bin/docker/docker_push ${release_version}
 
 notifications:
   webhooks:
