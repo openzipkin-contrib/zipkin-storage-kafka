@@ -36,7 +36,7 @@ RUN if [ -n "${VERSION}" ]; then echo "${VERSION}" > version; else \
 
 # When true, if the artifact was built and .dockerignore allows it, re-use instead of downloading
 ARG release_from_maven_build=false
-ENV RELEASE_FROM_MAVEN_BUILD=$RELEASE_FROM_MAVEN_BUILD
+ENV RELEASE_FROM_MAVEN_BUILD=$release_from_maven_build
 
 # Download or build the project's main artifact, then unzip it into /install
 ENV ARTIFACT_ID=zipkin-module-storage-kafka
