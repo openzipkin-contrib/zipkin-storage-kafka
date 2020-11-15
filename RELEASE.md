@@ -14,13 +14,13 @@ This repo uses semantic versions. Please keep this in mind when choosing version
 
 1. **Wait for Travis CI**
 
-   The `release-N.M.L` tag triggers [`build-bin/maven/maven_prepare_release`](build-bin/maven/maven_prepare_release), which
-   creates commits, `N.M.L` tag, and increments the version (maven-release-plugin).
+   The `release-N.M.L` tag triggers [`build-bin/maven/maven_release`](build-bin/maven/maven_release),
+   which creates commits, `N.M.L` tag, and increments the version (maven-release-plugin).
 
    The `N.M.L` tag triggers [`build-bin/deploy`](build-bin/deploy), which does the following:
      * Publishes jars to https://oss.sonatype.org/content/repositories/releases [`build-bin/maven/maven_deploy`](build-bin/maven/maven_deploy)
        * Later, the same jars synchronize to Maven Central
-     * Pushes images to Docker registries [`build-bin/docker/docker_push`](build-bin/docker/docker_push)
+     * Pushes images to Docker registries [`build-bin/docker_push`](build-bin/docker_push)
 
    Notes:
      * https://search.maven.org/ index will take longer than direct links like https://repo1.maven.org/maven2/io/zipkin
@@ -78,11 +78,11 @@ export SONATYPE_PASSWORD=your_sonatype_password
 release_version=xx-version-to-release-xx
 
 # now from latest master, create the release. This creates and pushes the N.M.L tag
-./build-bin/maven/maven_prepare_release ${release_version}
+./build-bin/maven/maven_release release-${release_version}
 
 # once this works, deploy the release
 git checkout ${release_version}
-./build-bin/deploy ${release_version}
+./build-bin/deploy
 
 # Finally, clean up
 ./mvnw release:clean

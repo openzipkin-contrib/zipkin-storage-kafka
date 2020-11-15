@@ -15,10 +15,12 @@
 
 set -ue
 
-# This script sets up anything needed for `./deploy`. Do not assume `configure_test` was called.
+# This script sets up anything needed for `./docker_push`.
 #
 # This script primarily helps `.travis.yml` and `RELEASE.md` contain nearly the same contents, even
 # if certain OpenZipkin projects need slight adjustments here.
 
-build-bin/maven/configure_maven_deploy
-build-bin/configure_docker_push
+# openzipkin-contrib is named differently in docker.io (openzipkincontrib). Skip the latter for now.
+export DOCKER_RELEASE_REPOS=ghcr.io
+export DOCKER_IMAGE=openzipkin-contrib/zipkin-storage-kafka
+build-bin/docker/configure_docker_push

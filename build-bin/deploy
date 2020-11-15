@@ -17,15 +17,17 @@ set -ue
 
 # This script deploys a SNAPSHOT or release version.
 #
-# Note: In CI, `configure_deploy` must be called before invoking this.
+# In CI..
+#  * trigger pattern for release: tag =~ /^[0-9]+\.[0-9]+\.[0-9]+$/
+#    * skip pull requests
+#  * trigger pattern for snapshot: tag IS blank AND commit_message !~ maven-release-plugin
+#    * skip documentation-only commits (paths-ignore: '**/*.md')
+#  * build-bin/configure_deploy must be called before invoking this.
 #
 # This script primarily helps `.travis.yml` and `RELEASE.md` contain nearly the same contents, even
 # if certain OpenZipkin projects need slight adjustments here.
 
-version=${1?version is required}
+version=${1-$(./mvnw help:evaluate -N -Dexpression=project.version -q -DforceStdout)}
 
 build-bin/maven/maven_deploy ${version}
-
-# openzipkin-contrib is named differently in docker.io (openzipkincontrib). Skip the latter for now.
-DOCKER_RELEASE_REPOS=ghcr.io RELEASE_FROM_MAVEN_BUILD=true build-bin/docker/docker_push \
-openzipkin-contrib/zipkin-storage-kafka ${version}
+RELEASE_FROM_MAVEN_BUILD=true build-bin/docker/docker_push ${version}

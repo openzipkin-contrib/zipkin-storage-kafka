@@ -80,7 +80,7 @@ else
 fi
 
 if ! test -f ${artifact_id}.jar; then
-  echo "*** Failed to build or get ${qualified_jar}"
+  >&2 echo "*** Failed to build or get ${qualified_jar}"
   exit 1
 fi
 
