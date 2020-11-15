@@ -21,4 +21,4 @@ set -ue
 # if certain OpenZipkin projects need slight adjustments here.
 
 build-bin/maven/configure_maven_deploy
-build-bin/configure_docker_push
+build-bin/docker/configure_docker_push

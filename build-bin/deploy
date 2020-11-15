@@ -30,4 +30,4 @@ set -ue
 version=${1-$(./mvnw help:evaluate -N -Dexpression=project.version -q -DforceStdout)}
 
 build-bin/maven/maven_deploy ${version}
-RELEASE_FROM_MAVEN_BUILD=true build-bin/docker/docker_push ${version}
+RELEASE_FROM_MAVEN_BUILD=true build-bin/docker_push ${version}

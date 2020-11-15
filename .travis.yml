@@ -68,7 +68,7 @@ jobs:
       name: Re-push all Docker images
       install:
         - ./build-bin/git/login_git
-        - ./build-bin/configure_docker_push
+        - ./build-bin/docker/configure_docker_push
       script: build-bin/docker_push ${TRAVIS_TAG}
 
 notifications:
