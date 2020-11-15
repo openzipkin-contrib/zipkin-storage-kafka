@@ -15,21 +15,26 @@
 
 set -ue
 
-# This script creates a release tag N.N.N which later will have `deploy` run against it.
+# This script creates a git `N.M.L` version tag which later will have `deploy` run against it.
 #
-# Note: In CI, `build-bin/git/login_git` must be called before invoking this.
-release_version=${1?release_version is required. Ex 2.22.2}
+# In CI..
+#  * trigger pattern: tag =~ /^release-[0-9]+\.[0-9]+\.[0-9]+$/
+#  * build-bin/git/login_git must be called before invoking this.
+
+trigger_tag=${1?trigger_tag is required. Ex release-1.2.3}
+release_version=$(build-bin/git/version_from_trigger_tag release- ${trigger_tag})
 release_branch=${2:-master}
 
 # Checkout master, as we release from master, not a tag ref
 git checkout -B ${release_branch}
+exit
 
 # Ensure no one pushed commits since this release tag as it would fail later commands
 git fetch origin ${release_branch}:origin/${release_branch}
 commit_local_release_branch=$(git show --pretty='format:%H' ${release_branch})
 commit_remote_release_branch=$(git show --pretty='format:%H' origin/${release_branch})
 if [ "$commit_local_release_branch" != "$commit_remote_release_branch" ]; then
-  echo "${release_branch} on remote 'origin' has commits since the version under release, aborting"
+  >&2 echo "${release_branch} on remote 'origin' has commits since the version to release, aborting"
   exit 1
 fi
 

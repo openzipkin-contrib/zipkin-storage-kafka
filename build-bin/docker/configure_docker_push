@@ -24,7 +24,7 @@ set -ue
 # Verify we are on an arch that can publish multi-arch images
 ARCH=$(uname -m)
 if [ "$ARCH" != "x86_64" ]; then
-  echo "multiarch/qemu-user-static doesn't support arch $ARCH"
+  >&2 echo "multiarch/qemu-user-static doesn't support arch $ARCH"
   exit 1
 fi
 

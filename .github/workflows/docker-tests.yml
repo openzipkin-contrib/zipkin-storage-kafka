@@ -1,14 +1,19 @@
 name: Continuous Build Docker
+
+# Trigger on pushes or pull requests to the master branch, but not for documentation-only updates.
 on:
   push:
-    branches:
-      - master
+    branches: master
+    paths-ignore: '**/*.md'
   pull_request:
+    branches: master
+    paths-ignore: '**/*.md'
 
 jobs:
   build-zipkin-storage-kafka:
     name: Build Zipkin Storage Kafka
     runs-on: ubuntu-20.04 # aka focal, because this is what we use in Travis
+    if: "!contains(github.event.head_commit.message, 'maven-release-plugin')"
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v2

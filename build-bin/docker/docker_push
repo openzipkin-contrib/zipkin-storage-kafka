@@ -21,12 +21,12 @@
 set -ue
 
 if ! test -f docker/Dockerfile; then
-  echo Please execute this script from the repository root
+  >&2 echo Please execute this script from the repository root
   exit 1
 fi
 
-docker_image=${1?docker_image is required. Ex openzipkin/zipkin}
-version=${2?version is required. Ex 1.2.3-SNAPSHOT or 2.22.2}
+docker_image=${DOCKER_IMAGE?required. Ex openzipkin/zipkin}
+version=${1?version is required. Ex 1.2.3-SNAPSHOT or 2.22.2}
 # Ex. "module" or "exec" Empty for no classifier.
 # optional classifier arg to ./build-bin/maven/maven_unjar if this image uses it. Allows you to
 # define a single image that builds two classifiers, which is the case in Zipkin (slim vs normal).
@@ -65,7 +65,7 @@ case ${arch} in
   amd64* )
     ;;
   * )
-    echo Pushing docker_platforms ${docker_platforms} with arch ${arch} is not yet supported.
+    >&2 echo Pushing docker_platforms ${docker_platforms} with arch ${arch} is not yet supported.
     exit 1
 esac
 

@@ -374,17 +374,20 @@
                 <docker_push>SCRIPT_STYLE</docker_push>
                 <!-- build-bin/git -->
                 <login_git>SCRIPT_STYLE</login_git>
+                <version_from_trigger_tag>SCRIPT_STYLE</version_from_trigger_tag>
                 <!-- build-bin/maven -->
                 <configure_maven>SCRIPT_STYLE</configure_maven>
                 <configure_maven_deploy>SCRIPT_STYLE</configure_maven_deploy>
                 <maven_build_or_unjar>SCRIPT_STYLE</maven_build_or_unjar>
                 <maven_deploy>SCRIPT_STYLE</maven_deploy>
-                <maven_prepare_release>SCRIPT_STYLE</maven_prepare_release>
+                <maven_release>SCRIPT_STYLE</maven_release>
                 <maven_unjar>SCRIPT_STYLE</maven_unjar>
                 <!-- build-bin -->
                 <configure_deploy>SCRIPT_STYLE</configure_deploy>
+                <configure_docker_push>SCRIPT_STYLE</configure_docker_push>
                 <configure_test>SCRIPT_STYLE</configure_test>
                 <deploy>SCRIPT_STYLE</deploy>
+                <docker_push>SCRIPT_STYLE</docker_push>
                 <test>SCRIPT_STYLE</test>
               </mapping>
               <excludes>

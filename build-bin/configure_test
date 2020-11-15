@@ -15,9 +15,8 @@
 
 set -ue
 
-# This script sets up anything needed to run tests in this project. This should not assume
-# `configure_test` was called at all. Nor should it login to anything, as that should be done in
-# `configure_deploy`.
+# This script sets up anything needed for `./test`. This should not login to anything, as that
+# should be done in `configure_deploy`.
 #
 # This script primarily helps `.travis.yml` and `RELEASE.md` contain nearly the same contents, even
 # if certain OpenZipkin projects need slight adjustments here.

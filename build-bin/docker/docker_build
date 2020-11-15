@@ -16,7 +16,7 @@
 set -ue
 
 if ! test -f docker/Dockerfile; then
-  echo Please execute this script from the repository root
+  >&2 echo Please execute this script from the repository root
   exit 1
 fi
 

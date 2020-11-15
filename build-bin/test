@@ -17,7 +17,10 @@ set -ue
 
 # This script runs the tests of the project.
 #
-# Note: In CI, `configure_test` must be called before invoking this.
+# In CI..
+#  * trigger pattern: tag IS blank AND commit_message !~ maven-release-plugin
+#    * skip documentation-only commits (paths-ignore: '**/*.md')
+#  * build-bin/configure_test must be called before invoking this.
 #
 # This script primarily helps `.travis.yml` and `RELEASE.md` contain nearly the same contents, even
 # if certain OpenZipkin projects need slight adjustments here.
