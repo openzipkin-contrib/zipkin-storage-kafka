@@ -27,7 +27,6 @@ release_branch=${2:-master}
 
 # Checkout master, as we release from master, not a tag ref
 git checkout -B ${release_branch}
-exit
 
 # Ensure no one pushed commits since this release tag as it would fail later commands
 git fetch origin ${release_branch}:origin/${release_branch}
