@@ -28,7 +28,7 @@ set -ue
 # if certain OpenZipkin projects need slight adjustments here.
 
 case ${1} in
-  docker- )
+  docker-* )
     version=$(build-bin/git/version_from_trigger_tag docker- ${1})
     ;;
   * )
