@@ -10,4 +10,5 @@ version=${1:-}
 
 build-bin/maven/maven_deploy
 export RELEASE_FROM_MAVEN_BUILD=true
+export MAVEN_CLASSIFIER=module
 build-bin/docker_push ${version}

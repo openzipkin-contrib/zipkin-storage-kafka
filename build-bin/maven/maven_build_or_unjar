@@ -27,6 +27,11 @@ artifact_id=${2?artifact_id is required}
 classifier=${3:-}
 version=${4:-}
 
+# master is the implicit version
+if [ "${version}" = "master" ]; then
+  version=""
+fi
+
 # Eagerly check if a pom is present, but don't error if it isn't
 if [ -n "${MAVEN_PROJECT_BASEDIR:-}" ] && [ -f "${MAVEN_PROJECT_BASEDIR}/pom.xml" ]; then
   pom="${MAVEN_PROJECT_BASEDIR}/pom.xml"
