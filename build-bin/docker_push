@@ -1,42 +1,19 @@
 #!/bin/sh
-#
-# Copyright 2019-2020 The OpenZipkin Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
-#
 
 set -ue
 
-# This script pushes Docker images for the indicated version. When arg1 starts with 'docker-', it is
-# interpreted as a build trigger.
-#
-# In CI..
-#  * trigger pattern: tag =~ /^docker-[0-9]+\.[0-9]+\.[0-9]+$/
-#    * skip pull requests
-#    * build-bin/git/login_git must be called before invoking this, when arg1 starts with 'docker-'
-#  * build-bin/docker/configure_docker_push must be called before invoking this.
-#
-# This script primarily helps `.travis.yml` and `RELEASE.md` contain nearly the same contents, even
-# if certain OpenZipkin projects need slight adjustments here.
+# Pushes docker as part of `deploy` or from a trigger tag
 
-case ${1} in
+version=${1:-}
+
+# handle trigger pattern like /^docker-[0-9]+\.[0-9]+\.[0-9]+$/
+case ${version} in
   docker-* )
-    version=$(build-bin/git/version_from_trigger_tag docker- ${1})
-    ;;
-  * )
-    version=${1}
+    version=$(build-bin/git/version_from_trigger_tag docker- ${version})
     ;;
 esac
 
 # openzipkin-contrib is named differently in docker.io (openzipkincontrib). Skip the latter for now.
 export DOCKER_RELEASE_REPOS=ghcr.io
-export DOCKER_IMAGE=openzipkin-contrib/zipkin-storage-kafka
-build-bin/docker/docker_push ${version}
+export MAVEN_CLASSIFIER=module
+build-bin/docker/docker_push openzipkin-contrib/zipkin-storage-kafka ${version}

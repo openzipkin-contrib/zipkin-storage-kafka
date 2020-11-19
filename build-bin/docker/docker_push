@@ -20,31 +20,34 @@
 # Note: In CI, `configure_docker_push` must be called before invoking this.
 set -ue
 
-if ! test -f docker/Dockerfile; then
-  >&2 echo Please execute this script from the repository root
-  exit 1
-fi
-
-docker_image=${DOCKER_IMAGE?required. Ex openzipkin/zipkin}
-version=${1?version is required. Ex 1.2.3-SNAPSHOT or 2.22.2}
-# Ex. "module" or "exec" Empty for no classifier.
-# optional classifier arg to ./build-bin/maven/maven_unjar if this image uses it. Allows you to
-# define a single image that builds two classifiers, which is the case in Zipkin (slim vs normal).
-maven_classifier=${MAVEN_CLASSIFIER:-}
+docker_image=${1?docker_image is required, notably without a tag. Ex openzipkin/zipkin}
+version=${2:-master}
 
 case ${version} in
+  master )
+    is_release=false
+    ;;
   *-SNAPSHOT )
-    docker_tags=master
-    docker_repos=ghcr.io
+    is_release=false
     ;;
   * )
+    is_release=true
+    ;;
+esac
+
+if [ "${is_release}" = "true" ]; then
+  docker_tags=${DOCKER_TAGS:-}
+  if [ -z "${docker_tags}" ]; then
     major_tag=$(echo "${version}" | cut -f1 -d. -s)
     minor_tag=$(echo "${version}" | cut -f1-2 -d. -s)
     subminor_tag="${version}"
     docker_tags="$subminor_tag $minor_tag $major_tag latest"
-    docker_repos=${DOCKER_RELEASE_REPOS:-ghcr.io docker.io}
-    ;;
-esac
+  fi
+  docker_repos=${DOCKER_RELEASE_REPOS:-ghcr.io docker.io}
+else
+  docker_tags=master
+  docker_repos=ghcr.io
+fi
 
 tags=""
 for repo in ${docker_repos}; do
@@ -57,25 +60,11 @@ done
 # plaforms to eventually push to the registry
 docker_platforms=${DOCKER_PLATFORMS:-linux/amd64,linux/arm64}
 
-# This can be less manual in the future, for example checking buildx to see what it can do.
-arch=${ARCH:-$(uname -m)}
-case ${arch} in
-  x86_64* )
-    ;;
-  amd64* )
-    ;;
-  * )
-    >&2 echo Pushing docker_platforms ${docker_platforms} with arch ${arch} is not yet supported.
-    exit 1
-esac
-
 echo "Will push the following tags with platform ${docker_platforms}:${tags}\n"
 
-docker_push="docker buildx build --progress plain --platform=${docker_platforms} \
---build-arg release_from_maven_build=${RELEASE_FROM_MAVEN_BUILD:-false} \
---build-arg maven_classifier=${maven_classifier} \
---build-arg version=${version} --label org.opencontainers.image.version=$version \
--f docker/Dockerfile . --push"
+docker_args=$($(dirname "$0")/docker_args ${version})
+
+docker_push="docker buildx build --progress plain --platform=${docker_platforms} ${docker_args} . --push"
 
 for tag in $(echo ${tags}|xargs); do
   echo "Pushing tag ${tag}..."

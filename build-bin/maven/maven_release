@@ -18,7 +18,7 @@ set -ue
 # This script creates a git `N.M.L` version tag which later will have `deploy` run against it.
 #
 # In CI..
-#  * trigger pattern: tag =~ /^release-[0-9]+\.[0-9]+\.[0-9]+$/
+#  * trigger pattern: tag =~ /^release-[0-9]+\.[0-9]+\.[0-9]+/
 #  * build-bin/git/login_git must be called before invoking this.
 
 trigger_tag=${1?trigger_tag is required. Ex release-1.2.3}
@@ -26,10 +26,10 @@ release_version=$(build-bin/git/version_from_trigger_tag release- ${trigger_tag}
 release_branch=${2:-master}
 
 # Checkout master, as we release from master, not a tag ref
-git checkout -B ${release_branch}
+git fetch --no-tags --prune --depth=1 origin +refs/heads/${release_branch}:refs/remotes/origin/${release_branch}
+git checkout ${release_branch}
 
 # Ensure no one pushed commits since this release tag as it would fail later commands
-git fetch origin ${release_branch}:origin/${release_branch}
 commit_local_release_branch=$(git show --pretty='format:%H' ${release_branch})
 commit_remote_release_branch=$(git show --pretty='format:%H' origin/${release_branch})
 if [ "$commit_local_release_branch" != "$commit_remote_release_branch" ]; then
@@ -38,4 +38,4 @@ if [ "$commit_local_release_branch" != "$commit_remote_release_branch" ]; then
 fi
 
 # Prepare and push release commits and the version tag (N.N.N), which triggers deployment.
-exec ./mvnw --batch-mode -nsu -DreleaseVersion=${release_version} -Darguments=-DskipTests release:prepare
+./mvnw --batch-mode -nsu -DreleaseVersion=${release_version} -Darguments=-DskipTests release:prepare

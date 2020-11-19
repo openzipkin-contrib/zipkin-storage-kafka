@@ -12,7 +12,7 @@ This repo uses semantic versions. Please keep this in mind when choosing version
 
    The tag should be of the format `release-N.M.L`, ex `git tag release-1.18.1; git push origin release-1.18.1`.
 
-1. **Wait for Travis CI**
+1. **Wait for CI**
 
    The `release-N.M.L` tag triggers [`build-bin/maven/maven_release`](build-bin/maven/maven_release),
    which creates commits, `N.M.L` tag, and increments the version (maven-release-plugin).
@@ -28,7 +28,7 @@ This repo uses semantic versions. Please keep this in mind when choosing version
 ## Credentials
 
 The release process uses various credentials. If you notice something failing due to unauthorized,
-look at the notes in [.travis.yml] and check the [project settings](https://travis-ci.com/github/openzipkin-contrib/zipkin-storage-kafka/settings)
+look at the notes in [.github/workflows/deploy.yml] and check the [org secrets](https://github.com/organizations/openzipkin-contrib/settings/secrets/actions)
 
 ### Troubleshooting invalid credentials
 
@@ -37,7 +37,7 @@ If you receive a '401 unauthorized' failure from OSSRH, it is likely
 user associated with them does not have rights to upload.
 
 The least destructive test is to try to publish a snapshot manually. By passing
-the values Travis would use, you can kick off a snapshot from your laptop. This
+the values CI would use, you can kick off a snapshot from your laptop. This
 is a good way to validate that your unencrypted credentials are authorized.
 
 Here's an example of a snapshot deploy with specified credentials.
@@ -70,7 +70,8 @@ this is a normal maven project, and can be released accordingly.
 *Note:* If [Sonatype is down](https://status.sonatype.com/), the below will not work.
 
 ```bash
-# First, set variable according to your personal credentials. These would normally be decrypted from .travis.yml
+# First, set variable according to your personal credentials. These would normally be assigned as
+# org secrets: https://github.com/organizations/openzipkin-contrib/settings/secrets/actions
 export GPG_TTY=$(tty)
 export GPG_PASSPHRASE=your_gpg_passphrase
 export SONATYPE_USER=your_sonatype_account
