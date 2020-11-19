@@ -20,9 +20,7 @@ set -eu
 #
 # Ex. ./maven_unjar io.zipkin zipkin-server 2.22.2 slim
 #
-# When the version ends in SNAPSHOT or [ "${RELEASE_FROM_MAVEN_BUILD}" = "true" ], this searches the
-# current directory instead of resolving remotely. If the intended artifact isn't there, it is built
-# on-demand using `mvn package`.
+# This searches ${MAVEN_PROJECT_BASEDIR} when set instead of resolving remotely.
 #
 # Note: If you are running this within Docker, ensure you have .dockerignore setup properly to pass
 # the artifact you are looking for.
@@ -43,10 +41,10 @@ fi
 
 case ${version} in
   *-SNAPSHOT )
-    is_snapshot=true
+    is_release=false
     ;;
   * )
-    is_snapshot=false
+    is_release=true
     ;;
 esac
 
@@ -56,10 +54,12 @@ local_repo_path=${local_repo}/$(echo ${group_id}|tr '.' '/')/${artifact_id}/${ve
 if test -f ${local_repo_path}; then
   echo "*** Reusing ${qualified_jar} from Maven local repository..."
   cp ${local_repo_path} ${artifact_id}.jar
-elif [ "${is_snapshot}" = "true" ] || [ "${RELEASE_FROM_MAVEN_BUILD:-false}" = "true" ]; then
-  echo "*** Searching for ${qualified_jar} in ${PWD}"
-  find . -name ${qualified_jar} -exec cp {} ${artifact_id}.jar \;
-else
+elif [ -n "${MAVEN_PROJECT_BASEDIR:-}" ]; then
+  echo "*** Searching for ${qualified_jar} in ${MAVEN_PROJECT_BASEDIR}"
+  find ${MAVEN_PROJECT_BASEDIR} -name ${qualified_jar} -exec cp {} ${artifact_id}.jar \;
+fi
+
+if ! test -f ${artifact_id}.jar && [ ${is_release} = "true" ]; then
   mvn_get="mvn -q --batch-mode org.apache.maven.plugins:maven-dependency-plugin:3.1.2:get \
   -Dtransitive=false -DgroupId=${group_id} -DartifactId=${artifact_id} -Dversion=${version}"
 

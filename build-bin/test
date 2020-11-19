@@ -1,29 +1,21 @@
 #!/bin/sh
-#
-# Copyright 2019-2020 The OpenZipkin Authors
-#
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-# in compliance with the License. You may obtain a copy of the License at
-#
-# http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software distributed under the License
-# is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing permissions and limitations under
-# the License.
-#
 
 set -ue
 
 # This script runs the tests of the project.
 #
-# In CI..
-#  * trigger pattern: tag IS blank AND commit_message !~ maven-release-plugin
-#    * skip documentation-only commits (paths-ignore: '**/*.md')
-#  * build-bin/configure_test must be called before invoking this.
-#
-# This script primarily helps `.travis.yml` and `RELEASE.md` contain nearly the same contents, even
-# if certain OpenZipkin projects need slight adjustments here.
+# See [README.md] for an explanation of this and how CI should use it.
 
-# * verify - runs all tests including Docker
-exec ./mvnw -nsu verify
+echo "Running Maven tests and integration tests..."
+./mvnw -nsu verify
+
+echo "Building Docker image..."
+export MAVEN_CLASSIFIER=module
+export RELEASE_FROM_MAVEN_BUILD=true
+build-bin/docker/docker_build openzipkin-contrib/zipkin-storage-kafka:test
+
+echo "Verifying Docker image..."
+# This just makes sure containers run and the HEALTHCHECK works (for now..)
+docker-compose -f build-bin/docker-compose.test.yml up -d --quiet-pull
+build-bin/docker/block_on_health sut || (docker logs sut && exit 1)
+docker-compose -f build-bin/docker-compose.test.yml down
