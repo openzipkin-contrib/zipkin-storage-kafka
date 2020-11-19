@@ -8,7 +8,7 @@ name: deploy
 # See https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#filter-pattern-cheat-sheet
 on:
   push:
-    tags: '[0-9]+.[0-9]+.[0-9]+**'  # Ex. 8.272.10 or 15.0.1_p9
+    # don't deploy tags: '[0-9]+.[0-9]+.[0-9]+**' as it will conflict with master
     branches: master
 
 jobs:
