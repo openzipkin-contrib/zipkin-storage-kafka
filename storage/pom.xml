@@ -49,6 +49,8 @@
     <dependency>
       <groupId>${armeria.groupId}</groupId>
       <artifactId>armeria</artifactId>
+      <version>${armeria.version}</version>
+      <scope>provided</scope>
       <exclusions>
         <exclusion>
           <groupId>${armeria.groupId}</groupId>
@@ -59,7 +61,6 @@
           <artifactId>*</artifactId>
         </exclusion>
       </exclusions>
-      <scope>provided</scope>
     </dependency>
 
     <dependency>

@@ -14,7 +14,9 @@
     the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.zipkin.contrib.zipkin-storage-kafka</groupId>
@@ -46,6 +48,8 @@
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.build.resourceEncoding>UTF-8</project.build.resourceEncoding>
+    <project.build.outputEncoding>UTF-8</project.build.outputEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <main.basedir>${project.basedir}</main.basedir>
     <main.signature.artifact>java18</main.signature.artifact>
@@ -68,7 +72,7 @@
     <assertj.version>3.18.0</assertj.version>
 
     <!-- override to set exclusions per-project -->
-    <errorprone.args />
+    <errorprone.args/>
     <errorprone.version>2.4.0</errorprone.version>
     <log4j.version>2.14.0</log4j.version>
 
@@ -109,8 +113,7 @@
   <scm>
     <url>https://github.com/openzipkin-contrib/zipkin-storage-kafka</url>
     <connection>scm:git:https://github.com/openzipkin-contrib/zipkin-storage-kafka.git</connection>
-    <developerConnection>
-      scm:git:https://github.com/openzipkin-contrib/zipkin-storage-kafka.git
+    <developerConnection>scm:git:https://github.com/openzipkin-contrib/zipkin-storage-kafka.git
     </developerConnection>
     <tag>HEAD</tag>
   </scm>
@@ -123,22 +126,6 @@
       <url>https://gitter.im/openzipkin/zipkin</url>
     </developer>
   </developers>
-
-  <dependencyManagement>
-    <dependencies>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>zipkin-storage-kafka</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${armeria.groupId}</groupId>
-        <artifactId>armeria</artifactId>
-        <version>${armeria.version}</version>
-        <scope>provided</scope>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
 
   <dependencies>
     <dependency>
@@ -154,9 +141,9 @@
       <scope>test</scope>
     </dependency>
     <!--
-    Current versions of JUnit5 provide the above junit-jupiter artifact for convenience but we may
-    still have transitive dependencies on these older artifacts and have to make sure they're all
-    using the same version.
+      Current versions of JUnit5 provide the above junit-jupiter artifact for convenience but we may
+      still have transitive dependencies on these older artifacts and have to make sure they're all
+      using the same version.
     -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
@@ -274,9 +261,6 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-surefire-plugin.version}</version>
         <configuration>
-          <includes>
-            <include>**/*Spec.java</include>
-          </includes>
           <!-- Ensure scope leak cause ends up in the console -->
           <trimStackTrace>false</trimStackTrace>
           <!-- Don't add org.apache.logging.log4j.jul.LogManager here as it conflicts with
@@ -378,11 +362,6 @@
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.8.6</version>
       </plugin>
     </plugins>
   </build>
