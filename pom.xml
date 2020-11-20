@@ -222,6 +222,12 @@
                 <repositoryType>MAIN</repositoryType>
               </DynamicDependency>
               <DynamicDependency>
+                <groupId>com.google.errorprone</groupId>
+                <artifactId>error_prone_core</artifactId>
+                <version>${errorprone.version}</version>
+                <repositoryType>MAIN</repositoryType>
+              </DynamicDependency>
+              <DynamicDependency>
                 <groupId>org.apache.maven.surefire</groupId>
                 <artifactId>surefire-junit-platform</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
