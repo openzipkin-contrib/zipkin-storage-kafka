@@ -239,7 +239,7 @@
           </configuration>
         </plugin>
 
-        <!-- maven-dependency-plugin:get and Retrolambda should use a recent version. -->
+        <!-- maven-dependency-plugin:get should use a recent version. -->
         <plugin>
           <artifactId>maven-dependency-plugin</artifactId>
           <version>${maven-dependency-plugin.version}</version>
