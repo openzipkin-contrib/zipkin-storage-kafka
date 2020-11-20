@@ -48,6 +48,7 @@
     <project.build.resourceEncoding>UTF-8</project.build.resourceEncoding>
 
     <main.basedir>${project.basedir}</main.basedir>
+    <main.signature.artifact>java18</main.signature.artifact>
 
     <!-- groupId overrinds allow testing feature branches with jitpack -->
     <!-- matching armeria/grpc/zipkin -->
@@ -63,8 +64,7 @@
     <kafka.version>2.6.0</kafka.version>
 
     <junit-jupiter.version>5.7.0</junit-jupiter.version>
-    <!-- TODO: cleanup when https://github.com/testcontainers/testcontainers-java/issues/3166 is fixed -->
-    <testcontainers.version>1.15.0-rc2</testcontainers.version>
+    <testcontainers.version>1.15.0</testcontainers.version>
     <assertj.version>3.18.0</assertj.version>
 
     <!-- override to set exclusions per-project -->
@@ -72,6 +72,10 @@
     <errorprone.version>2.4.0</errorprone.version>
     <log4j.version>2.14.0</log4j.version>
 
+    <animal-sniffer-maven-plugin.version>1.19</animal-sniffer-maven-plugin.version>
+    <go-offline-maven-plugin.version>1.2.7</go-offline-maven-plugin.version>
+    <!-- TODO: cleanup any redundant ignores now also in the 4.0 release (once final) -->
+    <license-maven-plugin.version>4.0.rc2</license-maven-plugin.version>
     <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
     <maven-install-plugin.version>3.0.0-M1</maven-install-plugin.version>
     <maven-deploy-plugin.version>3.0.0-M1</maven-deploy-plugin.version>
@@ -79,10 +83,8 @@
     <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
     <maven-javadoc-plugin.version>3.2.0</maven-javadoc-plugin.version>
     <maven-jar-plugin.version>3.2.0</maven-jar-plugin.version>
-    <maven-failsafe-plugin.version>3.0.0-M4</maven-failsafe-plugin.version>
+    <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
     <maven-enforcer-plugin.version>3.0.0-M3</maven-enforcer-plugin.version>
-    <!-- TODO: cleanup any redundant ignores now also in the 4.0 release (once final) -->
-    <license-maven-plugin.version>4.0.rc2</license-maven-plugin.version>
     <nexus-staging-maven-plugin.version>1.6.8</nexus-staging-maven-plugin.version>
   </properties>
 
@@ -221,7 +223,25 @@
         <plugin>
           <groupId>de.qaware.maven</groupId>
           <artifactId>go-offline-maven-plugin</artifactId>
-          <version>1.2.7</version>
+          <version>${go-offline-maven-plugin.version}</version>
+          <configuration>
+            <!-- Add dependencies indirectly referenced by build plugins -->
+            <dynamicDependencies>
+              <DynamicDependency>
+                <groupId>org.codehaus.mojo.signature</groupId>
+                <artifactId>${main.signature.artifact}</artifactId>
+                <version>1.0</version>
+                <type>signature</type>
+                <repositoryType>MAIN</repositoryType>
+              </DynamicDependency>
+              <DynamicDependency>
+                <groupId>org.apache.maven.surefire</groupId>
+                <artifactId>surefire-junit-platform</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <repositoryType>PLUGIN</repositoryType>
+              </DynamicDependency>
+            </dynamicDependencies>
+          </configuration>
         </plugin>
 
         <plugin>
@@ -252,22 +272,43 @@
     <plugins>
       <plugin>
         <artifactId>maven-surefire-plugin</artifactId>
-        <version>${maven-failsafe-plugin.version}</version>
+        <version>${maven-surefire-plugin.version}</version>
+        <configuration>
+          <includes>
+            <include>**/*Spec.java</include>
+          </includes>
+          <!-- Ensure scope leak cause ends up in the console -->
+          <trimStackTrace>false</trimStackTrace>
+          <!-- Don't add org.apache.logging.log4j.jul.LogManager here as it conflicts with
+               classloading, causing brave.test.propagation.PropagationTest to flake. -->
+          <classpathDependencyExcludes>
+            <classpathDependencyExclude>org.apache.logging.log4j:log4j-jul</classpathDependencyExclude>
+          </classpathDependencyExcludes>
+        </configuration>
       </plugin>
 
       <plugin>
         <artifactId>maven-failsafe-plugin</artifactId>
-        <version>${maven-failsafe-plugin.version}</version>
+        <version>${maven-surefire-plugin.version}</version>
+        <configuration>
+          <!-- Try to prevent flakes in CI -->
+          <reuseForks>false</reuseForks>
+          <!-- workaround to SUREFIRE-1831 -->
+          <useModulePath>false</useModulePath>
+          <!-- Zipkin logs with java.util.logging. Adding the bridge allows allows us to change
+               scope and format via log4j2.properties -->
+          <systemPropertyVariables>
+            <java.util.logging.manager>org.apache.logging.log4j.jul.LogManager</java.util.logging.manager>
+          </systemPropertyVariables>
+          <!-- Ensure scope leak cause ends up in the console -->
+          <trimStackTrace>false</trimStackTrace>
+        </configuration>
         <executions>
           <execution>
             <id>integration-test</id>
+            <phase>verify</phase>
             <goals>
               <goal>integration-test</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>verify</id>
-            <goals>
               <goal>verify</goal>
             </goals>
           </execution>
@@ -278,14 +319,14 @@
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>animal-sniffer-maven-plugin</artifactId>
-        <version>1.19</version>
+        <version>${animal-sniffer-maven-plugin.version}</version>
         <configuration>
+          <checkTestClasses>false</checkTestClasses>
           <signature>
             <groupId>org.codehaus.mojo.signature</groupId>
-            <artifactId>java18</artifactId>
+            <artifactId>${main.signature.artifact}</artifactId>
             <version>1.0</version>
           </signature>
-          <checkTestClasses>false</checkTestClasses>
         </configuration>
         <executions>
           <execution>
