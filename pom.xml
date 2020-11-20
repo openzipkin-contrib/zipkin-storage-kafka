@@ -57,7 +57,7 @@
     <!-- groupId overrinds allow testing feature branches with jitpack -->
     <!-- matching armeria/grpc/zipkin -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
-    <!-- when updating this, update docker/Dockerfile -->
+    <!-- when updating, update docker/Dockerfile and storage/src/test/java/zipkin2/storage/kafka/IT* -->
     <zipkin.version>2.22.2</zipkin.version>
     <zipkin-reporter.version>2.16.0</zipkin-reporter.version>
     <spring-boot.version>2.3.4.RELEASE</spring-boot.version>
@@ -394,6 +394,14 @@
         <includes>
           <include>LICENSE</include>
           <include>NOTICE</include>
+        </includes>
+      </resource>
+      <!-- This ensures any Spring Boot YAML are included in the jar -->
+      <resource>
+        <filtering>false</filtering>
+        <directory>src/main/resources</directory>
+        <includes>
+          <include>*.yml</include>
         </includes>
       </resource>
     </resources>

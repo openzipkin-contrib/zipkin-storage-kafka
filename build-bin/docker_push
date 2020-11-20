@@ -15,5 +15,4 @@ esac
 
 # openzipkin-contrib is named differently in docker.io (openzipkincontrib). Skip the latter for now.
 export DOCKER_RELEASE_REPOS=ghcr.io
-export MAVEN_CLASSIFIER=module
 build-bin/docker/docker_push openzipkin-contrib/zipkin-storage-kafka ${version}

@@ -33,6 +33,7 @@ services:
       STORAGE_TYPE: kafka
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       KAFKA_STORAGE_DIR: /zipkin/data
+    command: --logging.level.zipkin2=DEBUG
     volumes:
       - zipkin:/zipkin/data
     depends_on:
