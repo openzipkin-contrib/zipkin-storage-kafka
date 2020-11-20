@@ -26,8 +26,21 @@ jobs:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-maven-
+      - name: Cache Docker
+        uses: actions/cache@v2
+        with:
+          path: ~/.docker
+          key: ${{ runner.os }}-docker-${{ hashFiles('**/Dockerfile') }}
+          restore-keys: ${{ runner.os }}-docker
       - name: Deploy
         env:
+          # GH_USER=<user that created GH_TOKEN>
+          GH_USER: ${{ secrets.GH_USER }}
+          # GH_TOKEN=<hex token value>
+          #   - pushes Docker images to ghcr.io
+          #   - create via https://github.com/settings/tokens
+          #   - needs repo:status, public_repo, write:packages, delete:packages
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
           # GPG_PASSPHRASE=<passphrase for GPG_SIGNING_KEY>
           #   - referenced in .settings.xml
