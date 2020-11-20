@@ -26,7 +26,7 @@ jobs:
       - name: Configure Docker Push
         run: |
           build-bin/git/login_git &&
-          build-bin/configure_docker_push
+          build-bin/docker/configure_docker_push
         env:
           # GH_USER=<user that created GH_TOKEN>
           GH_USER: ${{ secrets.GH_USER }}
