@@ -482,10 +482,9 @@
 
   <profiles>
     <profile>
-      <id>error-prone-9+</id>
+      <id>error-prone</id>
       <activation>
-        <jdk>[9,)</jdk>
-        <activeByDefault>false</activeByDefault>
+        <activeByDefault>true</activeByDefault>
       </activation>
       <build>
         <plugins>
@@ -519,6 +518,7 @@
         </plugins>
       </build>
     </profile>
+
     <profile>
       <id>release</id>
       <build>
