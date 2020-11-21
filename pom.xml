@@ -280,7 +280,6 @@
             <useReleaseProfile>false</useReleaseProfile>
             <releaseProfiles>release</releaseProfiles>
             <autoVersionSubmodules>true</autoVersionSubmodules>
-            <!-- to match zipkin-scala (openzipkin/zipkin) -->
             <tagNameFormat>@{project.version}</tagNameFormat>
           </configuration>
         </plugin>
