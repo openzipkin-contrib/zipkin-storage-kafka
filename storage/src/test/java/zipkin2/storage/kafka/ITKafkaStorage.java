@@ -41,7 +41,6 @@ import org.testcontainers.containers.InternetProtocol;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import zipkin2.CheckResult;
 import zipkin2.DependencyLink;
 import zipkin2.Endpoint;
@@ -55,26 +54,24 @@ import zipkin2.storage.kafka.streams.serdes.SpansSerde;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.testcontainers.utility.DockerImageName.parse;
 
 @Testcontainers
 class ITKafkaStorage {
   static final long TODAY = System.currentTimeMillis();
   static final int KAFKA_PORT = 19092;
   static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:" + KAFKA_PORT;
-  static final DockerImageName IMAGE =
-    DockerImageName.parse("ghcr.io/openzipkin/zipkin-kafka:2.22.2");
-
-  @Container KafkaContainer kafkaContainer = new KafkaContainer(IMAGE);
-
   static final class KafkaContainer extends GenericContainer<KafkaContainer> {
-    KafkaContainer(DockerImageName image) {
-      super(image);
+    KafkaContainer() {
+      super(parse("ghcr.io/openzipkin/zipkin-kafka:2.22.2"));
       // 19092 is for connections from the Docker host and needs to be used as a fixed port.
       // TODO: someone who knows Kafka well, make ^^ comment better!
       addFixedExposedPort(KAFKA_PORT, KAFKA_PORT, InternetProtocol.TCP);
       this.waitStrategy = Wait.forHealthcheck();
     }
   }
+
+  @Container KafkaContainer kafkaContainer = new KafkaContainer();
 
   Duration traceTimeout;
   KafkaStorageBuilder storageBuilder;
@@ -98,16 +95,16 @@ class ITKafkaStorage {
     traceTimeout = Duration.ofSeconds(5);
     int serverPort = randomPort();
     storageBuilder = KafkaStorage.newBuilder()
-        .bootstrapServers(KAFKA_BOOTSTRAP_SERVERS)
-        .storageStateDir("target/zipkin_" + System.currentTimeMillis())
-        .hostname("localhost")
-        .serverPort(serverPort);
+      .bootstrapServers(KAFKA_BOOTSTRAP_SERVERS)
+      .storageStateDir("target/zipkin_" + System.currentTimeMillis())
+      .hostname("localhost")
+      .serverPort(serverPort);
     storageBuilder.spanAggregation.traceTimeout(traceTimeout);
     storage = (KafkaStorage) storageBuilder.build();
     server = Server.builder()
-        .annotatedService("/storage/kafka", new KafkaStorageHttpService(storage))
-        .http(serverPort)
-        .build();
+      .annotatedService("/storage/kafka", new KafkaStorageHttpService(storage))
+      .http(serverPort)
+      .build();
     server.start();
 
     Collection<NewTopic> newTopics = new ArrayList<>();
@@ -194,9 +191,11 @@ class ITKafkaStorage {
     // When: and stores running
     ServiceAndSpanNames serviceAndSpanNames = storage.serviceAndSpanNames();
     // When: been published
-    tracesProducer.send(new ProducerRecord<>(storageBuilder.traceStorage.spansTopic, parent.traceId(), spans));
-    tracesProducer.send(new ProducerRecord<>(storageBuilder.traceStorage.spansTopic, other.traceId(),
-      Collections.singletonList(other)));
+    tracesProducer.send(
+      new ProducerRecord<>(storageBuilder.traceStorage.spansTopic, parent.traceId(), spans));
+    tracesProducer.send(
+      new ProducerRecord<>(storageBuilder.traceStorage.spansTopic, other.traceId(),
+        Collections.singletonList(other)));
     tracesProducer.flush();
     // Then: stored
     IntegrationTestUtils.waitUntilMinRecordsReceived(

@@ -12,7 +12,7 @@
 # the License.
 #
 
-# zipkin version should match zipkin.version in /code/pom.xml
+# zipkin version should match zipkin.version in /pom.xml
 ARG zipkin_version=2.22.2
 
 # java_version is used during the installation process to build or download the module jar.

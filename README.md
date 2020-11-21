@@ -1,8 +1,8 @@
 # Zipkin Storage: Kafka *[EXPERIMENTAL]*
 
 [![Gitter chat](http://img.shields.io/badge/gitter-join%20chat%20%E2%86%92-brightgreen.svg)](https://gitter.im/openzipkin/zipkin)
-[![Build Status](https://travis-ci.com/openzipkin-contrib/zipkin-storage-kafka.svg?branch=master)](https://travis-ci.com/openzipkin-contrib/zipkin-storage-kafka)
-[![Maven Central](https://img.shields.io/maven-central/v/io.zipkin.gcp/zipkin-module-storage-stackdriver.svg)](https://search.maven.org/search?q=g:io.zipkin.contrib.zipkin-storage-kafka%20AND%20a:zipkin-module-storage-kafka)
+[![Build Status](https://github.com/openzipkin-contrib/zipkin-storage-kafka/workflows/test/badge.svg)](https://github.com/openzipkin-contrib/zipkin-storage-kafka/actions?query=workflow%3Atest)
+[![Maven Central](https://img.shields.io/maven-central/v/io.zipkin.contrib.zipkin-storage-kafka/zipkin-module-storage-kafka.svg)](https://search.maven.org/search?q=g:io.zipkin.contrib.zipkin-storage-kafka%20AND%20a:zipkin-module-storage-kafka)
 
 Kafka-based storage for Zipkin.
 
