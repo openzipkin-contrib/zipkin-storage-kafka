@@ -15,6 +15,8 @@
 
 set -ue
 
+export MAVEN_OPTS="$($(dirname "$0")/maven_opts)"
+
 # This script deploys a SNAPSHOT or release version to Sonatype.
 #
 # Note: In CI, `configure_maven_deploy` must be called before invoking this.

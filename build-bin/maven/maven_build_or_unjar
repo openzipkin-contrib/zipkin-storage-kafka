@@ -24,21 +24,13 @@ set -ue
 
 group_id=${1?group_id is required}
 artifact_id=${2?artifact_id is required}
-classifier=${3:-}
-version=${4:-}
+version=${3?version is required}
+classifier=${4:-}
 
-# master is the implicit version
-if [ "${version}" = "master" ]; then
-  version=""
-fi
+pom="${MAVEN_PROJECT_BASEDIR:-.}/pom.xml"
 
-# Eagerly check if a pom is present, but don't error if it isn't
-if [ -n "${MAVEN_PROJECT_BASEDIR:-}" ] && [ -f "${MAVEN_PROJECT_BASEDIR}/pom.xml" ]; then
-  pom="${MAVEN_PROJECT_BASEDIR}/pom.xml"
-fi
-
-# Use implicit version when left out, if we can..
-if [ -z "${version}" ] && [ -n "${pom:-}" ]; then
+# Use implicit version when master, if we can..
+if [ "${version}" = "master" ] && [ -f "${pom}" ]; then
   version=$(sed -En 's/.*<version>(.*)<\/version>.*/\1/p' ${pom}| head -1)
 fi
 
@@ -51,11 +43,11 @@ set -u +e
 $(dirname "$0")/maven_unjar $args
 unjar_rc=$?
 
-if [ "${unjar_rc}" == "0" ] || [ -z "${pom:-}" ]; then
+if [ "${unjar_rc}" = "0" ] || [ -z "${pom:-}" ]; then
   exit 0;
 fi
 
-case ${3?version is required} in
+case ${version} in
   *-SNAPSHOT )
     ;;
   * )
@@ -66,5 +58,5 @@ esac
 set -ue
 
 echo "*** Building snapshot from source..."
-(cd ${MAVEN_PROJECT_BASEDIR} && mvn -T1C -q --batch-mode -DskipTests package
-exec $(dirname "$0")/maven_unjar $args
+$(dirname "$0")/maven_build
+$(dirname "$0")/maven_unjar $args

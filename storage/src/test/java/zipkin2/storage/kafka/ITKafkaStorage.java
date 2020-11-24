@@ -63,7 +63,7 @@ class ITKafkaStorage {
   static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:" + KAFKA_PORT;
   static final class KafkaContainer extends GenericContainer<KafkaContainer> {
     KafkaContainer() {
-      super(parse("ghcr.io/openzipkin/zipkin-kafka:2.22.2"));
+      super(parse("ghcr.io/openzipkin/zipkin-kafka:2.23.0"));
       // 19092 is for connections from the Docker host and needs to be used as a fixed port.
       // TODO: someone who knows Kafka well, make ^^ comment better!
       addFixedExposedPort(KAFKA_PORT, KAFKA_PORT, InternetProtocol.TCP);

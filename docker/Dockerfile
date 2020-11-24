@@ -13,7 +13,7 @@
 #
 
 # zipkin version should match zipkin.version in /pom.xml
-ARG zipkin_version=2.22.2
+ARG zipkin_version=2.23.0
 
 # java_version is used during the installation process to build or download the module jar.
 #
@@ -43,11 +43,11 @@ WORKDIR /install
 # /code contains what is allowed in .dockerignore. On problem, ensure .dockerignore is correct.
 ARG release_from_maven_build=false
 ENV RELEASE_FROM_MAVEN_BUILD=$release_from_maven_build
-# Version of the artifact to unjar. Ex. "2.4.5" or "2.4.5-SNAPSHOT" "" to use the pom version.
-ARG version=
+# Version of the artifact to unjar. Ex. "2.4.5" or "2.4.5-SNAPSHOT" "master" to use the pom version.
+ARG version=master
 ENV VERSION=$version
-RUN if [ "${RELEASE_FROM_MAVEN_BUILD}" = "true" ]; then export MAVEN_PROJECT_BASEDIR=/code; fi && \
-    /code/build-bin/maven/maven_build_or_unjar io.zipkin.contrib.zipkin-storage-kafka zipkin-module-storage-kafka module ${VERSION}
+ENV MAVEN_PROJECT_BASEDIR=/code
+RUN /code/build-bin/maven/maven_build_or_unjar io.zipkin.contrib.zipkin-storage-kafka zipkin-module-storage-kafka ${VERSION} module
 
 # zipkin version should match zipkin.version in /code/pom.xml
 FROM ghcr.io/openzipkin/zipkin:$zipkin_version as zipkin-storage-kafka

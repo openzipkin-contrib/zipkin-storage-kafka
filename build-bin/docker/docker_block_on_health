@@ -13,7 +13,6 @@
 # the License.
 #
 
-
 set -ue
 
 # Blocks until a named docker container with a valid HEALTHCHECK instruction is healthy or not:
