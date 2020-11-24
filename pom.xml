@@ -14,14 +14,12 @@
     the License.
 
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.zipkin.contrib.zipkin-storage-kafka</groupId>
   <artifactId>zipkin-storage-kafka-parent</artifactId>
-  <version>0.9.5-SNAPSHOT</version>
+  <version>0.9.5</version>
   <packaging>pom</packaging>
 
   <modules>
@@ -72,7 +70,7 @@
     <assertj.version>3.18.1</assertj.version>
 
     <!-- override to set exclusions per-project -->
-    <errorprone.args/>
+    <errorprone.args />
     <errorprone.version>2.4.0</errorprone.version>
     <log4j.version>2.14.0</log4j.version>
 
@@ -119,7 +117,7 @@
     <connection>scm:git:https://github.com/openzipkin-contrib/zipkin-storage-kafka.git</connection>
     <developerConnection>scm:git:https://github.com/openzipkin-contrib/zipkin-storage-kafka.git
     </developerConnection>
-    <tag>HEAD</tag>
+    <tag>0.9.5</tag>
   </scm>
 
   <!-- Developer section is needed for Maven Central, but doesn't need to include each person -->
