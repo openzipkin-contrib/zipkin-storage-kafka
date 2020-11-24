@@ -21,6 +21,8 @@ set -ue
 #  * trigger pattern: tag =~ /^release-[0-9]+\.[0-9]+\.[0-9]+/
 #  * build-bin/git/login_git must be called before invoking this.
 
+export MAVEN_OPTS="$($(dirname "$0")/maven_opts)"
+
 trigger_tag=${1?trigger_tag is required. Ex release-1.2.3}
 release_version=$(build-bin/git/version_from_trigger_tag release- ${trigger_tag})
 release_branch=${2:-master}

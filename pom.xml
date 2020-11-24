@@ -58,9 +58,9 @@
     <!-- matching armeria/grpc/zipkin -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
     <!-- when updating, update docker/Dockerfile and storage/src/test/java/zipkin2/storage/kafka/IT* -->
-    <zipkin.version>2.22.2</zipkin.version>
-    <zipkin-reporter.version>2.16.0</zipkin-reporter.version>
-    <spring-boot.version>2.3.4.RELEASE</spring-boot.version>
+    <zipkin.version>2.23.0</zipkin.version>
+    <zipkin-reporter.version>2.16.1</zipkin-reporter.version>
+    <spring-boot.version>2.4.0</spring-boot.version>
     <!-- armeria.groupId allows you to test feature branches with jitpack -->
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
     <armeria.version>1.2.0</armeria.version>
@@ -69,12 +69,14 @@
 
     <junit-jupiter.version>5.7.0</junit-jupiter.version>
     <testcontainers.version>1.15.0</testcontainers.version>
-    <assertj.version>3.18.0</assertj.version>
+    <assertj.version>3.18.1</assertj.version>
 
     <!-- override to set exclusions per-project -->
     <errorprone.args/>
     <errorprone.version>2.4.0</errorprone.version>
     <log4j.version>2.14.0</log4j.version>
+
+    <license.skip>${skipTests}</license.skip>
 
     <animal-sniffer-maven-plugin.version>1.19</animal-sniffer-maven-plugin.version>
     <go-offline-maven-plugin.version>1.2.7</go-offline-maven-plugin.version>
@@ -216,6 +218,13 @@
           <configuration>
             <!-- Add dependencies indirectly referenced by build plugins -->
             <dynamicDependencies>
+              <!-- animal sniffer implicitly uses this -->
+              <DynamicDependency>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>${maven-dependency-plugin.version}</version>
+                <repositoryType>PLUGIN</repositoryType>
+              </DynamicDependency>
               <DynamicDependency>
                 <groupId>org.codehaus.mojo.signature</groupId>
                 <artifactId>${main.signature.artifact}</artifactId>
@@ -395,29 +404,32 @@
         <artifactId>license-maven-plugin</artifactId>
         <version>${license-maven-plugin.version}</version>
         <configuration>
-          <skip>${skipTests}</skip>
+          <skip>${license.skip}</skip>
           <header>${main.basedir}/src/etc/header.txt</header>
           <mapping>
             <!-- Don't use javadoc style as this makes code formatters break it by adding tags! -->
             <java>SLASHSTAR_STYLE</java>
             <!-- build-bin/docker -->
-            <block_on_health>SCRIPT_STYLE</block_on_health>
             <configure_docker>SCRIPT_STYLE</configure_docker>
             <configure_docker_push>SCRIPT_STYLE</configure_docker_push>
             <docker_arch>SCRIPT_STYLE</docker_arch>
             <docker_args>SCRIPT_STYLE</docker_args>
+            <docker_block_on_health>SCRIPT_STYLE</docker_block_on_health>
             <docker_build>SCRIPT_STYLE</docker_build>
             <docker_push>SCRIPT_STYLE</docker_push>
+            <docker_test_image>SCRIPT_STYLE</docker_test_image>
             <!-- build-bin/git -->
             <login_git>SCRIPT_STYLE</login_git>
             <version_from_trigger_tag>SCRIPT_STYLE</version_from_trigger_tag>
             <!-- build-bin/gpg -->
             <configure_gpg>SCRIPT_STYLE</configure_gpg>
             <!-- build-bin/maven -->
+            <maven_build>SCRIPT_STYLE</maven_build>
             <maven_build_or_unjar>SCRIPT_STYLE</maven_build_or_unjar>
             <maven_deploy>SCRIPT_STYLE</maven_deploy>
             <maven_go_offline>SCRIPT_STYLE</maven_go_offline>
             <maven_release>SCRIPT_STYLE</maven_release>
+            <maven_opts>SCRIPT_STYLE</maven_opts>
             <maven_unjar>SCRIPT_STYLE</maven_unjar>
           </mapping>
           <excludes>

@@ -15,5 +15,7 @@
 
 set -ue
 
+export MAVEN_OPTS="$($(dirname "$0")/maven_opts)"
+
 # Use a go-offline that properly works with multi-module builds
 ./mvnw -q --batch-mode -nsu -Prelease de.qaware.maven:go-offline-maven-plugin:resolve-dependencies

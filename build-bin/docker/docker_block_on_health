@@ -15,9 +15,16 @@
 
 set -ue
 
-export MAVEN_OPTS="$($(dirname "$0")/maven_opts)"
+# Blocks until a named docker container with a valid HEALTHCHECK instruction is healthy or not:
 
-# This script deploys a SNAPSHOT or release version to Sonatype.
-#
-# Note: In CI, `configure_maven_deploy` must be called before invoking this.
-./mvnw --batch-mode -s ./.settings.xml -Prelease -nsu -DskipTests clean deploy $@
+container_name=${1?container_name is required}
+container_id=$(docker ps  -q -f name=${container_name})
+
+while status="$(docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" "${container_id}")"; do
+  case $status in
+    starting) sleep 1;;
+    healthy) exit 0;;
+    unhealthy) exit 1;;
+  esac
+done
+exit 1

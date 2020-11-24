@@ -126,7 +126,7 @@
           <dependency>
             <groupId>io.zipkin.layout</groupId>
             <artifactId>zipkin-layout-factory</artifactId>
-            <version>0.0.5</version>
+            <version>1.0.0</version>
           </dependency>
         </dependencies>
       </plugin>

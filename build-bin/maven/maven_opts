@@ -13,19 +13,29 @@
 # the License.
 #
 
+# This script checks each variable value, so it isn't important to fail on unbound (set -u)
+set -e
 
-set -ue
+maven_project_basedir=${MAVEN_PROJECT_BASEDIR:-.}
+pom="${maven_project_basedir}/pom.xml"
 
-# Blocks until a named docker container with a valid HEALTHCHECK instruction is healthy or not:
+# fail if there's no pom
+test -f "${pom}"
 
-container_name=${1?container_name is required}
-container_id=$(docker ps  -q -f name=${container_name})
+arch=$(uname -m)
+case ${arch} in
+  arm64* )
+    arch=arm64
+    ;;
+  aarch64* )
+    arch=arm64
+    ;;
+esac
 
-while status="$(docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" "${container_id}")"; do
-  case $status in
-    starting) sleep 1;;
-    healthy) exit 0;;
-    unhealthy) exit 1;;
-  esac
-done
-exit 1
+maven_opts=""
+if [ ${arch} = "arm64" ] && [ -f /etc/alpine-release ]; then
+  # Defensively avoid arm64+alpine problems with posix_spawn
+  maven_opts="-Djdk.lang.Process.launchMechanism=vfork"
+fi
+
+echo ${maven_opts}
