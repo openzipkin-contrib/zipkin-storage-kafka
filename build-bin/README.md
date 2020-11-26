@@ -7,8 +7,8 @@ configuration settings.
 
 As zipkin-storage-kafka is a contrib project, Docker images only push to `ghcr.io`.
 
-[test] uses a non-standard [deploy-comppose.test.yml] to ensure Kafka is available before running
-the image.
+[test] uses a non-standard [docker-compose-zipkin-storage-kafka] to ensure Kafka is available before
+running the image.
 
 [//]: # (Below here should be standard for all projects)
 
