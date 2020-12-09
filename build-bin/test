@@ -1,16 +1,8 @@
-#!/bin/sh
-
-set -ue
+#!/bin/sh -ue
 
 # This script runs the tests of the project.
 #
 # See [README.md] for an explanation of this and how CI should use it.
-echo "Running Maven tests and integration tests..."
-./mvnw -T1C -nsu verify
 
-echo "Building Docker image..."
-export RELEASE_FROM_MAVEN_BUILD=true
-build-bin/docker/docker_build openzipkin-contrib/zipkin-storage-kafka:test
-
-echo "Verifying Docker image..."
-build-bin/docker/docker_test_image openzipkin-contrib/zipkin-storage-kafka
+# -DskipActuator ensures no tests rely on the actuator library
+./mvnw -T1C verify -nsu -DskipActuator "$@"

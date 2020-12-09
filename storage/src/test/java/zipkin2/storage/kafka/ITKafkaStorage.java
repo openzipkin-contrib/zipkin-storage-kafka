@@ -36,8 +36,12 @@ import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.opentest4j.TestAbortedException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.InternetProtocol;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -58,16 +62,22 @@ import static org.testcontainers.utility.DockerImageName.parse;
 
 @Testcontainers
 class ITKafkaStorage {
+  static final Logger LOGGER = LoggerFactory.getLogger(ITKafkaStorage.class);
   static final long TODAY = System.currentTimeMillis();
   static final int KAFKA_PORT = 19092;
   static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:" + KAFKA_PORT;
+  // mostly waiting for https://github.com/testcontainers/testcontainers-java/issues/3537
   static final class KafkaContainer extends GenericContainer<KafkaContainer> {
     KafkaContainer() {
-      super(parse("ghcr.io/openzipkin/zipkin-kafka:2.23.0"));
+      super(parse("ghcr.io/openzipkin/zipkin-kafka:2.23.1"));
+      if ("true".equals(System.getProperty("docker.skip"))) {
+        throw new TestAbortedException("${docker.skip} == true");
+      }
+      waitStrategy = Wait.forHealthcheck();
       // 19092 is for connections from the Docker host and needs to be used as a fixed port.
       // TODO: someone who knows Kafka well, make ^^ comment better!
       addFixedExposedPort(KAFKA_PORT, KAFKA_PORT, InternetProtocol.TCP);
-      this.waitStrategy = Wait.forHealthcheck();
+      withLogConsumer(new Slf4jLogConsumer(LOGGER));
     }
   }
 
