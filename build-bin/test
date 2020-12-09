@@ -1,6 +1,4 @@
-#!/bin/sh
-
-set -ue
+#!/bin/sh -ue
 
 # This script runs the tests of the project.
 #
@@ -13,4 +11,4 @@ export RELEASE_FROM_MAVEN_BUILD=true
 build-bin/docker/docker_build openzipkin-contrib/zipkin-storage-kafka:test
 
 echo "Verifying Docker image..."
-build-bin/docker/docker_test_image openzipkin-contrib/zipkin-storage-kafka
+build-bin/docker/docker_test_image openzipkin-contrib/zipkin-storage-kafka:test

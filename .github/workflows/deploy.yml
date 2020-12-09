@@ -8,7 +8,7 @@ name: deploy
 # See https://docs.github.com/en/free-pro-team@latest/actions/reference/workflow-syntax-for-github-actions#filter-pattern-cheat-sheet
 on:
   push:
-    # Don't deploy tags as they conflict with [maven-release-plugin] prepare release N.M.L
+    # Don't deploy tags as they conflict with [maven-release-plugin] prepare release MAJOR.MINOR.PATCH
     tags: ''
     branches: master
 
