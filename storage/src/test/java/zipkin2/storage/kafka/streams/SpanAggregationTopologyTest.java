@@ -15,9 +15,12 @@ package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.function.BiConsumer;
+import java.util.function.Predicate;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -27,6 +30,7 @@ import org.apache.kafka.streams.TopologyDescription;
 import org.apache.kafka.streams.TopologyTestDriver;
 import org.apache.kafka.streams.test.ConsumerRecordFactory;
 import org.apache.kafka.streams.test.OutputVerifier;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import zipkin2.DependencyLink;
 import zipkin2.Endpoint;
@@ -42,6 +46,18 @@ class SpanAggregationTopologyTest {
   String dependencyTopic = "dependencies";
 
   Properties props = new Properties();
+
+  private final SpansSerde spansSerde = new SpansSerde();
+  private final DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
+  private TopologyTestDriver testDriver;
+
+  @AfterEach
+  void tearDown() {
+    //Finally close resources
+    testDriver.close();
+    spansSerde.close();
+    dependencyLinkSerde.close();
+  }
 
   SpanAggregationTopologyTest() {
     props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
@@ -59,27 +75,65 @@ class SpanAggregationTopologyTest {
     TopologyDescription description = topology.describe();
     // Then: single threaded topology
     assertThat(description.subtopologies()).hasSize(0);
-    TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
-    testDriver.close();
+    testDriver = new TopologyTestDriver(topology, props);
   }
 
   @Test void should_aggregateSpans_and_mapDependencies() {
+    // accepts all traces
+    final Predicate<Collection<Span>> tracePredicate = spans -> true;
+
+    assertTrace(tracePredicate, (a, b) -> {
+      // Then: a trace is aggregated.1
+      ProducerRecord<String, List<Span>> trace =
+        testDriver.readOutput(traceTopic, new StringDeserializer(), spansSerde.deserializer());
+      assertThat(trace).isNotNull();
+      OutputVerifier.compareKeyValue(trace, a.traceId(), Arrays.asList(a, b));
+      // Then: a dependency link is created
+      ProducerRecord<String, DependencyLink> linkRecord =
+        testDriver.readOutput(dependencyTopic, new StringDeserializer(),
+          dependencyLinkSerde.deserializer());
+      assertThat(linkRecord).isNotNull();
+      DependencyLink link = DependencyLink.newBuilder()
+        .parent("svc_a").child("svc_b").callCount(1).errorCount(0)
+        .build();
+      OutputVerifier.compareKeyValue(linkRecord, "svc_a:svc_b", link);
+    });
+  }
+
+  @Test void should_discardTrace_ifSpecifiedPredicateFails() {
+    // discard all traces
+    final Predicate<Collection<Span>> tracePredicate = spans -> false;
+
+    assertTrace(tracePredicate, (a, b) -> {
+      // Then: a trace is aggregated.1
+      ProducerRecord<String, List<Span>> trace =
+        testDriver.readOutput(traceTopic, new StringDeserializer(), spansSerde.deserializer());
+      assertThat(trace).isNull();
+      // Then: a dependency link is created
+      ProducerRecord<String, DependencyLink> linkRecord =
+        testDriver.readOutput(dependencyTopic, new StringDeserializer(),
+          dependencyLinkSerde.deserializer());
+      assertThat(linkRecord).isNull();
+    });
+  }
+
+  private void assertTrace(Predicate<Collection<Span>> tracePredicate,
+    BiConsumer<Span, Span> spanAssertion) {
     // Given: configuration
     Duration traceTimeout = Duration.ofSeconds(1);
-    SpansSerde spansSerde = new SpansSerde();
-    DependencyLinkSerde dependencyLinkSerde = new DependencyLinkSerde();
     // When: topology built
     Topology topology = new SpanAggregationTopology(
         spansTopic,
         traceTopic,
         dependencyTopic,
         traceTimeout,
-        true).get();
+        true,
+      tracePredicate).get();
     TopologyDescription description = topology.describe();
     // Then: single threaded topology
     assertThat(description.subtopologies()).hasSize(1);
     // Given: test driver
-    TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
+    testDriver = new TopologyTestDriver(topology, props);
     // When: two related spans coming on the same Session window
     ConsumerRecordFactory<String, List<Span>> factory =
         new ConsumerRecordFactory<>(spansTopic, new StringSerializer(), spansSerde.serializer());
@@ -97,23 +151,6 @@ class SpanAggregationTopologyTest {
     Span c = Span.newBuilder().traceId("c").id("c").build();
     testDriver.pipeInput(factory.create(spansTopic, c.traceId(), Collections.singletonList(c),
         traceTimeout.toMillis() + 1));
-    // Then: a trace is aggregated.1
-    ProducerRecord<String, List<Span>> trace =
-        testDriver.readOutput(traceTopic, new StringDeserializer(), spansSerde.deserializer());
-    assertThat(trace).isNotNull();
-    OutputVerifier.compareKeyValue(trace, a.traceId(), Arrays.asList(a, b));
-    // Then: a dependency link is created
-    ProducerRecord<String, DependencyLink> linkRecord =
-        testDriver.readOutput(dependencyTopic, new StringDeserializer(),
-            dependencyLinkSerde.deserializer());
-    assertThat(linkRecord).isNotNull();
-    DependencyLink link = DependencyLink.newBuilder()
-        .parent("svc_a").child("svc_b").callCount(1).errorCount(0)
-        .build();
-    OutputVerifier.compareKeyValue(linkRecord, "svc_a:svc_b", link);
-    //Finally close resources
-    testDriver.close();
-    spansSerde.close();
-    dependencyLinkSerde.close();
+    spanAssertion.accept(a, b);
   }
 }

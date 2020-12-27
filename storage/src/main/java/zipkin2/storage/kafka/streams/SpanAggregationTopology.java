@@ -15,7 +15,9 @@ package zipkin2.storage.kafka.streams;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;
@@ -54,6 +56,7 @@ public final class SpanAggregationTopology implements Supplier<Topology> {
   // SerDes
   final SpansSerde spansSerde;
   final DependencyLinkSerde dependencyLinkSerde;
+  final Predicate<Collection<Span>> tracePredicate;
 
   public SpanAggregationTopology(
       String spansTopic,
@@ -62,11 +65,17 @@ public final class SpanAggregationTopology implements Supplier<Topology> {
       Duration traceTimeout,
       boolean aggregationEnabled
   ) {
+    this(spansTopic, traceTopic, dependencyTopic, traceTimeout, aggregationEnabled, spans -> true);
+  }
+
+  public SpanAggregationTopology(String spansTopic, String traceTopic, String dependencyTopic,
+    Duration traceTimeout, boolean aggregationEnabled, Predicate<Collection<Span>> tracePredicate) {
     this.spansTopic = spansTopic;
     this.traceTopic = traceTopic;
     this.dependencyTopic = dependencyTopic;
     this.traceTimeout = traceTimeout;
     this.aggregationEnabled = aggregationEnabled;
+    this.tracePredicate = tracePredicate;
     spansSerde = new SpansSerde();
     dependencyLinkSerde = new DependencyLinkSerde();
   }
@@ -92,6 +101,7 @@ public final class SpanAggregationTopology implements Supplier<Topology> {
               // hold until a new record tells that a window is closed and we can process it further
               .suppress(untilWindowCloses(unbounded()))
               .toStream()
+              .filter((traceId, spans) -> tracePredicate.test(spans))
               .selectKey((windowed, spans) -> windowed.key());
       // Downstream to traces topic
       tracesStream.to(traceTopic, Produced.with(Serdes.String(), spansSerde));

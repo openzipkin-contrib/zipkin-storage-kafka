@@ -123,7 +123,8 @@ public class KafkaStorage extends StorageComponent {
         builder.spanAggregation.traceTopic,
         builder.spanAggregation.dependencyTopic,
         builder.spanAggregation.traceTimeout,
-        builder.spanAggregation.enabled).get();
+        builder.spanAggregation.enabled,
+        builder.spanAggregation.tracePredicate).get();
     traceStoreTopology = new TraceStorageTopology(
         builder.traceStorage.spansTopic,
         autocompleteKeys,
