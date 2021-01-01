@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -21,25 +21,25 @@ class KafkaStorageBuilderTest {
 
   @Test void notSupported() {
     assertThatThrownBy(() -> KafkaStorage.newBuilder().strictTraceId(false))
-        .isInstanceOf(IllegalArgumentException.class);
+      .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test void buildDefaultBuilder() {
     KafkaStorageBuilder builder = KafkaStorage.newBuilder();
 
     assertThatThrownBy(() -> builder.spanPartitioning.spansTopic(null))
-        .isInstanceOf(NullPointerException.class);
+      .isInstanceOf(NullPointerException.class);
     assertThatThrownBy(() -> builder.spanAggregation.spansTopic(null))
-        .isInstanceOf(NullPointerException.class);
+      .isInstanceOf(NullPointerException.class);
     assertThatThrownBy(() -> builder.spanAggregation.traceTopic(null))
-        .isInstanceOf(NullPointerException.class);
+      .isInstanceOf(NullPointerException.class);
     assertThatThrownBy(() -> builder.spanAggregation.dependencyTopic(null))
-        .isInstanceOf(NullPointerException.class);
+      .isInstanceOf(NullPointerException.class);
     assertThatThrownBy(() -> builder.traceStorage.spansTopic(null))
-        .isInstanceOf(NullPointerException.class);
+      .isInstanceOf(NullPointerException.class);
     assertThatThrownBy(() -> builder.dependencyStorage.dependencyTopic(null))
-        .isInstanceOf(NullPointerException.class);
+      .isInstanceOf(NullPointerException.class);
     assertThatThrownBy(() -> builder.storageStateDir(null))
-        .isInstanceOf(NullPointerException.class);
+      .isInstanceOf(NullPointerException.class);
   }
 }

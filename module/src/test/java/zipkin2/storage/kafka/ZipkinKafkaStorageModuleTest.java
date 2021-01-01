@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -39,12 +39,12 @@ class ZipkinKafkaStorageModuleTest {
     context.refresh();
 
     assertThatThrownBy(() -> context.getBean(KafkaStorage.class))
-        .isInstanceOf(NoSuchBeanDefinitionException.class);
+      .isInstanceOf(NoSuchBeanDefinitionException.class);
   }
 
   @Test void providesStorageComponent_whenStorageTypeKafka() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka"
+      "zipkin.storage.type:kafka"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
@@ -54,174 +54,174 @@ class ZipkinKafkaStorageModuleTest {
 
   @Test void canOverridesProperty_bootstrapServers() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.bootstrap-servers:host1:19092"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.bootstrap-servers:host1:19092"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class)
-        .producerConfig.get(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG))
-        .isEqualTo("host1:19092");
+      .producerConfig.get(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG))
+      .isEqualTo("host1:19092");
   }
 
   @Test void canOverridesProperty_adminConfigs() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.overrides.bootstrap.servers:host1:19092"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.overrides.bootstrap.servers:host1:19092"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class)
-        .adminConfig.getProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG))
-        .isEqualTo("host1:19092");
+      .adminConfig.getProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG))
+      .isEqualTo("host1:19092");
   }
 
   @Test void canOverridesProperty_producerConfigs() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.span-partitioning.overrides.acks:1"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.span-partitioning.overrides.acks:1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class)
-        .producerConfig.get(ProducerConfig.ACKS_CONFIG))
-        .isEqualTo("1");
+      .producerConfig.get(ProducerConfig.ACKS_CONFIG))
+      .isEqualTo("1");
   }
 
   @Test void canOverridesProperty_aggregationStreamConfigs() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.span-aggregation.overrides.application.id:agg1"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.span-aggregation.overrides.application.id:agg1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class)
-        .aggregationStreamConfig.get(StreamsConfig.APPLICATION_ID_CONFIG))
-        .isEqualTo("agg1");
+      .aggregationStreamConfig.get(StreamsConfig.APPLICATION_ID_CONFIG))
+      .isEqualTo("agg1");
   }
 
   @Test void canOverridesProperty_traceStoreStreamConfigs() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.trace-storage.overrides.application.id:store1"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.trace-storage.overrides.application.id:store1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class)
-        .traceStoreStreamConfig.getProperty(StreamsConfig.APPLICATION_ID_CONFIG))
-        .isEqualTo("store1");
+      .traceStoreStreamConfig.getProperty(StreamsConfig.APPLICATION_ID_CONFIG))
+      .isEqualTo("store1");
   }
 
   @Test void canOverridesProperty_dependencyStoreStreamConfigs() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.dependency-storage.overrides.application.id:store1"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.dependency-storage.overrides.application.id:store1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class)
-        .dependencyStoreStreamConfig.getProperty(StreamsConfig.APPLICATION_ID_CONFIG))
-        .isEqualTo("store1");
+      .dependencyStoreStreamConfig.getProperty(StreamsConfig.APPLICATION_ID_CONFIG))
+      .isEqualTo("store1");
   }
 
   @Test void canOverridesProperty_storeDirectory() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.storage-dir:/zipkin/storage"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.storage-dir:/zipkin/storage"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class)
-        .traceStoreStreamConfig.getProperty(StreamsConfig.STATE_DIR_CONFIG))
-        .startsWith("/zipkin/storage");
+      .traceStoreStreamConfig.getProperty(StreamsConfig.STATE_DIR_CONFIG))
+      .startsWith("/zipkin/storage");
     assertThat(context.getBean(KafkaStorage.class)
-        .dependencyStoreStreamConfig.getProperty(StreamsConfig.STATE_DIR_CONFIG))
-        .startsWith("/zipkin/storage");
+      .dependencyStoreStreamConfig.getProperty(StreamsConfig.STATE_DIR_CONFIG))
+      .startsWith("/zipkin/storage");
   }
 
   @Test void canOverridesProperty_partitionedSpansTopic() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.span-partitioning.spans-topic:zipkin-spans-1"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.span-partitioning.spans-topic:zipkin-spans-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class).partitioningSpansTopic)
-        .isEqualTo("zipkin-spans-1");
+      .isEqualTo("zipkin-spans-1");
   }
 
   @Test void canOverridesProperty_aggregationSpansTopic() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.span-aggregation.spans-topic:zipkin-spans-1"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.span-aggregation.spans-topic:zipkin-spans-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class).aggregationSpansTopic).isEqualTo(
-        "zipkin-spans-1");
+      "zipkin-spans-1");
   }
 
   @Test void canOverridesProperty_aggregationTraceTopic() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.span-aggregation.trace-topic:zipkin-traces-1"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.span-aggregation.trace-topic:zipkin-traces-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class).aggregationTraceTopic)
-        .isEqualTo("zipkin-traces-1");
+      .isEqualTo("zipkin-traces-1");
   }
 
   @Test void canOverridesProperty_aggregationDependencyTopic() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.span-aggregation.dependency-topic:zipkin-dependencies-1"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.span-aggregation.dependency-topic:zipkin-dependencies-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class).aggregationDependencyTopic)
-        .isEqualTo("zipkin-dependencies-1");
+      .isEqualTo("zipkin-dependencies-1");
   }
 
   @Test void canOverridesProperty_storageSpansTopic() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.trace-storage.spans-topic:zipkin-spans-1"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.trace-storage.spans-topic:zipkin-spans-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class).storageSpansTopic)
-        .isEqualTo("zipkin-spans-1");
+      .isEqualTo("zipkin-spans-1");
   }
 
   @Test void canOverridesProperty_storageDependencyTopic() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.dependency-storage.dependency-topic:zipkin-dependencies-1"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.dependency-storage.dependency-topic:zipkin-dependencies-1"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();
 
     assertThat(context.getBean(KafkaStorage.class).storageDependencyTopic)
-        .isEqualTo("zipkin-dependencies-1");
+      .isEqualTo("zipkin-dependencies-1");
   }
 
   @Test void canOverridesProperty_hostname() {
     TestPropertyValues.of(
-        "zipkin.storage.type:kafka",
-        "zipkin.storage.kafka.hostname:other_host"
+      "zipkin.storage.type:kafka",
+      "zipkin.storage.kafka.hostname:other_host"
     ).applyTo(context);
     Access.registerKafka(context);
     context.refresh();

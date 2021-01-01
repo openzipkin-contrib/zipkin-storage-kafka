@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -41,7 +41,7 @@ class DependencyStorageTopologyTest {
     props.put(StreamsConfig.APPLICATION_ID_CONFIG, "test");
     props.put(StreamsConfig.BOOTSTRAP_SERVERS_CONFIG, "dummy:1234");
     props.put(StreamsConfig.STATE_DIR_CONFIG,
-        "target/kafka-streams-test/" + System.currentTimeMillis());
+      "target/kafka-streams-test/" + System.currentTimeMillis());
   }
 
   @Test void should_doNothing_whenDisabled() {
@@ -50,10 +50,10 @@ class DependencyStorageTopologyTest {
     Duration dependenciesWindowSize = Duration.ofMillis(100);
     // When: topology created
     Topology topology = new DependencyStorageTopology(
-        dependencyTopic,
-        dependenciesRetentionPeriod,
-        dependenciesWindowSize,
-        false).get();
+      dependencyTopic,
+      dependenciesRetentionPeriod,
+      dependenciesWindowSize,
+      false).get();
     TopologyDescription description = topology.describe();
     // Then: topology with 1 thread
     assertThat(description.subtopologies()).hasSize(0);
@@ -68,10 +68,10 @@ class DependencyStorageTopologyTest {
     Duration dependenciesWindowSize = Duration.ofMillis(100);
     // When: topology created
     Topology topology = new DependencyStorageTopology(
-        dependencyTopic,
-        dependenciesRetentionPeriod,
-        dependenciesWindowSize,
-        true).get();
+      dependencyTopic,
+      dependenciesRetentionPeriod,
+      dependenciesWindowSize,
+      true).get();
     TopologyDescription description = topology.describe();
     // Then: topology with 1 thread
     assertThat(description.subtopologies()).hasSize(1);
@@ -79,11 +79,11 @@ class DependencyStorageTopologyTest {
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     // When: a trace is passed
     ConsumerRecordFactory<String, DependencyLink> factory =
-        new ConsumerRecordFactory<>(dependencyTopic, new StringSerializer(),
-            dependencyLinkSerde.serializer());
+      new ConsumerRecordFactory<>(dependencyTopic, new StringSerializer(),
+        dependencyLinkSerde.serializer());
     DependencyLink dependencyLink = DependencyLink.newBuilder()
-        .parent("svc_a").child("svc_b").callCount(1).errorCount(0)
-        .build();
+      .parent("svc_a").child("svc_b").callCount(1).errorCount(0)
+      .build();
     String dependencyLinkId = "svc_a:svc_b";
     testDriver.pipeInput(factory.create(dependencyTopic, dependencyLinkId, dependencyLink, 10L));
     WindowStore<String, DependencyLink> links = testDriver.getWindowStore(DEPENDENCIES_STORE_NAME);

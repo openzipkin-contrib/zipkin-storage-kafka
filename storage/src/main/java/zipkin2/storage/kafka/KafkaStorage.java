@@ -119,24 +119,24 @@ public class KafkaStorage extends StorageComponent {
     this.dependencyStoreStreamConfig = builder.dependencyStorage.streamConfig;
 
     aggregationTopology = new SpanAggregationTopology(
-        builder.spanAggregation.spansTopic,
-        builder.spanAggregation.traceTopic,
-        builder.spanAggregation.dependencyTopic,
-        builder.spanAggregation.traceTimeout,
-        builder.spanAggregation.enabled).get();
+      builder.spanAggregation.spansTopic,
+      builder.spanAggregation.traceTopic,
+      builder.spanAggregation.dependencyTopic,
+      builder.spanAggregation.traceTimeout,
+      builder.spanAggregation.enabled).get();
     traceStoreTopology = new TraceStorageTopology(
-        builder.traceStorage.spansTopic,
-        autocompleteKeys,
-        builder.traceStorage.traceTtl,
-        builder.traceStorage.traceTtlCheckInterval,
-        builder.traceStorage.minTracesStored,
-        builder.traceStorage.traceByIdQueryEnabled,
-        builder.traceStorage.traceSearchEnabled).get();
+      builder.traceStorage.spansTopic,
+      autocompleteKeys,
+      builder.traceStorage.traceTtl,
+      builder.traceStorage.traceTtlCheckInterval,
+      builder.traceStorage.minTracesStored,
+      builder.traceStorage.traceByIdQueryEnabled,
+      builder.traceStorage.traceSearchEnabled).get();
     dependencyStoreTopology = new DependencyStorageTopology(
-        builder.dependencyStorage.dependencyTopic,
-        builder.dependencyStorage.dependencyTtl,
-        builder.dependencyStorage.dependencyWindowSize,
-        builder.dependencyStorage.enabled).get();
+      builder.dependencyStorage.dependencyTopic,
+      builder.dependencyStorage.dependencyTtl,
+      builder.dependencyStorage.dependencyWindowSize,
+      builder.dependencyStorage.enabled).get();
   }
 
   @Override public SpanConsumer spanConsumer() {
@@ -181,17 +181,17 @@ public class KafkaStorage extends StorageComponent {
       KafkaStreams.State state = getAggregationStream().state();
       if (!state.isRunningOrRebalancing()) {
         return CheckResult.failed(
-            new IllegalStateException("Aggregation stream not running. " + state));
+          new IllegalStateException("Aggregation stream not running. " + state));
       }
       KafkaStreams.State traceStateStore = getTraceStorageStream().state();
       if (!traceStateStore.isRunningOrRebalancing()) {
         return CheckResult.failed(
-            new IllegalStateException("Store stream not running. " + traceStateStore));
+          new IllegalStateException("Store stream not running. " + traceStateStore));
       }
       KafkaStreams.State dependencyStateStore = getDependencyStorageStream().state();
       if (!dependencyStateStore.isRunningOrRebalancing()) {
         return CheckResult.failed(
-            new IllegalStateException("Store stream not running. " + dependencyStateStore));
+          new IllegalStateException("Store stream not running. " + dependencyStateStore));
       }
       return CheckResult.OK;
     } catch (Exception e) {
@@ -264,7 +264,7 @@ public class KafkaStorage extends StorageComponent {
         if (dependencyStoreStream == null) {
           try {
             dependencyStoreStream =
-                new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
+              new KafkaStreams(dependencyStoreTopology, dependencyStoreStreamConfig);
             dependencyStoreStream.start();
             LOG.info("Dependency storage topology:\n{}", dependencyStoreTopology.describe());
           } catch (Exception e) {
@@ -301,18 +301,18 @@ public class KafkaStorage extends StorageComponent {
 
   @Override public String toString() {
     return "KafkaStorage{" +
-        " bootstrapServers=" + adminConfig.getProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG) +
-        ", spanPartitioning{ enabled=" + partitioningEnabled +
-        ", spansTopic=" + partitioningSpansTopic + "}" +
-        ", spanAggregation{ enabled=" + aggregationEnabled +
-        ", spansTopic=" + aggregationSpansTopic +
-        ", traceTopic=" + aggregationTraceTopic +
-        ", dependencyTopic=" + aggregationDependencyTopic + "}" +
-        ", traceStore { traceByIdQueryEnabled=" + traceByIdQueryEnabled +
-        ", traceSearchEnabled=" + traceSearchEnabled +
-        ", spansTopic=" + storageSpansTopic + "}" +
-        ", dependencyStore { dependencyQueryEnabled=" + dependencyQueryEnabled +
-        ", dependencyTopic=" + storageDependencyTopic + "}" +
-        '}';
+      " bootstrapServers=" + adminConfig.getProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG) +
+      ", spanPartitioning{ enabled=" + partitioningEnabled +
+      ", spansTopic=" + partitioningSpansTopic + "}" +
+      ", spanAggregation{ enabled=" + aggregationEnabled +
+      ", spansTopic=" + aggregationSpansTopic +
+      ", traceTopic=" + aggregationTraceTopic +
+      ", dependencyTopic=" + aggregationDependencyTopic + "}" +
+      ", traceStore { traceByIdQueryEnabled=" + traceByIdQueryEnabled +
+      ", traceSearchEnabled=" + traceSearchEnabled +
+      ", spansTopic=" + storageSpansTopic + "}" +
+      ", dependencyStore { dependencyQueryEnabled=" + dependencyQueryEnabled +
+      ", dependencyTopic=" + storageDependencyTopic + "}" +
+      '}';
   }
 }

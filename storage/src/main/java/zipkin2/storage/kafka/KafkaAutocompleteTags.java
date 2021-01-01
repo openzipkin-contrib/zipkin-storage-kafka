@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2020 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -66,13 +66,13 @@ final class KafkaAutocompleteTags implements AutocompleteTags {
     final BiFunction<String, Integer, String> httpBaseUrl;
 
     GetTagKeysCall(KafkaStreams traceStoreStream,
-        BiFunction<String, Integer, String> httpBaseUrl) {
+      BiFunction<String, Integer, String> httpBaseUrl) {
       super(
-          traceStoreStream,
-          AUTOCOMPLETE_TAGS_STORE_NAME,
-          httpBaseUrl,
-          "/autocompleteTags",
-          AUTOCOMPLETE_TAGS_LIMIT);
+        traceStoreStream,
+        AUTOCOMPLETE_TAGS_STORE_NAME,
+        httpBaseUrl,
+        "/autocompleteTags",
+        AUTOCOMPLETE_TAGS_LIMIT);
       this.traceStoreStream = traceStoreStream;
       this.httpBaseUrl = httpBaseUrl;
     }
@@ -92,14 +92,14 @@ final class KafkaAutocompleteTags implements AutocompleteTags {
     final String tagKey;
 
     GetTagValuesCall(KafkaStreams traceStoreStream,
-        BiFunction<String, Integer, String> httpBaseUrl,
-        String tagKey) {
+      BiFunction<String, Integer, String> httpBaseUrl,
+      String tagKey) {
       super(
-          traceStoreStream,
-          AUTOCOMPLETE_TAGS_STORE_NAME,
-          httpBaseUrl,
-          "/autocompleteTags/" + tagKey,
-          tagKey);
+        traceStoreStream,
+        AUTOCOMPLETE_TAGS_STORE_NAME,
+        httpBaseUrl,
+        "/autocompleteTags/" + tagKey,
+        tagKey);
       this.traceStoreStream = traceStoreStream;
       this.httpBaseUrl = httpBaseUrl;
       this.tagKey = tagKey;
