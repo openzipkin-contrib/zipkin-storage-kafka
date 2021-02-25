@@ -152,4 +152,4 @@ commits to master.
 
 ### Docker Images
 Released versions of zipkin-storage-kafka are published to GitHub Container Registry as
-`ghcr.io/openzipkin-contrib/zipkin-storage-kafka`. See [docker](./docker) for details.
+`beta.zipkin.io/openzipkin-contrib/zipkin-storage-kafka`. See [docker](./docker) for details.

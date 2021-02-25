@@ -38,7 +38,7 @@ services:
       kafka:
         condition: service_healthy
   zipkin:
-    image: ghcr.io/openzipkin-contrib/zipkin-storage-kafka
+    image: beta.zipkin.io/openzipkin-contrib/zipkin-storage-kafka
     container_name: zipkin
     hostname: zipkin # required to route call to scatter-gather endpoint properly. should not be needed after #40 is solved
     ports:
