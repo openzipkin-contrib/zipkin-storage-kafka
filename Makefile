@@ -20,7 +20,7 @@ test: license-header
 ## Build test image
 .PHONY: docker-build-test
 docker-build-test:
-	docker/build_image openzipkin-contrib/zipkin-storage-kafka:test
+	build-bin/docker/docker_build openzipkin-contrib/zipkin-storage-kafka:test
 ## Run test distributed compose
 .PHONY: docker-up-test
 docker-up-test:
@@ -28,7 +28,7 @@ docker-up-test:
 ## Build local image
 .PHONY: docker-build
 docker-build:
-	docker/build_image openzipkin-contrib/zipkin-storage-kafka:latest
+	build-bin/docker/docker_build openzipkin-contrib/zipkin-storage-kafka:latest
 ## Run single instance compose
 .PHONY: docker-up-single
 docker-up-single:
@@ -44,19 +44,19 @@ run-docker: build docker-build docker-up-single
 ## Testing distributed instances
 .PHONY: zipkin-test-distributed
 zipkin-test-distributed:
-	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/netflix.json | \
+	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/yelp.json | \
 	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
 	${OPEN} 'http://localhost:19411/zipkin/?lookback=custom&startTs=1'
 	sleep 61
-	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/messaging.json | \
+	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/ascend.json | \
 	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
 	${OPEN} 'http://localhost:29411/zipkin/?lookback=custom&startTs=1'
 ## Testing single instance
 .PHONY: zipkin-test-single
 zipkin-test-single:
-	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/netflix.json | \
+	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/yelp.json | \
 	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @- ; \
 	${OPEN} 'http://localhost:9411/zipkin/?lookback=custom&startTs=1'
 	sleep 61
-	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/messaging.json | \
+	curl -s https://raw.githubusercontent.com/openzipkin/zipkin/master/zipkin-lens/testdata/ascend.json | \
 	curl -X POST -s localhost:9411/api/v2/spans -H'Content-Type: application/json' -d @-
