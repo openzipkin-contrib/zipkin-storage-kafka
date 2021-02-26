@@ -62,3 +62,9 @@ COPY --from=install --chown=${USER} /install/* /zipkin/${module}
 ENV MODULE_OPTS="-Dloader.path=${module} -Dspring.profiles.active=${module}"
 ENV KAFKA_STORAGE_DIR /zipkin/data
 RUN mkdir /zipkin/data
+
+# Install C++
+USER root
+RUN apk add --update --no-cache libstdc++ libc6-compat && \
+    ln -s /lib/libc.musl-x86_64.so.1 /lib/ld-linux-x86-64.so.2
+USER ${USER}
