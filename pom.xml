@@ -74,7 +74,7 @@
     <!-- override to set exclusions per-project -->
     <errorprone.args/>
     <errorprone.version>2.4.0</errorprone.version>
-    <log4j.version>2.15.0</log4j.version>
+    <log4j.version>2.16.0</log4j.version>
 
     <license.skip>${skipTests}</license.skip>
 
