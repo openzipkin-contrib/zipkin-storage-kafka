@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenZipkin Authors
+ * Copyright 2019-2024 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -35,6 +35,7 @@ import org.apache.kafka.streams.errors.InvalidStateStoreException;
 import org.apache.kafka.streams.integration.utils.IntegrationTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.opentest4j.TestAbortedException;
 import org.slf4j.Logger;
@@ -60,19 +61,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.testcontainers.utility.DockerImageName.parse;
 
-@Testcontainers
+@Tag("docker")
+@Testcontainers(disabledWithoutDocker = true)
 class ITKafkaStorage {
   static final Logger LOGGER = LoggerFactory.getLogger(ITKafkaStorage.class);
   static final long TODAY = System.currentTimeMillis();
   static final int KAFKA_PORT = 19092;
   static final String KAFKA_BOOTSTRAP_SERVERS = "localhost:" + KAFKA_PORT;
-  // mostly waiting for https://github.com/testcontainers/testcontainers-java/issues/3537
+
   static final class KafkaContainer extends GenericContainer<KafkaContainer> {
     KafkaContainer() {
-      super(parse("ghcr.io/openzipkin/zipkin-kafka:2.23.2"));
-      if ("true".equals(System.getProperty("docker.skip"))) {
-        throw new TestAbortedException("${docker.skip} == true");
-      }
+      super(parse("ghcr.io/openzipkin/zipkin-kafka:3.0.0"));
       waitStrategy = Wait.forHealthcheck();
       // 19092 is for connections from the Docker host and needs to be used as a fixed port.
       // TODO: someone who knows Kafka well, make ^^ comment better!

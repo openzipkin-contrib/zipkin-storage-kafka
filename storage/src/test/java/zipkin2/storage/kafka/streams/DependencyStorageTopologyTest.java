@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenZipkin Authors
+ * Copyright 2019-2024 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.Properties;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.streams.StreamsConfig;
+import org.apache.kafka.streams.TestInputTopic;
 import org.apache.kafka.streams.Topology;
 import org.apache.kafka.streams.TopologyDescription;
 import org.apache.kafka.streams.TopologyTestDriver;
@@ -24,7 +25,6 @@ import org.apache.kafka.streams.kstream.Windowed;
 import org.apache.kafka.streams.state.KeyValueIterator;
 import org.apache.kafka.streams.state.WindowStore;
 import org.apache.kafka.streams.state.WindowStoreIterator;
-import org.apache.kafka.streams.test.ConsumerRecordFactory;
 import org.junit.jupiter.api.Test;
 import zipkin2.DependencyLink;
 import zipkin2.storage.kafka.streams.serdes.DependencyLinkSerde;
@@ -78,28 +78,28 @@ class DependencyStorageTopologyTest {
     // Given: streams configuration
     TopologyTestDriver testDriver = new TopologyTestDriver(topology, props);
     // When: a trace is passed
-    ConsumerRecordFactory<String, DependencyLink> factory =
-      new ConsumerRecordFactory<>(dependencyTopic, new StringSerializer(),
+    TestInputTopic<String, DependencyLink> inputTopic =
+      testDriver.createInputTopic(dependencyTopic, new StringSerializer(),
         dependencyLinkSerde.serializer());
     DependencyLink dependencyLink = DependencyLink.newBuilder()
       .parent("svc_a").child("svc_b").callCount(1).errorCount(0)
       .build();
     String dependencyLinkId = "svc_a:svc_b";
-    testDriver.pipeInput(factory.create(dependencyTopic, dependencyLinkId, dependencyLink, 10L));
+    inputTopic.pipeInput(dependencyLinkId, dependencyLink, 10L);
     WindowStore<String, DependencyLink> links = testDriver.getWindowStore(DEPENDENCIES_STORE_NAME);
     // Then: dependency link created
     WindowStoreIterator<DependencyLink> firstLink = links.fetch(dependencyLinkId, 0L, 100L);
     assertThat(firstLink).hasNext();
     assertThat(firstLink.next().value).isEqualTo(dependencyLink);
     // When: new links appear
-    testDriver.pipeInput(factory.create(dependencyTopic, dependencyLinkId, dependencyLink, 90L));
+    inputTopic.pipeInput(dependencyLinkId, dependencyLink, 90L);
     // Then: dependency link increases
     WindowStoreIterator<DependencyLink> secondLink = links.fetch(dependencyLinkId, 0L, 100L);
     assertThat(secondLink).hasNext();
     assertThat(secondLink.next().value.callCount()).isEqualTo(2);
     // When: time moves forward
-    testDriver.advanceWallClockTime(dependenciesRetentionPeriod.toMillis() + 91L);
-    testDriver.pipeInput(factory.create(dependencyTopic, dependencyLinkId, dependencyLink));
+    testDriver.advanceWallClockTime(dependenciesRetentionPeriod.plusMillis(91L));
+    inputTopic.pipeInput(dependencyLinkId, dependencyLink);
     // Then: dependency link is removed and restarted
     KeyValueIterator<Windowed<String>, DependencyLink> thirdLink = links.all();
     assertThat(thirdLink).hasNext();

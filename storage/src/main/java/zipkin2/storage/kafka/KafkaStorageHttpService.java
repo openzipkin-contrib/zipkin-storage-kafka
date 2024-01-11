@@ -1,5 +1,5 @@
 /*
- * Copyright 2019-2021 The OpenZipkin Authors
+ * Copyright 2019-2024 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -304,8 +304,8 @@ final class KafkaStorageHttpService {
     try {
       if (!storage.traceSearchEnabled) return MAPPER.createArrayNode();
       ReadOnlyKeyValueStore<String, Set<String>> autocompleteTagsStore =
-        storage.getTraceStorageStream().store(AUTOCOMPLETE_TAGS_STORE_NAME,
-          QueryableStoreTypes.keyValueStore());
+        storage.getTraceStorageStream().store(StoreQueryParameters.fromNameAndType(AUTOCOMPLETE_TAGS_STORE_NAME,
+          QueryableStoreTypes.keyValueStore()));
       ArrayNode array = MAPPER.createArrayNode();
       try (KeyValueIterator<String, Set<String>> all = autocompleteTagsStore.all()) {
         all.forEachRemaining(keyValue -> array.add(keyValue.key));

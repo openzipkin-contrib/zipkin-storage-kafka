@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2024 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -24,7 +24,7 @@ public final class DependencyLinkSerde implements Serde<DependencyLink> {
   static final String KEY_PATTERN = "%s:%s";
 
   public static String linkKey(DependencyLink link) {
-    return String.format(KEY_PATTERN, link.parent(), link.child());
+    return KEY_PATTERN.formatted(link.parent(), link.child());
   }
 
   @Override public Serializer<DependencyLink> serializer() {

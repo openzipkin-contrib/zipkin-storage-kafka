@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The OpenZipkin Authors
+ * Copyright 2019-2024 The OpenZipkin Authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  * in compliance with the License. You may obtain a copy of the License at
@@ -35,8 +35,8 @@ public final class AwaitableCallback implements Callback<Void> {
       countDown.await();
       Throwable result = throwable;
       if (result == null) return; // void return
-      if (result instanceof Error) throw (Error) result;
-      if (result instanceof RuntimeException) throw (RuntimeException) result;
+      if (result instanceof Error error) throw error;
+      if (result instanceof RuntimeException exception) throw exception;
       // Don't set interrupted status when the callback received InterruptedException
       throw new RuntimeException(result);
     } catch (InterruptedException e) {

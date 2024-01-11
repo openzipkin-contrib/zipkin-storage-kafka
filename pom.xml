@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 
-    Copyright 2019-2022 The OpenZipkin Authors
+    Copyright 2019-2024 The OpenZipkin Authors
 
     Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
     in compliance with the License. You may obtain a copy of the License at
@@ -21,7 +21,7 @@
 
   <groupId>io.zipkin.contrib.zipkin-storage-kafka</groupId>
   <artifactId>zipkin-storage-kafka-parent</artifactId>
-  <version>0.9.6-SNAPSHOT</version>
+  <version>0.10.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <modules>
@@ -52,51 +52,60 @@
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
     <main.basedir>${project.basedir}</main.basedir>
-    <main.signature.artifact>java18</main.signature.artifact>
 
-    <!-- groupId overrinds allow testing feature branches with jitpack -->
+    <!-- We only use these modules in zipkin-server: for convenience use 17 -->
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.release>17</maven.compiler.release>
+
+    <!-- groupId overrides allow testing feature branches with jitpack -->
     <!-- matching armeria/grpc/zipkin -->
     <zipkin.groupId>io.zipkin.zipkin2</zipkin.groupId>
     <!-- when updating, update docker/Dockerfile and storage/src/test/java/zipkin2/storage/kafka/IT* -->
-    <zipkin.version>2.23.2</zipkin.version>
-    <zipkin-reporter.version>2.16.3</zipkin-reporter.version>
-    <spring-boot.version>2.4.1</spring-boot.version>
+    <zipkin.version>3.0.0</zipkin.version>
+    <zipkin-reporter.version>3.1.1</zipkin-reporter.version>
+    <spring-boot.version>3.2.1</spring-boot.version>
     <!-- armeria.groupId allows you to test feature branches with jitpack -->
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
-    <armeria.version>1.3.0</armeria.version>
+    <armeria.version>1.26.4</armeria.version>
+    <jackson.version>2.16.1</jackson.version>
+    <log4j.version>2.21.1</log4j.version>
+    <slf4j.version>1.7.36</slf4j.version>
 
-    <kafka.version>2.7.0</kafka.version>
+    <kafka.version>3.6.1</kafka.version>
 
-    <junit-jupiter.version>5.7.0</junit-jupiter.version>
-    <testcontainers.version>1.15.1</testcontainers.version>
-    <assertj.version>3.18.1</assertj.version>
+    <assertj.version>3.25.1</assertj.version>
+    <awaitility.version>4.2.0</awaitility.version>
+    <junit-jupiter.version>5.10.1</junit-jupiter.version>
+    <testcontainers.version>1.19.3</testcontainers.version>
 
     <!-- override to set exclusions per-project -->
-    <errorprone.args/>
-    <errorprone.version>2.4.0</errorprone.version>
-    <log4j.version>2.17.1</log4j.version>
+    <errorprone.args />
+    <errorprone.version>2.24.1</errorprone.version>
 
     <license.skip>${skipTests}</license.skip>
 
-    <animal-sniffer-maven-plugin.version>1.19</animal-sniffer-maven-plugin.version>
+    <maven-surefire-plugin.argLine />
+    <maven-failsafe-plugin.argLine />
+
     <go-offline-maven-plugin.version>1.2.8</go-offline-maven-plugin.version>
     <!-- TODO: cleanup any redundant ignores now also in the 4.0 release (once final) -->
-    <license-maven-plugin.version>4.0.rc2</license-maven-plugin.version>
-    <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
+    <license-maven-plugin.version>4.3</license-maven-plugin.version>
+    <maven-compiler-plugin.version>3.12.1</maven-compiler-plugin.version>
     <!-- Use same version as https://github.com/openzipkin/docker-java -->
-    <maven-dependency-plugin.version>3.1.2</maven-dependency-plugin.version>
-    <maven-deploy-plugin.version>3.0.0-M1</maven-deploy-plugin.version>
-    <maven-enforcer-plugin.version>3.0.0-M3</maven-enforcer-plugin.version>
+    <maven-dependency-plugin.version>3.6.1</maven-dependency-plugin.version>
+    <maven-deploy-plugin.version>3.1.1</maven-deploy-plugin.version>
+    <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
     <!-- Use same version as https://github.com/openzipkin/docker-java -->
-    <maven-help-plugin.version>3.2.0</maven-help-plugin.version>
-    <maven-install-plugin.version>3.0.0-M1</maven-install-plugin.version>
-    <maven-javadoc-plugin.version>3.2.0</maven-javadoc-plugin.version>
-    <maven-jar-plugin.version>3.2.0</maven-jar-plugin.version>
-    <maven-release-plugin.version>3.0.0-M1</maven-release-plugin.version>
-    <maven-shade-plugin.version>3.2.4</maven-shade-plugin.version>
-    <maven-source-plugin.version>3.2.1</maven-source-plugin.version>
-    <maven-surefire-plugin.version>3.0.0-M5</maven-surefire-plugin.version>
-    <nexus-staging-maven-plugin.version>1.6.8</nexus-staging-maven-plugin.version>
+    <maven-help-plugin.version>3.4.0</maven-help-plugin.version>
+    <maven-install-plugin.version>3.1.1</maven-install-plugin.version>
+    <maven-javadoc-plugin.version>3.6.3</maven-javadoc-plugin.version>
+    <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
+    <maven-release-plugin.version>3.0.1</maven-release-plugin.version>
+    <maven-shade-plugin.version>3.5.1</maven-shade-plugin.version>
+    <maven-source-plugin.version>3.3.0</maven-source-plugin.version>
+    <maven-surefire-plugin.version>3.2.3</maven-surefire-plugin.version>
+    <nexus-staging-maven-plugin.version>1.6.13</nexus-staging-maven-plugin.version>
   </properties>
 
   <name>Zipkin Storage: Kafka (Parent)</name>
@@ -135,32 +144,16 @@
   </developers>
 
   <dependencies>
+    <!-- use same slf4j version as zipkin -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>${slf4j.version}</version>
+    </dependency>
+
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
-      <version>${junit-jupiter.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.vintage</groupId>
-      <artifactId>junit-vintage-engine</artifactId>
-      <version>${junit-jupiter.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <!--
-      Current versions of JUnit5 provide the above junit-jupiter artifact for convenience but we may
-      still have transitive dependencies on these older artifacts and have to make sure they're all
-      using the same version.
-    -->
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-api</artifactId>
-      <version>${junit-jupiter.version}</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter-engine</artifactId>
       <version>${junit-jupiter.version}</version>
       <scope>test</scope>
     </dependency>
@@ -203,16 +196,6 @@
   <build>
     <pluginManagement>
       <plugins>
-        <!-- mvn -N io.takari:maven:wrapper generates the ./mvnw script -->
-        <plugin>
-          <groupId>io.takari</groupId>
-          <artifactId>maven</artifactId>
-          <version>0.7.7</version>
-          <configuration>
-            <maven>3.6.3</maven>
-          </configuration>
-        </plugin>
-
         <!-- mvn de.qaware.maven:go-offline-maven-plugin:resolve-dependencies -->
         <plugin>
           <groupId>de.qaware.maven</groupId>
@@ -221,13 +204,6 @@
           <configuration>
             <!-- Add dependencies indirectly referenced by build plugins -->
             <dynamicDependencies>
-              <DynamicDependency>
-                <groupId>org.codehaus.mojo.signature</groupId>
-                <artifactId>${main.signature.artifact}</artifactId>
-                <version>1.0</version>
-                <type>signature</type>
-                <repositoryType>MAIN</repositoryType>
-              </DynamicDependency>
               <DynamicDependency>
                 <groupId>com.mycila</groupId>
                 <artifactId>license-maven-plugin-git</artifactId>
@@ -307,8 +283,6 @@
         <version>${maven-compiler-plugin.version}</version>
         <inherited>true</inherited>
         <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
           <fork>true</fork>
           <showWarnings>true</showWarnings>
         </configuration>
@@ -318,7 +292,7 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>${maven-surefire-plugin.version}</version>
         <configuration>
-          <!-- Ensure scope leak cause ends up in the console -->
+          <!-- Ensures root cause ends up in the console -->
           <trimStackTrace>false</trimStackTrace>
           <!-- Don't add org.apache.logging.log4j.jul.LogManager here as it conflicts with
                classloading, causing brave.test.propagation.PropagationTest to flake. -->
@@ -326,6 +300,15 @@
             <classpathDependencyExclude>org.apache.logging.log4j:log4j-jul</classpathDependencyExclude>
           </classpathDependencyExcludes>
         </configuration>
+        <dependencies>
+          <!-- needed for surefire.
+     https://maven.apache.org/surefire/maven-surefire-plugin/examples/junit-platform.html -->
+          <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit-jupiter.version}</version>
+          </dependency>
+        </dependencies>
       </plugin>
 
       <plugin>
@@ -356,29 +339,6 @@
         </executions>
       </plugin>
 
-      <!-- Ensure no Java 9+ api usage -->
-      <plugin>
-        <groupId>org.codehaus.mojo</groupId>
-        <artifactId>animal-sniffer-maven-plugin</artifactId>
-        <version>${animal-sniffer-maven-plugin.version}</version>
-        <configuration>
-          <checkTestClasses>false</checkTestClasses>
-          <skip>${skipTests}</skip>
-          <signature>
-            <groupId>org.codehaus.mojo.signature</groupId>
-            <artifactId>${main.signature.artifact}</artifactId>
-            <version>1.0</version>
-          </signature>
-        </configuration>
-        <executions>
-          <execution>
-            <goals>
-              <goal>check</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-
       <plugin>
         <artifactId>maven-enforcer-plugin</artifactId>
         <version>${maven-enforcer-plugin.version}</version>
@@ -391,7 +351,9 @@
             <configuration>
               <rules>
                 <requireJavaVersion>
-                  <version>[11,16)</version>
+                  <!-- Change this to control LTS JDK versions allowed to build
+                       the project. Keep in sync with .github/workflows -->
+                  <version>[17,18),[21,22)</version>
                 </requireJavaVersion>
               </rules>
             </configuration>
@@ -433,8 +395,8 @@
             <maven_unjar>SCRIPT_STYLE</maven_unjar>
           </mapping>
           <excludes>
-            <exclude>.docker.env</exclude>
             <exclude>.gitignore</exclude>
+            <exclude>.dockerignore</exclude>
             <exclude>.editorconfig</exclude>
             <exclude>.mvn/**</exclude>
             <exclude>mvnw*</exclude>
@@ -493,14 +455,21 @@
 
   <profiles>
     <profile>
-      <id>error-prone</id>
+      <id>error-prone-17+</id>
       <activation>
-        <activeByDefault>true</activeByDefault>
+        <!-- Only LTS versions -->
+        <jdk>[17,18),[21,22)</jdk>
       </activation>
       <build>
         <plugins>
           <plugin>
             <artifactId>maven-compiler-plugin</artifactId>
+            <version>${maven-compiler-plugin.version}</version>
+            <inherited>true</inherited>
+            <configuration>
+              <fork>true</fork>
+              <showWarnings>true</showWarnings>
+            </configuration>
             <executions>
               <execution>
                 <!-- only use errorprone on main source tree -->
@@ -514,6 +483,17 @@
                   <compilerArgs>
                     <arg>-XDcompilePolicy=simple</arg>
                     <arg>-Xplugin:ErrorProne ${errorprone.args}</arg>
+                    <!-- below needed for JDK16+ per https://errorprone.info/docs/installation -->
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                    <arg>-J--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                    <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                    <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
                   </compilerArgs>
                   <annotationProcessorPaths>
                     <processorPath>
@@ -541,9 +521,10 @@
             <configuration>
               <serverId>ossrh</serverId>
               <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-              <!-- Double the normal timeout even though we haven't had a problem in this project.
-                   The only outcome of timing out client side is trying again. -->
-              <stagingProgressTimeoutMinutes>10</stagingProgressTimeoutMinutes>
+              <!-- Zipkin release is about ~100M mostly from the two server distributions. Default
+                   will timeout after 5 minutes, which can trigger fairly easily with this size. -->
+              <stagingProgressPauseDurationSeconds>20</stagingProgressPauseDurationSeconds>
+              <stagingProgressTimeoutMinutes>30</stagingProgressTimeoutMinutes>
               <autoReleaseAfterClose>true</autoReleaseAfterClose>
             </configuration>
           </plugin>
@@ -551,7 +532,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
-            <version>1.6</version>
+            <version>3.1.0</version>
             <executions>
               <execution>
                 <id>sign-artifacts</id>
