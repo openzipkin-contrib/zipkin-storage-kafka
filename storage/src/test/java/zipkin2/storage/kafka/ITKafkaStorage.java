@@ -71,7 +71,7 @@ class ITKafkaStorage {
 
   static final class KafkaContainer extends GenericContainer<KafkaContainer> {
     KafkaContainer() {
-      super(parse("ghcr.io/openzipkin/zipkin-kafka:3.0.0"));
+      super(parse("ghcr.io/openzipkin/zipkin-kafka:3.0.2"));
       waitStrategy = Wait.forHealthcheck();
       // 19092 is for connections from the Docker host and needs to be used as a fixed port.
       // TODO: someone who knows Kafka well, make ^^ comment better!
