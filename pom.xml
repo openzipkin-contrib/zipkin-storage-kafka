@@ -54,7 +54,7 @@
     <armeria.groupId>com.linecorp.armeria</armeria.groupId>
     <armeria.version>1.26.4</armeria.version>
     <jackson.version>2.16.1</jackson.version>
-    <log4j.version>2.21.1</log4j.version>
+    <log4j.version>2.25.4</log4j.version>
     <slf4j.version>1.7.36</slf4j.version>
 
     <kafka.version>3.6.1</kafka.version>
